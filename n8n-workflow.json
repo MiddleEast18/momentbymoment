@@ -1,0 +1,710 @@
+{
+  "name": "Mirsad — Cognitive Processing & Fact-Check Pipeline v2",
+  "meta": {
+    "description": "Webhook intake, AI classification, fact-checking, quarantine routing, and Supabase writes.",
+    "instanceNotes": "Set N8N_WEBHOOK_SECRET, OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY before activating."
+  },
+  "nodes": [
+    {
+      "id": "webhook_intake",
+      "name": "Webhook: Ingest Item",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "mirsad-ingest",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      }
+    },
+    {
+      "id": "verify_secret",
+      "name": "IF: Verify Shared Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.headers['x-mirsad-secret']}}",
+              "operation": "equals",
+              "value2": "={{$env.N8N_WEBHOOK_SECRET}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "route_by_mode",
+      "name": "Switch: Route by mode",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        470,
+        0
+      ],
+      "parameters": {
+        "dataPropertyName": "={{$json.body.mode}}",
+        "rules": {
+          "rules": [
+            {
+              "value": "inherit_from_cache",
+              "output": 0
+            },
+            {
+              "value": "new_article",
+              "output": 1
+            },
+            {
+              "value": "cluster_update",
+              "output": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "map_inherited_payload",
+      "name": "Set: Map Inherited Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [
+        700,
+        -180
+      ],
+      "parameters": {
+        "assignments": {
+          "category": "={{$json.body.inheritedFrom.category}}",
+          "importanceScore": "={{$json.body.inheritedFrom.importanceScore}}",
+          "sentiment": "={{$json.body.inheritedFrom.sentiment}}",
+          "confidenceScore": "={{$json.body.inheritedFrom.confidenceScore || 75}}",
+          "clusterId": "={{$json.body.inheritedFrom.clusterId || $json.body.clusterId}}",
+          "isPendingVerification": false,
+          "inheritedFromCache": true,
+          "aiHints": "={{$json.body.aiHints || {}}}",
+          "claimDigest": "={{$json.body.claimDigest || {}}}"
+        }
+      }
+    },
+    {
+      "id": "build_context",
+      "name": "Code: Build AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const body = $json.body || {}; return [{ json: { ...$json, promptContext: { mode: body.mode, headline: body.headline, body: body.body, sourceName: body.sourceName, sourceTrust: body.sourceTrust || 0, aiHints: body.aiHints || {}, clusterId: body.clusterId, aggregatedClusterTexts: body.aggregatedClusterTexts || [body.body || ''] } } }];"
+      }
+    },
+    {
+      "id": "openai_classify",
+      "name": "OpenAI: Classify & Summarize",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        940,
+        0
+      ],
+      "parameters": {
+        "resource": "chat",
+        "model": "={{$json.body.model || 'gpt-4o'}}",
+        "responseFormat": "json_object",
+        "systemMessage": "أنت محرر أخبار متخصص في الشرق الأوسط. أعد JSON فقط بالمفاتيح التالية: category, importanceScore, sentiment, summary, claimDigest, confidenceScore. category يكون واحدًا من Politics|Economy|Tech|Society|Sports. importanceScore عدد صحيح 1-100. sentiment واحد من Negative|Positive|Neutral. summary جملتان بالفصحى المبسطة. claimDigest كائن يحوي entities[], dates[], locations[], numbers[], main_claim. confidenceScore عدد 0-100.",
+        "prompt": "={{JSON.stringify($json.promptContext)}}"
+      }
+    },
+    {
+      "id": "validate_output",
+      "name": "Code: Validate Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1170,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const out = $json || {}; const categories = new Set(['Politics','Economy','Tech','Society','Sports']); const sentiments = new Set(['Negative','Positive','Neutral']); if (!categories.has(out.category)) throw new Error('Invalid category'); if (!sentiments.has(out.sentiment)) throw new Error('Invalid sentiment'); out.importanceScore = Math.max(1, Math.min(100, Number(out.importanceScore || 50))); out.layoutSize = out.importanceScore > 85 ? 'large' : out.importanceScore >= 60 ? 'medium' : 'small'; out.confidenceScore = Math.max(0, Math.min(100, Number(out.confidenceScore ?? 0))); out.claimDigest = out.claimDigest || {}; return [{ json: out }];"
+      }
+    },
+    {
+      "id": "fetch_cluster_context",
+      "name": "HTTP: Fetch Existing Cluster Row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        940,
+        170
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/news_articles?cluster_id=eq.{{$json.body.clusterId}}&select=*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "openai_factcheck",
+      "name": "OpenAI: Cross-Reference Fact Check",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1170,
+        170
+      ],
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o",
+        "responseFormat": "json_object",
+        "systemMessage": "قارن النص الجديد مع النصوص المجمعة لنفس الحدث. أعد JSON فقط: {\"isDivergent\": boolean, \"divergenceNotes\": string|null}. اجعل divergence فقط عند تعارض فعلي في الأسماء أو الأعداد أو التواريخ أو المكان.",
+        "prompt": "={{JSON.stringify({ source: $json.body.body, clusterTexts: $json.body.aggregatedClusterTexts || [] })}}"
+      }
+    },
+    {
+      "id": "if_divergent",
+      "name": "IF: isDivergent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        170
+      ],
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.isDivergent}}",
+              "value2": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "queue_verification",
+      "name": "Supabase: Insert Verification Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1630,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/news_verification_queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "article_id",
+              "value": "={{$json.body.articleId || $json.body.clusterId}}"
+            },
+            {
+              "name": "cluster_id",
+              "value": "={{$json.body.clusterId}}"
+            },
+            {
+              "name": "source_name",
+              "value": "={{$json.body.sourceName}}"
+            },
+            {
+              "name": "source_url",
+              "value": "={{$json.body.sourceUrl}}"
+            },
+            {
+              "name": "headline",
+              "value": "={{$json.body.headline}}"
+            },
+            {
+              "name": "summary",
+              "value": "={{$json.summary || $json.body.headline}}"
+            },
+            {
+              "name": "verification_notes",
+              "value": "={{$json.divergenceNotes || 'Fact-check divergence detected'}}"
+            },
+            {
+              "name": "raw_payload",
+              "value": "={{JSON.stringify($json.body)}}"
+            },
+            {
+              "name": "status",
+              "value": "queued"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "patch_pending",
+      "name": "Supabase: Mark Pending Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1630,
+        170
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/news_articles?cluster_id=eq.{{$json.body.clusterId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "is_pending_verification",
+              "value": true
+            },
+            {
+              "name": "verification_notes",
+              "value": "={{$json.divergenceNotes}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "merge_branch",
+      "name": "Merge: Clean Classification + Fact-Check",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1400,
+        -20
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition"
+      }
+    },
+    {
+      "id": "write_verified",
+      "name": "Supabase: Upsert news_articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1850,
+        -20
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/news_articles",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "source_name",
+              "value": "={{$json.body.sourceName}}"
+            },
+            {
+              "name": "source_url",
+              "value": "={{$json.body.sourceUrl}}"
+            },
+            {
+              "name": "agency_urls",
+              "value": "={{[$json.body.sourceUrl]}}"
+            },
+            {
+              "name": "headline",
+              "value": "={{$json.body.headline}}"
+            },
+            {
+              "name": "summary",
+              "value": "={{$json.summary}}"
+            },
+            {
+              "name": "category",
+              "value": "={{$json.category}}"
+            },
+            {
+              "name": "importance_score",
+              "value": "={{$json.importanceScore}}"
+            },
+            {
+              "name": "sentiment",
+              "value": "={{$json.sentiment}}"
+            },
+            {
+              "name": "cluster_id",
+              "value": "={{$json.body.clusterId}}"
+            },
+            {
+              "name": "source_trust_score",
+              "value": "={{$json.body.sourceTrust || 0}}"
+            },
+            {
+              "name": "confidence_score",
+              "value": "={{$json.confidenceScore || 0}}"
+            },
+            {
+              "name": "is_pending_verification",
+              "value": false
+            },
+            {
+              "name": "inherited_from_cache",
+              "value": "={{$json.body.mode === 'inherit_from_cache'}}"
+            },
+            {
+              "name": "llm_model_used",
+              "value": "={{$json.body.model || 'gpt-4o'}}"
+            },
+            {
+              "name": "ai_hints",
+              "value": "={{JSON.stringify($json.body.aiHints || {})}}"
+            },
+            {
+              "name": "claim_digest",
+              "value": "={{JSON.stringify($json.claimDigest || {})}}"
+            },
+            {
+              "name": "raw_payload",
+              "value": "={{JSON.stringify($json.body)}}"
+            },
+            {
+              "name": "published_at",
+              "value": "={{$json.body.publishedAt}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "merge_rpc",
+      "name": "Supabase: RPC merge_cluster_update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1850,
+        130
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/rpc/merge_cluster_update",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_cluster_id",
+              "value": "={{$json.body.clusterId}}"
+            },
+            {
+              "name": "p_summary",
+              "value": "={{$json.summary}}"
+            },
+            {
+              "name": "p_agency_url",
+              "value": "={{$json.body.sourceUrl}}"
+            },
+            {
+              "name": "p_claim_digest",
+              "value": "={{JSON.stringify($json.claimDigest || {})}}"
+            },
+            {
+              "name": "p_source_trust_score",
+              "value": "={{$json.body.sourceTrust || 0}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "respond_ok",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        20
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, clusterId: $json.body.clusterId } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Ingest Item": {
+      "main": [
+        [
+          {
+            "node": "IF: Verify Shared Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Verify Shared Secret": {
+      "main": [
+        [
+          {
+            "node": "Switch: Route by mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch: Route by mode": {
+      "main": [
+        [
+          {
+            "node": "Set: Map Inherited Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code: Build AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP: Fetch Existing Cluster Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build AI Context": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: Classify & Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: Classify & Summarize": {
+      "main": [
+        [
+          {
+            "node": "Code: Validate Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Validate Output": {
+      "main": [
+        [
+          {
+            "node": "Merge: Clean Classification + Fact-Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Fetch Existing Cluster Row": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: Cross-Reference Fact Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: Cross-Reference Fact Check": {
+      "main": [
+        [
+          {
+            "node": "IF: isDivergent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: isDivergent": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Mark Pending Verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge: Clean Classification + Fact-Check",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Set: Map Inherited Payload": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Upsert news_articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge: Clean Classification + Fact-Check": {
+      "main": [
+        [
+          {
+            "node": "Supabase: RPC merge_cluster_update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Upsert news_articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Mark Pending Verification": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Insert Verification Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Insert Verification Queue": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Upsert news_articles": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: RPC merge_cluster_update": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
