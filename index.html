@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مِرصاد — رصد أخبار الشرق الأوسط لحظة بلحظة</title>
+  <meta name="description" content="لوحة أخبار حية تعرض أهم مستجدات الشرق الأوسط فور صدورها، مصنّفة ومدقّقة آليًا.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#newsGrid">تخطَّ إلى الأخبار</a>
+
+  <header class="wire-header">
+    <div class="wire-header__brand">
+      <span class="wire-header__mark" aria-hidden="true">＋</span>
+      <div class="wire-header__title">
+        <h1>مِرصاد</h1>
+        <p class="wire-header__tagline">رصد الشرق الأوسط لحظة بلحظة</p>
+      </div>
+    </div>
+
+    <div class="wire-header__status" id="connectionStatus" role="status" aria-live="polite">
+      <span class="status-dot" id="statusDot" data-state="connecting"></span>
+      <span class="status-text" id="statusText">جارٍ الاتصال بالبث الحي…</span>
+      <span class="status-sync" id="lastSync"></span>
+    </div>
+  </header>
+
+  <div class="ticker-strip" aria-label="آخر العناوين">
+    <div class="ticker-strip__label">عاجل</div>
+    <div class="ticker-strip__track" id="tickerTrack">
+      <span class="ticker-strip__item">بانتظار ورود الأخبار…</span>
+    </div>
+  </div>
+
+  <nav class="control-bar" aria-label="لوحة التصفية">
+    <div class="control-bar__left">
+      <input class="search-box" id="searchBox" type="search" placeholder="ابحث في العناوين والملخصات…">
+      <select class="sort-box" id="sortBox" aria-label="ترتيب الأخبار">
+        <option value="priority">الأولوية</option>
+        <option value="latest">الأحدث</option>
+        <option value="updates">الأكثر تحديثًا</option>
+      </select>
+    </div>
+
+    <div class="control-bar__filters" id="categoryFilters">
+      <button class="chip is-active" data-category="all" type="button">الكل</button>
+      <button class="chip" data-category="Politics" type="button"><span class="chip__dot chip__dot--politics"></span>سياسة</button>
+      <button class="chip" data-category="Economy" type="button"><span class="chip__dot chip__dot--economy"></span>اقتصاد</button>
+      <button class="chip" data-category="Tech" type="button"><span class="chip__dot chip__dot--tech"></span>تقنية</button>
+      <button class="chip" data-category="Society" type="button"><span class="chip__dot chip__dot--society"></span>مجتمع</button>
+      <button class="chip" data-category="Sports" type="button"><span class="chip__dot chip__dot--sports"></span>رياضة</button>
+    </div>
+
+    <div class="control-bar__count" id="liveCount">0 خبر معروض</div>
+  </nav>
+
+  <section class="insight-bar" id="insightBar" aria-label="ملخص الحالة">
+    <div class="insight-pill"><span>الأحداث النشطة</span><strong id="insightClusterCount">0</strong></div>
+    <div class="insight-pill"><span>قيد التحقق</span><strong id="insightPendingCount">0</strong></div>
+    <div class="insight-pill"><span>متوسط الثقة</span><strong id="insightAvgConfidence">0%</strong></div>
+    <div class="insight-pill"><span>مصادر موثوقة</span><strong id="insightTrustedSources">0</strong></div>
+  </section>
+
+  <main>
+    <section class="featured-rail-wrap">
+      <div class="section-heading">الأبرز على الهاتف</div>
+      <div id="featuredRail" class="featured-rail" aria-label="الأخبار الأبرز"></div>
+    </section>
+
+    <div class="news-grid" id="newsGrid" aria-live="polite" aria-relevant="additions"></div>
+    <p class="empty-state" id="emptyState" hidden>لا توجد أخبار في هذا التصنيف حاليًا.</p>
+  </main>
+
+  <footer class="wire-footer">
+    <p>مِرصاد — واجهة عرض فقط. الأخبار المُظللة بالحجر الصحي لا تظهر حتى يراجعها المشرف.</p>
+  </footer>
+
+  <template id="cardTemplate">
+    <article class="card">
+      <div class="card__importance" aria-hidden="true">
+        <span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span>
+        <span class="card__score"></span>
+      </div>
+      <span class="card__update-badge" hidden></span>
+      <span class="card__verification-badge" hidden></span>
+      <div class="card__eyebrow">
+        <span class="card__dot"></span>
+        <span class="card__category"></span>
+        <span class="card__source"></span>
+      </div>
+      <h2 class="card__headline"></h2>
+      <p class="card__summary"></p>
+      <p class="card__evidence"></p>
+      <div class="card__meta">
+        <span class="card__confidence"></span>
+        <time class="card__time"></time>
+      </div>
+    </article>
+  </template>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
