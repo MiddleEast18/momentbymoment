@@ -3,60 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
   <title>اتصل بنا — مِرصاد</title>
   <meta name="description" content="تواصل مع مِرصاد عبر قناة البريد المخصصة للمشروع.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="contact.css?v=202609092305">
+  <link rel="stylesheet" href="styles.css?v=202609092305">
+  <link rel="stylesheet" href="legal.css?v=202609092400">
+  <style>
+    html, body { width: 100%; min-width: 0; max-width: none; margin: 0; padding: 0; overflow-x: hidden; }
+    body { min-height: 100vh; }
+    .legal-page { position: relative; z-index: 1; }
+    .legal-header, .legal-page, .legal-footer { width: 100%; }
+    .legal-page { max-width: 900px; }
+    .contact-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; width: 100%; }
+    .contact-form label { min-width: 0; }
+    .contact-form input, .contact-form textarea { width: 100%; max-width: 100%; min-width: 0; }
+    @media (max-width: 700px), (pointer: coarse) {
+      .legal-header { padding: 14px 12px; }
+      .legal-page { width: calc(100% - 24px); max-width: 900px; padding: 30px 0 56px; }
+      .legal-page h1 { font-size: 28px; }
+      .legal-lead { font-size: 15px; }
+      .legal-footer { padding: 20px 12px 32px; }
+      .legal-brand small { font-size: 11px; }
+      .legal-nav { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+      .legal-nav a { width: 100%; min-width: 0; justify-content: center; }
+      .legal-section p { overflow-wrap: anywhere; }
+    }
+    @media (max-width: 380px) {
+      .legal-nav { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
-  <header class="contact-header">
-    <a class="contact-brand" href="index.html" aria-label="العودة إلى مِرصاد">
-      <span class="contact-mark" aria-hidden="true">＋</span>
-      <span><strong>مِرصاد</strong><small>رصد الشرق الأوسط لحظة بلحظة</small></span>
-    </a>
-    <nav class="contact-nav" aria-label="التنقل">
-      <a href="index.html">الرئيسية</a><a href="about.html">من نحن</a><a href="contact.html" aria-current="page">اتصل بنا</a><a href="privacy.html">الخصوصية</a><a href="terms.html">الشروط</a>
-    </nav>
+  <header class="wire-header legal-header">
+    <a class="legal-brand" href="index.html" aria-label="العودة إلى مِرصاد"><span class="wire-header__mark" aria-hidden="true">＋</span><span><strong>مِرصاد</strong><small>رصد الشرق الأوسط لحظة بلحظة</small></span></a>
+    <nav class="legal-nav" aria-label="التنقل"><a href="index.html">الرئيسية</a><a href="about.html">من نحن</a><a href="contact.html" aria-current="page">اتصل بنا</a><a href="privacy.html">الخصوصية</a><a href="terms.html">الشروط</a></nav>
   </header>
-
-  <main class="contact-page">
-    <div class="contact-kicker">مِرصاد / التواصل والإبلاغ</div>
+  <main class="legal-page">
+    <div class="legal-kicker">مِرصاد / التواصل والإبلاغ</div>
     <h1>اتصل بنا</h1>
-    <p class="contact-lead">نستقبل البلاغات المتعلقة بالأخبار والمصادر والتصنيفات والأخطاء التقنية، إضافة إلى الاقتراحات والاستفسارات العامة حول المشروع.</p>
-
-    <section class="contact-section">
-      <h2>وسيلة التواصل</h2>
-      <p>تُرسل رسالتك عبر قناة البريد المخصصة لمِرصاد <strong>farid-9262@agentmail.to</strong> ثم تُمرَّر إلى فريق العمل. لا نعرض عنوان بريد الفريق الداخلي في واجهة الموقع.</p>
-      <div class="contact-actions" style="margin-top:12px"><a class="contact-button" href="mailto:farid-9262@agentmail.to">فتح البريد ↗</a></div>
-    </section>
-
-    <section class="contact-section">
-      <h2>نموذج تواصل مباشر</h2>
-      <p class="contact-note">أدخل بريدك إذا أردت أن يتمكن فريق العمل من الرد عليك. لا تُرسل بيانات شخصية لا حاجة لها.</p>
+    <p class="legal-lead">نستقبل البلاغات المتعلقة بالأخبار والمصادر والتصنيفات والأخطاء التقنية، إضافة إلى الاقتراحات والاستفسارات العامة حول المشروع.</p>
+    <section class="legal-section"><h2>وسيلة التواصل</h2><p>تُرسل رسالتك عبر قناة البريد المخصصة لمِرصاد <strong>farid-9262@agentmail.to</strong> ثم تُمرَّر إلى فريق العمل. لا نعرض عنوان بريد الفريق الداخلي في واجهة الموقع.</p><div class="legal-actions"><a class="legal-button secondary" href="mailto:farid-9262@agentmail.to">فتح البريد ↗</a></div></section>
+    <section class="legal-section"><h2>نموذج تواصل مباشر</h2><p class="legal-note">أدخل بريدك إذا أردت أن يتمكن فريق العمل من الرد عليك. لا تُرسل بيانات شخصية لا حاجة لها.</p>
       <form class="contact-form" id="contactForm" novalidate>
         <label>الاسم (اختياري)<input id="contactName" type="text" autocomplete="name" maxlength="80"></label>
         <label>بريدك الإلكتروني (اختياري)<input id="contactEmail" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com"></label>
         <label>عنوان الرسالة<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصنيف خبر في غير مكانه"></label>
         <label>الرسالة<textarea id="contactMessage" required maxlength="5000" placeholder="اكتب التفاصيل والرابط إن وجد..."></textarea></label>
-        <label class="contact-honeypot" aria-hidden="true">اترك هذا الحقل فارغًا<input id="contactWebsite" type="text" tabindex="-1" autocomplete="off"></label>
-        <div class="contact-actions"><button class="contact-button" type="submit">إرسال الرسالة</button></div>
-        <div class="contact-status" id="contactStatus" role="status" aria-live="polite"></div>
+        <label class="contact-honeypot" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none">اترك هذا الحقل فارغًا<input id="contactWebsite" type="text" tabindex="-1" autocomplete="off"></label>
+        <div class="legal-actions"><button class="legal-button" type="submit">إرسال الرسالة</button></div>
+        <div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div>
       </form>
     </section>
-
-    <section class="contact-section">
-      <h2>بلاغات الأخبار</h2>
-      <p>للتصحيح السريع، أرسل رابط الخبر أو عنوانه واذكر المشكلة بوضوح، مثل: مصدر غير صحيح، تصنيف خاطئ، عنوان غير عربي، أو ملخص لا يطابق الخبر.</p>
-    </section>
+    <section class="legal-section"><h2>بلاغات الأخبار</h2><p>للتصحيح السريع، أرسل رابط الخبر أو عنوانه واذكر المشكلة بوضوح، مثل: مصدر غير صحيح، تصنيف خاطئ، عنوان غير عربي، أو ملخص لا يطابق الخبر.</p></section>
   </main>
-
-  <footer class="contact-footer">
-    <span>مِرصاد — رصد الأخبار لحظة بلحظة</span>
-    <span><a href="about.html">من نحن</a> · <a href="contact.html">اتصل بنا</a> · <a href="privacy.html">الخصوصية</a> · <a href="terms.html">الشروط</a></span>
-  </footer>
-
+  <footer class="legal-footer"><span>مِرصاد — رصد الأخبار لحظة بلحظة</span><span><a href="about.html">من نحن</a> · <a href="contact.html">اتصل بنا</a> · <a href="privacy.html">الخصوصية</a> · <a href="terms.html">الشروط</a></span></footer>
   <script>
     (() => {
       const form = document.getElementById('contactForm');
