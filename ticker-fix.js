@@ -4,25 +4,52 @@
   const track = document.getElementById('tickerTrack');
   if (!track) return;
 
+  const SUPABASE_URL = 'https://dndlkenyfymlrjnslyzb.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
   const SPEED = 42;
   const GAP = 48;
   const PAD = 24;
+  const MAX_ITEMS = 4;
+  const POLL_MS = 30 * 1000;
+
   let raf = 0;
+  let pollTimer = 0;
   let last = performance.now();
   let x = 0;
   let cycleWidth = 0;
+  let currentItems = [];
+  let currentSignature = '';
+  let rebuilding = false;
   let syncFrame = 0;
   let resizeFrame = 0;
   let observer = null;
-  let rebuilding = false;
-  let currentSignature = '';
 
   const stop = () => {
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
   };
 
-  const signature = (items) => items.map((el) => (el.textContent || '').trim()).join('\u0001');
+  const normalize = (value) => String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, '')
+    .replace(/[أإآا]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const signature = (items) => items.map((item) => normalize(item.headline)).join('\u0001');
+
+  const makeItem = (headline) => {
+    const span = document.createElement('span');
+    span.className = 'ticker-strip__item mirsad-ticker-item';
+    span.textContent = headline;
+    span.style.cssText = 'flex:0 0 auto;direction:rtl;';
+    return span;
+  };
 
   const buildGroup = (items) => {
     const group = document.createElement('div');
@@ -37,34 +64,23 @@
       padding: `10px ${PAD}px`,
       whiteSpace: 'nowrap',
     });
-
-    for (const item of items) {
-      const clone = item.cloneNode(true);
-      clone.classList.add('mirsad-ticker-item');
-      clone.style.cssText += ';flex:0 0 auto;direction:rtl;';
-      group.appendChild(clone);
-    }
+    for (const item of items) group.appendChild(makeItem(item.headline));
     return group;
   };
 
   const apply = () => {
     const rail = track.firstElementChild;
-    if (rail && cycleWidth > 0) {
-      // Move continuously to the left; the identical group is already waiting on the right.
-      rail.style.transform = `translate3d(${-x}px,0,0)`;
-    }
+    if (rail && cycleWidth > 0) rail.style.transform = `translate3d(${-x}px,0,0)`;
   };
 
   const tick = (now) => {
     const dt = Math.min(100, Math.max(0, now - last));
     last = now;
-
     if (cycleWidth > 0) {
       x += (dt / 1000) * SPEED;
       if (x >= cycleWidth) x %= cycleWidth;
       apply();
     }
-
     raf = requestAnimationFrame(tick);
   };
 
@@ -74,7 +90,7 @@
     raf = requestAnimationFrame(tick);
   };
 
-  const rebuild = (items, preserveProgress = false) => {
+  const rebuild = (items, preserveProgress = true) => {
     if (!items.length || rebuilding) return;
     rebuilding = true;
     if (observer) observer.disconnect();
@@ -107,16 +123,11 @@
       transform: 'translate3d(0,0,0)',
     });
 
-    // First group establishes the exact loop distance. There is intentionally NO gap
-    // between groups, so the second copy starts exactly where the first copy ends.
     const firstGroup = buildGroup(items);
     rail.appendChild(firstGroup);
     track.replaceChildren(rail);
 
     cycleWidth = firstGroup.getBoundingClientRect().width;
-
-    // Repeat enough identical groups to cover the entire visible viewport, even when
-    // there is only one short headline. This prevents the ticker from ever becoming blank.
     const viewportWidth = Math.max(track.clientWidth, window.innerWidth, 1);
     const requiredWidth = viewportWidth + cycleWidth * 2;
     let guard = 0;
@@ -127,35 +138,100 @@
 
     x = preserveProgress && cycleWidth > 0 ? progress * cycleWidth : 0;
     apply();
-    currentSignature = signature(items);
     rebuilding = false;
-
     if (observer) observer.observe(track, { childList: true, subtree: false });
     start();
   };
 
-  const sync = () => {
-    syncFrame = 0;
-    if (rebuilding) return;
+  const setItems = (items, preserveProgress = true) => {
+    const clean = [];
+    const seen = new Set();
+    for (const item of items) {
+      const headline = String(item?.headline || '').trim();
+      const key = normalize(headline);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      clean.push({ headline, published_at: item.published_at || null });
+      if (clean.length >= MAX_ITEMS) break;
+    }
+    if (!clean.length) return;
+    const nextSignature = signature(clean);
+    currentItems = clean;
+    if (nextSignature === currentSignature && track.querySelector('.mirsad-ticker-rail')) return;
+    currentSignature = nextSignature;
+    rebuild(currentItems, preserveProgress);
+  };
 
-    // app.js replaces tickerTrack contents when news changes. Always read the fresh
-    // direct children before the rail is rebuilt, never the old cloned rail.
-    const directItems = [...track.children].filter((el) => el.classList?.contains('ticker-strip__item'));
-    if (!directItems.length) return;
+  const readDomFallback = () => [...track.children]
+    .filter((el) => el.classList?.contains('ticker-strip__item'))
+    .map((el) => ({ headline: (el.textContent || '').trim() }))
+    .filter((item) => item.headline);
 
-    const nextSignature = signature(directItems);
-    if (nextSignature === currentSignature && track.firstElementChild?.classList?.contains('mirsad-ticker-rail')) return;
+  const fetchLatestUrgent = async () => {
+    const base = `${SUPABASE_URL}/rest/v1/news_articles`;
+    const headers = {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+    };
 
-    rebuild(directItems, Boolean(currentSignature));
+    const fetchRows = async (url) => {
+      const response = await fetch(url, { headers, cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    };
+
+    try {
+      const params = new URLSearchParams({
+        select: 'headline,published_at,updated_at,importance_score',
+        is_pending_verification: 'eq.false',
+        headline: 'not.is.null',
+        order: 'published_at.desc.nullslast,updated_at.desc.nullslast',
+        limit: String(MAX_ITEMS),
+      });
+      params.set('importance_score', 'gte.45');
+      let rows = await fetchRows(`${base}?${params.toString()}`);
+
+      if (rows.length < MAX_ITEMS) {
+        const fallbackParams = new URLSearchParams({
+          select: 'headline,published_at,updated_at,importance_score',
+          is_pending_verification: 'eq.false',
+          headline: 'not.is.null',
+          order: 'published_at.desc.nullslast,updated_at.desc.nullslast',
+          limit: String(MAX_ITEMS * 2),
+        });
+        rows = await fetchRows(`${base}?${fallbackParams.toString()}`);
+      }
+
+      rows.sort((a, b) => new Date(b.published_at || b.updated_at || 0) - new Date(a.published_at || a.updated_at || 0));
+      setItems(rows, true);
+    } catch (error) {
+      console.error('[mirsad ticker] latest urgent fetch failed', error);
+      if (!currentItems.length) {
+        const fallback = readDomFallback();
+        if (fallback.length) setItems(fallback.slice(0, MAX_ITEMS), false);
+      }
+    }
+  };
+
+  const scheduleFetch = () => {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = window.setTimeout(async () => {
+      await fetchLatestUrgent();
+      scheduleFetch();
+    }, POLL_MS);
   };
 
   observer = new MutationObserver(() => {
     if (syncFrame) cancelAnimationFrame(syncFrame);
-    syncFrame = requestAnimationFrame(sync);
+    syncFrame = requestAnimationFrame(() => {
+      syncFrame = 0;
+      if (rebuilding || !currentItems.length) return;
+      rebuild(currentItems, true);
+    });
   });
 
-  const boot = [...track.children].filter((el) => el.classList?.contains('ticker-strip__item'));
-  if (boot.length) rebuild(boot, false);
+  const initial = readDomFallback();
+  if (initial.length) setItems(initial.slice(0, MAX_ITEMS), false);
   observer.observe(track, { childList: true, subtree: false });
 
   window.addEventListener('resize', () => {
@@ -165,7 +241,6 @@
       const rail = track.querySelector('.mirsad-ticker-rail');
       const firstGroup = rail?.firstElementChild;
       if (!rail || !firstGroup) return;
-
       const oldWidth = cycleWidth;
       const progress = oldWidth > 0 ? (x % oldWidth) / oldWidth : 0;
       cycleWidth = firstGroup.getBoundingClientRect().width;
@@ -174,4 +249,7 @@
       last = performance.now();
     });
   });
+
+  fetchLatestUrgent();
+  scheduleFetch();
 })();
