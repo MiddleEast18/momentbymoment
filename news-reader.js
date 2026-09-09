@@ -14,6 +14,11 @@
     box.innerHTML = String(value || '');
     return (box.textContent || box.innerText || '').replace(/\s+\n/g, '\n').replace(/\n\s+/g, '\n').trim();
   };
+  const escapeHtml = (value) => {
+    const div = document.createElement('div');
+    div.textContent = String(value ?? '');
+    return div.innerHTML;
+  };
   const formatTime = (value) => {
     const t = new Date(value || 0).getTime();
     if (!Number.isFinite(t) || t <= 0) return 'وقت غير محدد';
@@ -29,8 +34,11 @@
     if (Math.abs(hours) < 24) return rtf.format(hours, 'hour');
     return rtf.format(Math.round(hours / 24), 'day');
   };
-  const escUrl = (value) => {
-    try { return new URL(value, window.location.href).href; } catch { return '#'; }
+  const safeUrl = (value) => {
+    try {
+      const url = new URL(value || '', window.location.href);
+      return /^https?:$/i.test(url.protocol) ? url.href : '#';
+    } catch { return '#'; }
   };
 
   const backdrop = document.createElement('div');
@@ -51,7 +59,6 @@
     </section>`;
   document.body.appendChild(backdrop);
 
-  const reader = backdrop.querySelector('.mirsad-reader');
   const body = backdrop.querySelector('.mirsad-reader__body');
   const content = backdrop.querySelector('.mirsad-reader__content');
   const closeBtn = backdrop.querySelector('.mirsad-reader__close');
@@ -83,17 +90,17 @@
         <h3 id="mirsadRelatedTitle">أخبار مرتبطة بالحدث</h3>
         <div class="mirsad-reader__related">
           ${related.map((item) => `
-            <button type="button" class="mirsad-related-item" data-related-id="${item.id}">
-              ${text(item.headline) || 'خبر مرتبط'}
-              <small>${text(item.source_name) || 'مصدر'} · ${relative(item.published_at)}</small>
+            <button type="button" class="mirsad-related-item" data-related-id="${escapeHtml(item.id)}">
+              ${escapeHtml(text(item.headline) || 'خبر مرتبط')}
+              <small>${escapeHtml(text(item.source_name) || 'مصدر')} · ${escapeHtml(relative(item.published_at))}</small>
             </button>`).join('')}
         </div>
       </section>` : '';
 
     return `
       <div class="mirsad-reader__meta">
-        <span class="mirsad-reader__dot" style="background:${dot}"></span>
-        <span>${category}</span><span>·</span><span>${source}</span><span>·</span><span>${relative(article.published_at)}</span>
+        <span class="mirsad-reader__dot" style="background:${escapeHtml(dot)}"></span>
+        <span>${escapeHtml(category)}</span><span>·</span><span>${escapeHtml(source)}</span><span>·</span><span>${escapeHtml(relative(article.published_at))}</span>
       </div>
       <h2 id="mirsadReaderTitle" class="mirsad-reader__title">${escapeHtml(title)}</h2>
       <p class="mirsad-reader__summary">${escapeHtml(summary || 'لا يتوفر ملخص لهذا الخبر.')}</p>
@@ -106,12 +113,6 @@
         <div class="mirsad-reader__stat"><span>آخر مزامنة</span><strong>${escapeHtml(formatTime(article.updated_at || article.created_at))}</strong></div>
       </div>
       ${relatedMarkup}`;
-  }
-
-  function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = String(value ?? '');
-    return div.innerHTML;
   }
 
   async function fetchJson(url) {
@@ -148,6 +149,24 @@
     return { article, related };
   }
 
+  async function showArticle(id) {
+    body.scrollTop = 0;
+    renderLoading();
+    try {
+      const { article, related } = await loadArticle(id);
+      state.article = article;
+      state.related = related;
+      content.innerHTML = articleMarkup(article, related);
+      sourceBtn.hidden = !article.source_url;
+      sourceBtn.href = safeUrl(article.source_url || (article.agency_urls || [])[0] || '');
+      body.scrollTop = 0;
+      wireRelated();
+    } catch (error) {
+      console.error('[mirsad reader] load failed', error);
+      renderError();
+    }
+  }
+
   function openReader(id, sourceElement) {
     if (!id || state.open) return;
     state.open = true;
@@ -157,18 +176,7 @@
     body.scrollTop = 0;
     renderLoading();
     closeBtn.focus();
-    loadArticle(id).then(({ article, related }) => {
-      state.article = article;
-      state.related = related;
-      content.innerHTML = articleMarkup(article, related);
-      sourceBtn.hidden = !article.source_url;
-      sourceBtn.href = escUrl(article.source_url || (article.agency_urls || [])[0] || '#');
-      body.scrollTop = 0;
-      wireRelated();
-    }).catch((error) => {
-      console.error('[mirsad reader] load failed', error);
-      renderError();
-    });
+    void showArticle(id);
   }
 
   function closeReader() {
@@ -185,21 +193,7 @@
     content.querySelectorAll('.mirsad-related-item').forEach((button) => {
       button.addEventListener('click', () => {
         const id = button.dataset.relatedId;
-        if (!id) return;
-        body.scrollTop = 0;
-        renderLoading();
-        loadArticle(id).then(({ article, related }) => {
-          state.article = article;
-          state.related = related;
-          content.innerHTML = articleMarkup(article, related);
-          sourceBtn.hidden = !article.source_url;
-          sourceBtn.href = escUrl(article.source_url || (article.agency_urls || [])[0] || '#');
-          body.scrollTop = 0;
-          wireRelated();
-        }).catch((error) => {
-          console.error('[mirsad reader] related load failed', error);
-          renderError();
-        });
+        if (id) void showArticle(id);
       });
     });
   }
