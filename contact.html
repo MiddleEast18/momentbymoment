@@ -2,19 +2,27 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>اتصل بنا — مِرصاد</title><meta name="description" content="تواصل مع مِرصاد عبر وسيط البريد AgentMail.">
+  <title>اتصل بنا — مِرصاد</title><meta name="description" content="تواصل مع مِرصاد عبر قناة البريد المخصصة للمشروع.">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=202609092130"><link rel="stylesheet" href="legal.css?v=202609092040">
+  <style>.contact-honeypot{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important}</style>
 </head>
 <body>
   <header class="wire-header legal-header"><a class="legal-brand" href="index.html" aria-label="العودة إلى مِرصاد"><span class="wire-header__mark" aria-hidden="true">＋</span><span><strong>مِرصاد</strong><small>رصد الشرق الأوسط لحظة بلحظة</small></span></a><nav class="legal-nav" aria-label="التنقل"><a href="index.html">الرئيسية</a><a href="about.html">من نحن</a><a href="contact.html" aria-current="page">اتصل بنا</a><a href="privacy.html">الخصوصية</a><a href="terms.html">الشروط</a></nav></header>
   <main class="legal-page">
     <div class="legal-kicker">مِرصاد / التواصل والإبلاغ</div><h1>اتصل بنا</h1>
     <p class="legal-lead">نستقبل البلاغات المتعلقة بالأخبار والمصادر والتصنيفات والأخطاء التقنية، إضافة إلى الاقتراحات والاستفسارات العامة حول المشروع.</p>
-    <section class="legal-section"><h2>وسيلة التواصل</h2><p>تُرسل رسالتك عبر صندوق البريد الوسيط <strong>farid-9262@agentmail.to</strong> ثم تُحوّل إلى بريد فريق العمل. لا نعرض عنوان Gmail الداخلي في واجهة الموقع.</p><div class="legal-actions"><a class="legal-button secondary" href="mailto:farid-9262@agentmail.to">فتح البريد الوسيط ↗</a></div></section>
+    <section class="legal-section"><h2>وسيلة التواصل</h2><p>تُرسل رسالتك عبر قناة البريد المخصصة لمِرصاد <strong>farid-9262@agentmail.to</strong> ثم تُمرَّر إلى فريق العمل. لا نعرض عنوان بريد الفريق الداخلي في واجهة الموقع.</p><div class="legal-actions"><a class="legal-button secondary" href="mailto:farid-9262@agentmail.to">فتح البريد ↗</a></div></section>
     <section class="legal-section"><h2>نموذج تواصل مباشر</h2><p class="legal-note">أدخل بريدك إذا أردت أن يتمكن فريق العمل من الرد عليك. لا تُرسل بيانات شخصية لا حاجة لها.</p>
-      <form class="legal-form" id="contactForm"><label>الاسم (اختياري)<input id="contactName" type="text" autocomplete="name" maxlength="80"></label><label>بريدك الإلكتروني (اختياري)<input id="contactEmail" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com"></label><label>عنوان الرسالة<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصنيف خبر في غير مكانه"></label><label>الرسالة<textarea id="contactMessage" required maxlength="5000" placeholder="اكتب التفاصيل والرابط إن وجد..."></textarea></label><div class="legal-actions"><button class="legal-button" type="submit">إرسال الرسالة</button></div><div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div></form>
+      <form class="legal-form" id="contactForm" novalidate>
+        <label>الاسم (اختياري)<input id="contactName" type="text" autocomplete="name" maxlength="80"></label>
+        <label>بريدك الإلكتروني (اختياري)<input id="contactEmail" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com"></label>
+        <label>عنوان الرسالة<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصنيف خبر في غير مكانه"></label>
+        <label>الرسالة<textarea id="contactMessage" required maxlength="5000" placeholder="اكتب التفاصيل والرابط إن وجد..."></textarea></label>
+        <label class="contact-honeypot" aria-hidden="true">اترك هذا الحقل فارغًا<input id="contactWebsite" type="text" tabindex="-1" autocomplete="off"></label>
+        <div class="legal-actions"><button class="legal-button" type="submit">إرسال الرسالة</button></div><div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div>
+      </form>
     </section>
     <section class="legal-section"><h2>بلاغات الأخبار</h2><p>للتصحيح السريع، أرسل رابط الخبر أو عنوانه واذكر المشكلة بوضوح، مثل: مصدر غير صحيح، تصنيف خاطئ، عنوان غير عربي، أو ملخص لا يطابق الخبر.</p></section>
   </main>
@@ -30,16 +38,18 @@
         name:document.getElementById('contactName').value.trim(),
         email:document.getElementById('contactEmail').value.trim(),
         subject:document.getElementById('contactSubject').value.trim(),
-        message:document.getElementById('contactMessage').value.trim()
+        message:document.getElementById('contactMessage').value.trim(),
+        website:document.getElementById('contactWebsite').value.trim()
       };
       if(!payload.subject||!payload.message){status.textContent='أكمل عنوان الرسالة والرسالة.';return;}
+      if(payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)){status.textContent='أدخل بريدًا إلكترونيًا صحيحًا.';return;}
       button.disabled=true;status.textContent='جارٍ إرسال الرسالة…';
       try{
         const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const result=await response.json().catch(()=>({}));
         if(!response.ok) throw new Error(result.error||'send_failed');
-        form.reset();status.textContent='تم إرسال رسالتك إلى فريق العمل عبر AgentMail.';
-      }catch(error){status.textContent='تعذر إرسال الرسالة حاليًا. يمكنك استخدام عنوان البريد الوسيط أعلاه.';}
+        form.reset();status.textContent='تم إرسال رسالتك إلى فريق العمل.';
+      }catch(error){status.textContent='تعذر إرسال الرسالة حاليًا. يمكنك استخدام عنوان البريد أعلاه.';}
       finally{button.disabled=false;}
     });
   </script>
