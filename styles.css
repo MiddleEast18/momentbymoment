@@ -45,9 +45,11 @@ button, input, select { font: inherit; }
 .status-sync { color: var(--text-faint); }
 .ticker-strip { display: flex; align-items: stretch; background: var(--bg-elevated); border-bottom: 1px solid var(--panel-border); overflow: hidden; }
 .ticker-strip__label { flex-shrink: 0; display: flex; align-items: center; padding: 0 18px; background: var(--negative); color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 13px; }
-.ticker-strip__track { display: flex; align-items: center; gap: 48px; width: max-content; white-space: nowrap; padding: 10px 24px; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); animation: ticker-scroll 40s linear infinite; will-change: transform; }
+/* ticker-fix.js is the sole owner of urgent ticker motion. */
+.ticker-strip__track { display: flex; align-items: center; gap: 48px; width: max-content; white-space: nowrap; padding: 10px 24px; font-family: var(--font-mono); font-size: 13px; color: var(--text-dim); animation: none !important; will-change: transform; }
+.ticker-strip__item { flex: 0 0 auto; }
 .ticker-strip__item::before { content: '◆'; color: var(--gold); margin-left: 12px; font-size: 9px; }
-@keyframes ticker-scroll { from { transform: translateX(0%); } to { transform: translateX(-50%); } }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(0); } }
 .control-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; flex-wrap: wrap; }
 .control-bar__left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .search-box, .sort-box { border: 1px solid var(--panel-border-strong); background: rgba(255,255,255,.03); color: var(--text); border-radius: 999px; padding: 10px 14px; min-height: 42px; }
@@ -90,8 +92,6 @@ button, input, select { font: inherit; }
 .card__evidence { margin: 0; color: var(--gold); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 .card__meta { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text-faint); font-size: 11.5px; font-family: var(--font-mono); } .card__confidence { color: var(--text-dim); }
 .wire-footer { padding: 20px 28px 40px; color: var(--text-faint); font-size: 12px; text-align: center; }
-
-/* Mirsad sort bottom sheet */
 .sort-sheet[hidden] { display: none; }
 .sort-sheet { position: fixed; inset: 0; z-index: 1000; direction: rtl; }
 .sort-sheet__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.66); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -105,29 +105,27 @@ button, input, select { font: inherit; }
 .sort-option:last-child { border-bottom: 0; }
 .sort-option:hover { background: rgba(255,255,255,.035); color: var(--text); }
 .sort-option[aria-checked="true"] { color: var(--text); background: var(--gold-soft); }
-.sort-option__radio { flex: 0 0 auto; width: 22px; height: 22px; border: 2px solid var(--text-faint); border-radius: 50%; position: relative; }
-.sort-option[aria-checked="true"] .sort-option__radio { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,162,39,.10); }
-.sort-option[aria-checked="true"] .sort-option__radio::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px rgba(201,162,39,.35); }
-body.sort-sheet-open { overflow: hidden; }
-@keyframes sort-sheet-in { from { transform: translateY(20px); opacity: .7; } to { transform: translateY(0); opacity: 1; } }
-
-@media (max-width: 1200px) { .news-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 900px) {
-  .insight-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 16px 16px; }
-  .featured-rail-wrap { display: block; }
-  .news-grid { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 16px; padding: 8px 16px 40px; }
-  .card-large, .card-medium { grid-column: span 1; grid-row: span 1; }
-  .card { min-height: 160px; }
-  .card-large .card__headline { font-size: 19px; }
-  .card__summary { -webkit-line-clamp: 2; }
-  .wire-header, .control-bar { padding-left: 16px; padding-right: 16px; }
-  .search-box, .sort-box { width: 100%; min-width: 0; }
-  .sort-trigger { text-align: right; }
-  .sort-sheet__panel { border-radius: 22px 22px 0 0; }
+.sort-option__radio { width: 18px; height: 18px; border: 2px solid var(--panel-border-strong); border-radius: 50%; flex: 0 0 auto; position: relative; }
+.sort-option[aria-checked="true"] .sort-option__radio { border-color: var(--gold); }
+.sort-option[aria-checked="true"] .sort-option__radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--gold); }
+@keyframes sort-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@media (max-width: 980px) {
+  .news-grid { grid-template-columns: repeat(2, 1fr); }
+  .insight-bar { grid-template-columns: repeat(2, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ticker-strip__track { animation: none; }
-  .status-dot[data-state="live"], .status-dot[data-state="polling"] { animation: none; }
-  .sort-sheet__panel { animation: none; }
-  * { scroll-behavior: auto !important; }
+@media (max-width: 700px) {
+  .wire-header { padding: 16px; align-items: flex-start; }
+  .wire-header__status { width: 100%; }
+  .control-bar { padding: 12px 16px; align-items: stretch; }
+  .control-bar__left { width: 100%; }
+  .search-box, .sort-box { flex: 1; min-width: 0; }
+  .control-bar__filters { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .control-bar__filters .chip { flex: 0 0 auto; }
+  .control-bar__count { width: 100%; }
+  .featured-rail-wrap { display: block; }
+  .news-grid { grid-template-columns: 1fr; grid-auto-rows: auto; padding: 8px 16px 40px; gap: 12px; }
+  .news-grid .card, .card-large, .card-medium { grid-column: auto; grid-row: auto; min-height: 230px; }
+  .insight-bar { padding: 0 16px 12px; gap: 8px; }
+  .insight-pill { padding: 9px 12px; }
+  .ticker-strip__track { font-size: 12.5px; padding: 10px 16px; }
 }
