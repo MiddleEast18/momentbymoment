@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>اتصل بنا — مِرصاد</title><meta name="description" content="تواصل مع مِرصاد للإبلاغ عن الأخطاء والاقتراحات والاستفسارات المتعلقة بالموقع والمصادر.">
+  <title>اتصل بنا — مِرصاد</title><meta name="description" content="تواصل مع مِرصاد عبر وسيط البريد AgentMail.">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=202609092130"><link rel="stylesheet" href="legal.css?v=202609092040">
@@ -12,16 +12,36 @@
   <main class="legal-page">
     <div class="legal-kicker">مِرصاد / التواصل والإبلاغ</div><h1>اتصل بنا</h1>
     <p class="legal-lead">نستقبل البلاغات المتعلقة بالأخبار والمصادر والتصنيفات والأخطاء التقنية، إضافة إلى الاقتراحات والاستفسارات العامة حول المشروع.</p>
-    <section class="legal-section"><h2>وسيلة التواصل</h2><p>لأن مِرصاد مشروع منشور على GitHub، فإن قناة التواصل العامة المعتمدة حاليًا هي مستودع المشروع وقسم <strong>Issues</strong>. يمكنك إنشاء بلاغ جديد، ويفضل أن يتضمن عنوان الخبر أو رابطه وسبب البلاغ.</p><div class="legal-actions"><a class="legal-button" href="https://github.com/MiddleEast18/momentbymoment/issues/new" target="_blank" rel="noopener noreferrer">فتح نموذج تواصل عبر GitHub ↗</a><a class="legal-button secondary" href="https://github.com/MiddleEast18/momentbymoment" target="_blank" rel="noopener noreferrer">فتح المستودع ↗</a></div></section>
-    <section class="legal-section"><h2>نموذج بلاغ سريع</h2><p class="legal-note">هذا النموذج لا يرسل البيانات إلى خادم تابع لمِرصاد. بعد الإرسال سينشئ رسالة جاهزة داخل GitHub، ويمكنك مراجعتها قبل نشرها.</p>
-      <form class="legal-form" id="contactForm"><label>الاسم (اختياري)<input id="contactName" type="text" autocomplete="name" maxlength="80"></label><label>عنوان البلاغ<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصنيف خبر في غير مكانه"></label><label>الرسالة<textarea id="contactMessage" required maxlength="3000" placeholder="اكتب التفاصيل والرابط إن وجد..."></textarea></label><div class="legal-actions"><button class="legal-button" type="submit">إنشاء البلاغ على GitHub ↗</button></div><div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div></form>
+    <section class="legal-section"><h2>وسيلة التواصل</h2><p>تُرسل رسالتك عبر صندوق البريد الوسيط <strong>farid-9262@agentmail.to</strong> ثم تُحوّل إلى بريد فريق العمل. لا نعرض عنوان Gmail الداخلي في واجهة الموقع.</p><div class="legal-actions"><a class="legal-button secondary" href="mailto:farid-9262@agentmail.to">فتح البريد الوسيط ↗</a></div></section>
+    <section class="legal-section"><h2>نموذج تواصل مباشر</h2><p class="legal-note">أدخل بريدك إذا أردت أن يتمكن فريق العمل من الرد عليك. لا تُرسل بيانات شخصية لا حاجة لها.</p>
+      <form class="legal-form" id="contactForm"><label>الاسم (اختياري)<input id="contactName" type="text" autocomplete="name" maxlength="80"></label><label>بريدك الإلكتروني (اختياري)<input id="contactEmail" type="email" autocomplete="email" maxlength="254" placeholder="name@example.com"></label><label>عنوان الرسالة<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصنيف خبر في غير مكانه"></label><label>الرسالة<textarea id="contactMessage" required maxlength="5000" placeholder="اكتب التفاصيل والرابط إن وجد..."></textarea></label><div class="legal-actions"><button class="legal-button" type="submit">إرسال الرسالة</button></div><div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div></form>
     </section>
-    <section class="legal-section"><h2>بلاغات الأخبار</h2><p>للتصحيح السريع، أرسل رابط الخبر أو عنوانه واذكر المشكلة بوضوح، مثل: مصدر غير صحيح، تصنيف خاطئ، عنوان غير عربي، أو ملخص لا يطابق الخبر. لا ترسل بيانات شخصية لا حاجة لها.</p></section>
+    <section class="legal-section"><h2>بلاغات الأخبار</h2><p>للتصحيح السريع، أرسل رابط الخبر أو عنوانه واذكر المشكلة بوضوح، مثل: مصدر غير صحيح، تصنيف خاطئ، عنوان غير عربي، أو ملخص لا يطابق الخبر.</p></section>
   </main>
   <footer class="legal-footer"><span>مِرصاد — رصد الأخبار لحظة بلحظة</span><span><a href="about.html">من نحن</a> · <a href="contact.html">اتصل بنا</a> · <a href="privacy.html">الخصوصية</a> · <a href="terms.html">الشروط</a></span></footer>
   <script>
-    const form=document.getElementById('contactForm');const status=document.getElementById('contactStatus');
-    form.addEventListener('submit',(e)=>{e.preventDefault();const n=document.getElementById('contactName').value.trim();const s=document.getElementById('contactSubject').value.trim();const m=document.getElementById('contactMessage').value.trim();if(!s||!m){status.textContent='أكمل عنوان البلاغ والرسالة.';return;}const body=[n?'الاسم: '+n:'', 'الرسالة:',m,'','— أُرسل من صفحة تواصل مِرصاد'].filter(Boolean).join('\n');const url='https://github.com/MiddleEast18/momentbymoment/issues/new?title='+encodeURIComponent(s)+'&body='+encodeURIComponent(body);window.open(url,'_blank','noopener,noreferrer');status.textContent='تم تجهيز البلاغ. سيُفتح GitHub في نافذة جديدة لإكمال الإرسال.';});
+    const form=document.getElementById('contactForm');
+    const status=document.getElementById('contactStatus');
+    const endpoint='https://dndlkenyfymlrjnslyzb.supabase.co/functions/v1/contact-relay';
+    form.addEventListener('submit',async(e)=>{
+      e.preventDefault();
+      const button=form.querySelector('button[type="submit"]');
+      const payload={
+        name:document.getElementById('contactName').value.trim(),
+        email:document.getElementById('contactEmail').value.trim(),
+        subject:document.getElementById('contactSubject').value.trim(),
+        message:document.getElementById('contactMessage').value.trim()
+      };
+      if(!payload.subject||!payload.message){status.textContent='أكمل عنوان الرسالة والرسالة.';return;}
+      button.disabled=true;status.textContent='جارٍ إرسال الرسالة…';
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const result=await response.json().catch(()=>({}));
+        if(!response.ok) throw new Error(result.error||'send_failed');
+        form.reset();status.textContent='تم إرسال رسالتك إلى فريق العمل عبر AgentMail.';
+      }catch(error){status.textContent='تعذر إرسال الرسالة حاليًا. يمكنك استخدام عنوان البريد الوسيط أعلاه.';}
+      finally{button.disabled=false;}
+    });
   </script>
 </body>
 </html>
