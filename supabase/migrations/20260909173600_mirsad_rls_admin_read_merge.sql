@@ -1,0 +1,1 @@
+drop policy if exists news_admin_read_live on public.news_articles;
