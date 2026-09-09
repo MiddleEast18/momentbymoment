@@ -14,10 +14,12 @@ const importance = (s: string) => { let n = 35; for (const x of ["عاجل", "ع
 const sentiment = (s: string) => s.includes("حرب") || s.includes("هجوم") || s.includes("قتلى") || s.includes("أزمة") || s.includes("انفجار") ? "Negative" : s.includes("اتفاق") || s.includes("فوز") || s.includes("نمو") ? "Positive" : "Neutral";
 const canonicalUrl = (raw: string) => { try { const u = new URL(raw); for (const k of [...u.searchParams.keys()]) if (/^(utm_|fbclid|gclid|ref|source)$/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
 const publishedAt = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); if (v) { const d = new Date(v); if (Number.isFinite(d.getTime())) return d.toISOString(); } } return new Date().toISOString(); };
+const rawPayload = (sourceKey: string, item: string, title: string, link: string, summary: string) => ({ source_key: sourceKey, title, link, description: summary, published: field(item, "pubDate") || field(item, "published") || field(item, "updated") || field(item, "dc:date") || null, author: field(item, "author") || field(item, "dc:creator") || null, category: field(item, "category") || null, guid: field(item, "guid") || null });
 
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+
   const run = await db.from("ingest_runs").insert({ status: "running" }).select("id").single();
   let seen = 0, written = 0, duplicates = 0, clusterUpdates = 0;
   const errors: string[] = [];
@@ -25,6 +27,7 @@ Deno.serve(async req => {
   if (sources.error) return reply({ error: sources.error.message }, 500);
   const existing = await db.from("news_articles").select("source_url,headline,cluster_id,category").eq("is_pending_verification", false).order("updated_at", { ascending: false }).limit(400);
   const known = new Set((existing.data || []).map((x: any) => canonicalUrl(x.source_url)));
+
   for (const source of sources.data || []) {
     try {
       const r = await fetch(source.feed_url, { headers: { "user-agent": "MirsadRSS/2.0" }, signal: AbortSignal.timeout(10000) });
@@ -44,12 +47,33 @@ Deno.serve(async req => {
           if (!merged.error) { clusterUpdates++; known.add(link); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
         }
-        const row = { source_name: source.name, source_url: link, agency_urls: [link], headline: title, summary, category: source.default_category || classify(all), importance_score: importance(all), sentiment: sentiment(all), cluster_id: crypto.randomUUID(), source_trust_score: Number(source.trust_weight), confidence_score: Math.min(100, Number(source.trust_weight) * 100), is_pending_verification: false, inherited_from_cache: false, llm_model_used: "rss-rule-based-v4", ai_hints: { ingested_by: "mirsad-ingest", source_key: source.source_key }, claim_digest: { main_claim: title }, raw_payload: { source_key: source.source_key }, published_at: publishedAt(item) };
+        const row = {
+          source_name: source.name,
+          source_url: link,
+          agency_urls: [link],
+          headline: title,
+          summary,
+          category: source.default_category || classify(all),
+          importance_score: importance(all),
+          sentiment: sentiment(all),
+          cluster_id: crypto.randomUUID(),
+          source_trust_score: Number(source.trust_weight),
+          confidence_score: Math.min(100, Number(source.trust_weight) * 100),
+          is_pending_verification: false,
+          inherited_from_cache: false,
+          llm_model_used: "rss-rule-based-v5",
+          ai_hints: { ingested_by: "mirsad-ingest", source_key: source.source_key },
+          claim_digest: { main_claim: title },
+          raw_payload: rawPayload(source.source_key, item, title, link, summary),
+          published_at: publishedAt(item),
+        };
         const result = await db.from("news_articles").insert(row);
         if (!result.error) { written++; known.add(link); } else if (result.error.code === "23505") duplicates++; else errors.push(`${source.source_key}: ${result.error.message}`);
       }
     } catch (error) { errors.push(`${source.source_key}: ${String(error)}`); }
   }
-  if (run.data?.id) await db.from("ingest_runs").update({ status: "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, errors: errors.slice(0, 10) }) }).eq("id", run.data.id);
-  return reply({ ok: true, seen, written, duplicates, clusterUpdates, errors: errors.slice(0, 10) });
+  const cleanup = await db.rpc("mirsad_trim_news_to_400");
+  if (cleanup.error) errors.push(`cleanup: ${cleanup.error.message}`);
+  if (run.data?.id) await db.from("ingest_runs").update({ status: "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) }) }).eq("id", run.data.id);
+  return reply({ ok: true, seen, written, duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) });
 });
