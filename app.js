@@ -8,8 +8,8 @@
   'use strict';
 
   const CONFIG = {
-    SUPABASE_URL: 'https://YOUR-PROJECT.supabase.co',
-    SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
+    SUPABASE_URL: 'https://dndlkenyfymlrjnslyzb.supabase.co',
+    SUPABASE_ANON_KEY: 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx',
     TABLE: 'news_articles',
     INITIAL_FETCH_LIMIT: 80,
     MAX_KEPT_ARTICLES: 240,
