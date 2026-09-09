@@ -4,7 +4,6 @@
   const INITIAL_COUNT = 7;
   const MORE_COUNT = 5;
   const grid = document.getElementById('newsGrid');
-  const emptyState = document.getElementById('emptyState');
   if (!grid) return;
 
   const controls = document.createElement('div');
@@ -20,15 +19,11 @@
   const moreButton = controls.querySelector('[data-action="more"]');
   const allButton = controls.querySelector('[data-action="all"]');
   let shown = INITIAL_COUNT;
-  let previousIds = [];
   let showAll = false;
+  let reconcileQueued = false;
 
   function cards() {
     return [...grid.querySelectorAll(':scope > .card')];
-  }
-
-  function currentIds() {
-    return cards().map((card) => card.dataset.id || '');
   }
 
   function apply() {
@@ -36,50 +31,37 @@
     const total = list.length;
     if (!total) {
       controls.hidden = true;
-      previousIds = [];
       return;
     }
 
     const limit = showAll ? total : Math.min(shown, total);
     list.forEach((card, index) => {
-      card.hidden = index >= limit;
+      const isHidden = index >= limit;
+      card.classList.toggle('is-pagination-hidden', isHidden);
+      card.setAttribute('aria-hidden', isHidden ? 'true' : 'false');
+      card.tabIndex = isHidden ? -1 : 0;
     });
 
     const canExpand = !showAll && limit < total;
-    controls.hidden = total <= INITIAL_COUNT;
+    controls.hidden = !canExpand;
     moreButton.hidden = !canExpand;
     allButton.hidden = !canExpand;
-
-    previousIds = list.map((card) => card.dataset.id || '');
   }
 
-  function reconcile() {
-    const ids = currentIds();
-    if (!ids.length) {
+  function scheduleApply() {
+    if (reconcileQueued) return;
+    reconcileQueued = true;
+    requestAnimationFrame(() => {
+      reconcileQueued = false;
       apply();
-      return;
-    }
-
-    if (!previousIds.length) {
-      shown = INITIAL_COUNT;
-      showAll = false;
-    } else {
-      const previousSet = new Set(previousIds.filter(Boolean));
-      const shared = ids.filter((id) => id && previousSet.has(id)).length;
-      const overlap = shared / Math.max(1, Math.min(previousIds.length, ids.length));
-      const delta = Math.abs(ids.length - previousIds.length);
-      if (overlap < 0.45 && delta > 2) {
-        shown = INITIAL_COUNT;
-        showAll = false;
-      }
-    }
-    apply();
+    });
   }
 
   moreButton.addEventListener('click', () => {
     shown += MORE_COUNT;
     showAll = false;
     apply();
+    window.scrollBy({ top: 1, behavior: 'instant' });
   });
 
   allButton.addEventListener('click', () => {
@@ -87,10 +69,24 @@
     apply();
   });
 
-  const observer = new MutationObserver(() => {
-    requestAnimationFrame(reconcile);
-  });
-  observer.observe(grid, { childList: true });
+  document.addEventListener('input', (event) => {
+    if (event.target?.id === 'searchBox') {
+      shown = INITIAL_COUNT;
+      showAll = false;
+      scheduleApply();
+    }
+  }, true);
 
-  requestAnimationFrame(reconcile);
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target?.closest?.('#categoryFilters [data-category], #sortSheet [data-sort-option]')) {
+      shown = INITIAL_COUNT;
+      showAll = false;
+      scheduleApply();
+    }
+  }, true);
+
+  const observer = new MutationObserver(scheduleApply);
+  observer.observe(grid, { childList: true });
+  scheduleApply();
 })();
