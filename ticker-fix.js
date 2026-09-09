@@ -6,6 +6,7 @@
   let last = performance.now();
   let offset = 0;
   let loopWidth = 0;
+  let restarting = false;
   const speed = 42;
 
   const measure = () => {
@@ -28,32 +29,52 @@
 
     if (loopWidth > 0) {
       offset -= (delta / 1000) * speed;
-      if (-offset >= loopWidth) offset += loopWidth;
+      while (-offset >= loopWidth) offset += loopWidth;
+      while (offset > 0) offset -= loopWidth;
       track.style.transform = `translate3d(${offset}px,0,0)`;
     }
 
     raf = requestAnimationFrame(tick);
   };
 
-  const restart = () => {
+  const start = (preserveOffset = false) => {
+    if (restarting) return;
+    restarting = true;
     if (raf) cancelAnimationFrame(raf);
-    offset = 0;
+
+    const previousWidth = loopWidth;
     measure();
-    track.style.transform = 'translate3d(0,0,0)';
+
+    if (!preserveOffset || previousWidth <= 0 || loopWidth <= 0) {
+      offset = 0;
+    } else {
+      offset = ((offset % loopWidth) + loopWidth) % loopWidth;
+      offset = -offset;
+    }
+
+    track.style.transform = `translate3d(${offset}px,0,0)`;
     last = performance.now();
     raf = requestAnimationFrame(tick);
+    requestAnimationFrame(() => {
+      restarting = false;
+    });
   };
 
-  const observer = new MutationObserver(() => restart());
+  const observer = new MutationObserver(() => {
+    // Rebuild the measurement after ticker content changes, but restart from
+    // the equivalent loop position so a Realtime update cannot create a gap.
+    start(true);
+  });
   observer.observe(track, { childList: true });
+
+  let resizeFrame = 0;
   window.addEventListener('resize', () => {
-    const previous = loopWidth;
-    measure();
-    if (previous !== loopWidth) {
-      offset = loopWidth > 0 ? offset % loopWidth : 0;
-    }
-    last = performance.now();
+    if (resizeFrame) cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      start(true);
+    });
   });
 
-  restart();
+  start(false);
 })();
