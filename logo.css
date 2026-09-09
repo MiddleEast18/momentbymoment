@@ -1,0 +1,34 @@
+.wire-header__mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--gold);
+  transform: none;
+  background: radial-gradient(circle at center, rgba(201,162,39,.07), transparent 68%);
+}
+
+.wire-header__mark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wire-header__mark svg circle:first-child {
+  opacity: .98;
+}
+
+.wire-header__mark svg circle:nth-of-type(2) {
+  opacity: .9;
+}
+
+@media (max-width: 700px) {
+  .wire-header__mark {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+}
