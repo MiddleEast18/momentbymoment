@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=202609092130">
+  <link rel="stylesheet" href="news-reader.css?v=202609092110">
 </head>
 <body>
   <a class="skip-link" href="#newsGrid">تخطَّ إلى الأخبار</a>
@@ -47,10 +48,11 @@
   <section class="insight-bar" id="insightBar" aria-label="ملخص الحالة"><div class="insight-pill"><span>الأحداث النشطة</span><strong id="insightClusterCount">0</strong></div><div class="insight-pill"><span>قيد التحقق</span><strong id="insightPendingCount">0</strong></div><div class="insight-pill"><span>متوسط الثقة</span><strong id="insightAvgConfidence">0%</strong></div><div class="insight-pill"><span>مصادر موثوقة</span><strong id="insightTrustedSources">0</strong></div></section>
   <main><section class="featured-rail-wrap"><div class="section-heading">الأبرز على الهاتف</div><div id="featuredRail" class="featured-rail" aria-label="الأخبار الأبرز"></div></section><div class="news-grid" id="newsGrid" aria-live="polite" aria-relevant="additions"></div><p class="empty-state" id="emptyState" hidden>لا توجد أخبار في هذا التصنيف حاليًا.</p></main>
   <footer class="wire-footer"><p>مِرصاد — واجهة عرض فقط. الأخبار المُظللة بالحجر الصحي لا تظهر حتى يراجعها المشرف.</p></footer>
-  <template id="cardTemplate"><article class="card"><div class="card__importance" aria-hidden="true"><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__score"></span></div><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
+  <template id="cardTemplate"><article class="card" tabindex="0" role="button" aria-label="فتح الخبر"><div class="card__importance" aria-hidden="true"><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__score"></span></div><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=202609092359"></script>
+  <script src="app.js?v=202609092345"></script>
   <script src="ticker-fix.js?v=202609092300"></script>
   <script src="sort-sheet.js?v=202609092000"></script>
+  <script src="news-reader.js?v=202609092112"></script>
 </body>
 </html>
