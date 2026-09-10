@@ -60,7 +60,7 @@
       const button = form.querySelector('button[type="submit"]');
       const turnstileContainer = document.getElementById('turnstileContainer');
       const endpoint = 'https://dndlkenyfymlrjnslyzb.supabase.co/functions/v1/contact-relay';
-      const TURNSTILE_SITEKEY = '';
+      const TURNSTILE_SITEKEY = '0x4AAAAAAEu-mXpUN-l9q4ef';
       let turnstileWidgetId = null;
       let turnstileToken = '';
 
@@ -70,6 +70,7 @@
         turnstileWidgetId = window.turnstile.render(turnstileContainer, {
           sitekey: TURNSTILE_SITEKEY,
           theme: 'auto',
+          size: 'invisible',
           action: 'contact',
           callback: (token) => { turnstileToken = token; },
           'expired-callback': () => { turnstileToken = ''; },
@@ -83,8 +84,19 @@
         if (turnstileWidgetId !== null && window.turnstile) window.turnstile.reset(turnstileWidgetId);
       }
 
+      async function waitForTurnstileToken(timeoutMs) {
+        ensureTurnstile();
+        const start = Date.now();
+        while (!turnstileToken && Date.now() - start < timeoutMs) {
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          ensureTurnstile();
+        }
+        return turnstileToken;
+      }
+
       const turnstileBoot = () => { if (TURNSTILE_SITEKEY) ensureTurnstile(); };
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', turnstileBoot, { once: true }); else turnstileBoot();
+      window.addEventListener('load', turnstileBoot, { once: true });
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -99,9 +111,9 @@
         if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) { status.textContent = 'أدخل بريدًا إلكترونيًا صحيحًا.'; return; }
 
         if (TURNSTILE_SITEKEY) {
-          ensureTurnstile();
-          if (!turnstileToken) { status.textContent = 'أكمل التحقق الأمني ثم أرسل الرسالة.'; return; }
-          payload.turnstileToken = turnstileToken;
+          status.textContent = 'جارٍ التحقق الأمني…';
+          payload.turnstileToken = await waitForTurnstileToken(8000);
+          if (!payload.turnstileToken) { status.textContent = 'أكمل التحقق الأمني ثم أرسل الرسالة.'; return; }
         }
 
         button.disabled = true;
