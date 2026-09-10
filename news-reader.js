@@ -295,6 +295,7 @@
   }
 
   function openReader(id, sourceElement) {
+    if (localStorage.getItem('mirsad.guest.v1') === '1') return;
     if (!id || state.open) return;
     state.open = true;
     state.returnFocus = sourceElement || document.activeElement;
