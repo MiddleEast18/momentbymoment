@@ -6,6 +6,10 @@
   const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS);
   const redirectTo=()=>new URL('/', window.location.origin).href;
   const AUTH_QUERY_KEYS=['code','state','error','error_code','error_description'];
+  let googleFlowActive=false;
+  let googleFlowStartedAt=0;
+  let googleFlowTimer=null;
+  const GOOGLE_FLOW_TIMEOUT_MS=15000;
   const AUTH_HASH_KEYS=['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','provider_token','provider_refresh_token'];
   function cleanAuthUrl(){
     const url=new URL(window.location.href);
@@ -90,7 +94,18 @@
   function showGate(){
     injectStyles();let gate=document.getElementById('mirsadAuthGate');if(!gate){gate=document.createElement('div');gate.id='mirsadAuthGate';gate.className='mirsad-auth-gate';document.body.appendChild(gate);}gate.innerHTML=gateMarkup();removeGuestExit();
     const status=gate.querySelector('#mirsadAuthStatus'),email=gate.querySelector('#mirsadEmail');
-    gate.querySelector('#mirsadGoogle').addEventListener('click',async()=>{const btn=gate.querySelector('#mirsadGoogle');btn.disabled=true;statusText(status,'جارٍ فتح Google…');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirectTo(),queryParams:{prompt:'select_account'},skipBrowserRedirect:false}});if(error){btn.disabled=false;statusText(status,'تعذر تسجيل الدخول عبر Google. تأكد من تفعيل المزود في Supabase.');}});
+    gate.querySelector('#mirsadGoogle').addEventListener('click',async()=>{
+      const btn=gate.querySelector('#mirsadGoogle');
+      if(googleFlowActive && Date.now()-googleFlowStartedAt<GOOGLE_FLOW_TIMEOUT_MS)return;
+      clearTimeout(googleFlowTimer);
+      googleFlowActive=true;googleFlowStartedAt=Date.now();btn.disabled=true;statusText(status,'جارٍ فتح Google…');
+      const timeout=()=>{googleFlowActive=false;btn.disabled=false;if(status?.textContent==='جارٍ فتح Google…')statusText(status,'');};
+      googleFlowTimer=setTimeout(timeout,GOOGLE_FLOW_TIMEOUT_MS);
+      try{
+        const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirectTo(),queryParams:{prompt:'select_account'},skipBrowserRedirect:false}});
+        if(error){clearTimeout(googleFlowTimer);googleFlowActive=false;btn.disabled=false;statusText(status,'تعذر فتح Google. حاول مرة أخرى.');}
+      }catch(error){clearTimeout(googleFlowTimer);googleFlowActive=false;btn.disabled=false;statusText(status,'تعذر فتح Google. حاول مرة أخرى.');}
+    });
     const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true,emailRedirectTo:redirectTo()}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
     gate.querySelector('#mirsadEmailContinue').addEventListener('click',sendOtp);email.addEventListener('keydown',e=>{if(e.key==='Enter')sendOtp()});
     gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();});
@@ -143,6 +158,7 @@
   }
 
   function resetOAuthButtonAfterReturn(){
+    clearTimeout(googleFlowTimer);googleFlowActive=false;googleFlowStartedAt=0;
     const gate=document.getElementById('mirsadAuthGate');
     if(!gate)return;
     const btn=gate.querySelector('#mirsadGoogle');
