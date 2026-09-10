@@ -7,9 +7,9 @@
   <meta name="description" content="تواصل مع مِرصاد لإرسال الاستفسارات والبلاغات والتصحيحات.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=202609092300">
   <link rel="stylesheet" href="legal.css?v=202609092300">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
 </head>
 <body>
   <header class="wire-header legal-header">
@@ -39,6 +39,7 @@
         <label>عنوان الرسالة<input id="contactSubject" type="text" required maxlength="120" placeholder="مثال: تصحيح خبر"></label>
         <label>الرسالة<textarea id="contactMessage" required maxlength="5000" placeholder="اكتب رسالتك بالتفصيل، وأضف رابط الخبر عند الحاجة..."></textarea></label>
         <label class="contact-honeypot" aria-hidden="true"><span>اترك هذا الحقل فارغًا</span><input id="contactWebsite" type="text" tabindex="-1" autocomplete="off"></label>
+        <div id="turnstileContainer" aria-label="التحقق الأمني"></div>
         <div class="legal-actions"><button class="legal-button" type="submit">إرسال الرسالة</button></div>
         <div class="legal-status" id="contactStatus" role="status" aria-live="polite"></div>
       </form>
@@ -57,7 +58,34 @@
       const form = document.getElementById('contactForm');
       const status = document.getElementById('contactStatus');
       const button = form.querySelector('button[type="submit"]');
+      const turnstileContainer = document.getElementById('turnstileContainer');
       const endpoint = 'https://dndlkenyfymlrjnslyzb.supabase.co/functions/v1/contact-relay';
+      const TURNSTILE_SITEKEY = '';
+      let turnstileWidgetId = null;
+      let turnstileToken = '';
+
+      function ensureTurnstile() {
+        if (!TURNSTILE_SITEKEY || turnstileWidgetId !== null) return true;
+        if (!window.turnstile || !turnstileContainer) return false;
+        turnstileWidgetId = window.turnstile.render(turnstileContainer, {
+          sitekey: TURNSTILE_SITEKEY,
+          theme: 'auto',
+          action: 'contact',
+          callback: (token) => { turnstileToken = token; },
+          'expired-callback': () => { turnstileToken = ''; },
+          'error-callback': () => { turnstileToken = ''; }
+        });
+        return true;
+      }
+
+      function resetTurnstile() {
+        turnstileToken = '';
+        if (turnstileWidgetId !== null && window.turnstile) window.turnstile.reset(turnstileWidgetId);
+      }
+
+      const turnstileBoot = () => { if (TURNSTILE_SITEKEY) ensureTurnstile(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', turnstileBoot, { once: true }); else turnstileBoot();
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const payload = {
@@ -69,6 +97,13 @@
         };
         if (!payload.subject || !payload.message) { status.textContent = 'أكمل عنوان الرسالة والرسالة.'; return; }
         if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) { status.textContent = 'أدخل بريدًا إلكترونيًا صحيحًا.'; return; }
+
+        if (TURNSTILE_SITEKEY) {
+          ensureTurnstile();
+          if (!turnstileToken) { status.textContent = 'أكمل التحقق الأمني ثم أرسل الرسالة.'; return; }
+          payload.turnstileToken = turnstileToken;
+        }
+
         button.disabled = true;
         status.textContent = 'جارٍ إرسال الرسالة…';
         try {
@@ -76,9 +111,11 @@
           const result = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(result.error || 'send_failed');
           form.reset();
+          resetTurnstile();
           status.textContent = 'تم إرسال رسالتك إلى فريق العمل.';
         } catch (_) {
           status.textContent = 'تعذر إرسال الرسالة حاليًا. يمكنك استخدام عنوان البريد أعلاه.';
+          resetTurnstile();
         } finally {
           button.disabled = false;
         }
