@@ -1,10 +1,12 @@
 (() => {
   'use strict';
-  const CONFIG={SUPABASE_URL:'https://dndlkenyfymlrjnslyzb.supabase.co',SUPABASE_KEY:'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx',PROFILE_TABLE:'profiles',GUEST_KEY:'mirsad.guest.v1'};
+  const CONFIG={SUPABASE_URL:'https://dndlkenyfymlrjnslyzb.supabase.co',SUPABASE_KEY:'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx',PROFILE_TABLE:'profiles',GUEST_KEY:'mirsad.guest.v1',PRODUCTION_ORIGIN:'https://marsad.website/'};
   if(!window.supabase)return;
   const AUTH_OPTIONS={auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}};
   const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS);
-  const redirectTo=()=>new URL('/', window.location.origin).href;
+  // OAuth must return to a reachable origin. A phone opening a local dev server sees its own localhost,
+  // so never send the Google callback back to localhost; production always returns to Mirsad.
+  const redirectTo=()=>/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i.test(window.location.hostname)?CONFIG.PRODUCTION_ORIGIN:new URL('/',window.location.origin).href;
   const AUTH_QUERY_KEYS=['code','state','error','error_code','error_description'];
   let googleFlowActive=false;
   let googleFlowStartedAt=0;
@@ -167,8 +169,6 @@
     if(status && status.textContent==='جارٍ فتح Google…')status.textContent='';
   }
 
-  // Mobile browsers often restore the page from the back/forward cache after leaving for Google.
-  // Reset transient loading state so the Google button can be used again without a full reload.
   window.addEventListener('pageshow',()=>resetOAuthButtonAfterReturn());
   window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
