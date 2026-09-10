@@ -2,22 +2,18 @@
   overflow: visible;
 }
 
-.card__importance {
-  top: 16px;
-  left: 16px;
-  right: auto;
-  z-index: 2;
-}
-
+/* Update badge: centered on the card's upper edge, half inside / half outside. */
 .card__update-badge {
-  top: 0;
-  left: 0;
+  left: 12px;
   right: auto;
+  top: 0;
   transform: translateY(-50%);
   z-index: 4;
-  border-radius: 8px 8px 8px 0;
+  border-radius: 9px 9px 9px 3px;
   padding: 6px 11px;
-  border: 1px solid rgba(251,191,36,.28);
+  border: 1px solid rgba(251,191,36,.30);
+  background: rgba(22,29,39,.98);
+  box-shadow: 0 4px 12px rgba(0,0,0,.16);
 }
 
 .card__verification-badge {
@@ -26,22 +22,27 @@
   z-index: 2;
 }
 
+/* Keep the importance indicator in its original upper-left position. */
+.card__importance {
+  top: 16px;
+  left: 16px;
+  right: auto;
+  z-index: 2;
+}
+
 @media (max-width: 700px) {
+  .card__update-badge {
+    left: 12px;
+    right: auto;
+    top: 0;
+  }
+  .card__verification-badge {
+    right: 12px;
+    top: 47px;
+  }
   .card__importance {
     top: 16px;
     left: 16px;
     right: auto;
-  }
-
-  .card__update-badge {
-    top: 0;
-    left: 0;
-    right: auto;
-    transform: translateY(-50%);
-  }
-
-  .card__verification-badge {
-    right: 12px;
-    top: 47px;
   }
 }
