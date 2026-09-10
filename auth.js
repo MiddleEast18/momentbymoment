@@ -35,9 +35,33 @@
       .mirsad-profile-banner__text{min-width:0}.mirsad-profile-banner__text strong{display:block}.mirsad-profile-banner__text span{display:block;color:var(--text-dim);font-size:12px;margin-top:3px}.mirsad-profile-banner__actions{display:flex;gap:8px;flex-shrink:0}
       .mirsad-profile-modal{position:fixed;inset:0;z-index:5100;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.72)}.mirsad-profile-panel{width:min(520px,100%);max-height:90vh;overflow:auto;padding:22px;border:1px solid var(--panel-border-strong);border-radius:22px;background:linear-gradient(180deg,rgba(22,29,39,.99),rgba(11,15,20,.99))}
       .mirsad-profile-panel h2{margin:0 0 16px;font-family:var(--font-display)}.mirsad-profile-grid{display:grid;gap:11px}.mirsad-profile-grid label{display:grid;gap:6px;color:var(--text-dim);font-size:12px}.mirsad-profile-grid input{min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text)}.mirsad-profile-footer{display:flex;gap:10px;margin-top:16px}.mirsad-profile-footer button{flex:1}
-      @media(max-width:700px){.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}}
+      .mirsad-guest-exit{position:fixed;top:14px;left:14px;z-index:5400;display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:36px;padding:0 12px;border:1px solid var(--panel-border-strong);border-radius:999px;background:rgba(16,21,28,.88);backdrop-filter:blur(8px);color:var(--text-dim);font:500 12px var(--font-sans,inherit);cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.16)}
+      .mirsad-guest-exit:hover{color:var(--text);border-color:var(--gold)}.mirsad-guest-exit:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+      @media(max-width:700px){.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}.mirsad-guest-exit{top:10px;left:10px;min-width:38px;height:34px;padding:0 10px}}
     `;
     document.head.appendChild(s);
+  }
+
+  function removeGuestExit() {
+    document.getElementById('mirsadGuestExit')?.remove();
+  }
+
+  function showGuestExit() {
+    injectStyles();
+    if (document.getElementById('mirsadGuestExit')) return;
+    const button = document.createElement('button');
+    button.id = 'mirsadGuestExit';
+    button.className = 'mirsad-guest-exit';
+    button.type = 'button';
+    button.textContent = 'تسجيل الدخول';
+    button.setAttribute('aria-label', 'الخروج من وضع الزائر والعودة إلى صفحة تسجيل الدخول');
+    button.addEventListener('click', () => {
+      localStorage.removeItem(CONFIG.GUEST_KEY);
+      removeGuestExit();
+      document.body.classList.add('mirsad-auth-required');
+      showGate();
+    });
+    document.body.appendChild(button);
   }
 
   function gateMarkup() {
@@ -59,6 +83,7 @@
     let gate = document.getElementById('mirsadAuthGate');
     if (!gate) { gate = document.createElement('div'); gate.id = 'mirsadAuthGate'; gate.className = 'mirsad-auth-gate'; document.body.appendChild(gate); }
     gate.innerHTML = gateMarkup();
+    removeGuestExit();
     const status = gate.querySelector('#mirsadAuthStatus'), email = gate.querySelector('#mirsadEmail');
 
     gate.querySelector('#mirsadGoogle').addEventListener('click', async () => {
@@ -79,7 +104,10 @@
     gate.querySelector('#mirsadEmailContinue').addEventListener('click', sendOtp);
     email.addEventListener('keydown', e => { if (e.key === 'Enter') sendOtp(); });
     gate.querySelector('#mirsadGuest').addEventListener('click', () => {
-      localStorage.setItem(CONFIG.GUEST_KEY, '1'); gate.remove(); document.body.classList.remove('mirsad-auth-required');
+      localStorage.setItem(CONFIG.GUEST_KEY, '1');
+      gate.remove();
+      document.body.classList.remove('mirsad-auth-required');
+      showGuestExit();
     });
   }
 
@@ -159,6 +187,7 @@
 
   async function finishAuthenticated(user) {
     localStorage.removeItem(CONFIG.GUEST_KEY);
+    removeGuestExit();
     let profile;
     try { profile=await ensureProfile(user); } catch(error) { console.error('[mirsad auth] profile setup failed',error); }
     document.getElementById('mirsadAuthGate')?.remove(); document.body.classList.remove('mirsad-auth-required');
@@ -171,7 +200,7 @@
     const {data,error}=await sb.auth.getSession();
     if(error){console.error('[mirsad auth] session lookup failed',error);}
     if(data?.session?.user){await finishAuthenticated(data.session.user);return;}
-    if(localStorage.getItem(CONFIG.GUEST_KEY)==='1'){document.body.classList.remove('mirsad-auth-required');return;}
+    if(localStorage.getItem(CONFIG.GUEST_KEY)==='1'){document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
     showGate();
     sb.auth.onAuthStateChange(async(_event,session)=>{if(session?.user)await finishAuthenticated(session.user);});
   }
