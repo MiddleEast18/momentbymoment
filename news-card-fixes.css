@@ -1,0 +1,15 @@
+.card__update-badge {
+  left: auto;
+  right: 14px;
+  top: 14px;
+  z-index: 2;
+}
+.card__verification-badge {
+  top: 50px;
+  right: 14px;
+  z-index: 2;
+}
+@media (max-width: 700px) {
+  .card__update-badge { right: 12px; top: 12px; }
+  .card__verification-badge { right: 12px; top: 47px; }
+}
