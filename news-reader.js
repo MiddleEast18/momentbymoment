@@ -74,6 +74,44 @@
     sourceBtn.hidden = true;
   }
 
+  function getClaimDigest(article) {
+    if (!article?.claim_digest) return '';
+    if (typeof article.claim_digest === 'string') return stripHtml(article.claim_digest);
+    if (typeof article.claim_digest === 'object') {
+      return stripHtml(article.claim_digest.main_claim || article.claim_digest.summary || article.claim_digest.claim || '');
+    }
+    return '';
+  }
+
+  function buildMirsadReading(article) {
+    const claim = getClaimDigest(article);
+    const sourceCount = Math.max(1, Number(article.source_count) || 1);
+    const updates = Math.max(0, Number(article.update_count) || 0);
+    const importance = Math.round(Number(article.importance_score) || 0);
+    const confidence = Math.round(Number(article.confidence_score) || 0);
+
+    let significance = 'خبر للمتابعة ضمن المستجدات الجارية.';
+    if (importance >= 80) significance = 'تطور مرتفع الأهمية ويستحق المتابعة المباشرة.';
+    else if (importance >= 60) significance = 'تطور مهم وقد يستدعي متابعة تحديثاته.';
+    else if (importance >= 40) significance = 'تطور متوسط الأهمية ضمن سياق الأخبار الجارية.';
+
+    const evidence = sourceCount > 1
+      ? `يدعمه أكثر من مصدر (${sourceCount})، ما يرفع قابلية المقارنة بين الروايات.`
+      : 'يستند حاليًا إلى مصدر واحد، لذلك يُنصح بالرجوع إلى المصدر الأصلي لأي تفاصيل إضافية.';
+
+    const freshness = updates > 0
+      ? `شهد ${updates} ${updates === 1 ? 'تحديثًا' : 'تحديثات'} منذ نشره.`
+      : 'لم يُسجَّل تحديث إضافي حتى آخر مزامنة.';
+
+    return {
+      claim: claim || 'لا تتوفر خلاصة تحليلية مستقلة لهذا الخبر حاليًا.',
+      significance,
+      evidence,
+      freshness,
+      confidence,
+    };
+  }
+
   function articleMarkup(article, related) {
     const category = CATEGORY_LABELS[article.category] || article.category || 'عام';
     const dot = CATEGORY_COLORS[article.category] || 'var(--gold)';
@@ -84,6 +122,7 @@
     const importance = Math.round(Number(article.importance_score) || 0);
     const updates = Math.max(0, Number(article.update_count) || 0);
     const sources = Math.max(1, Number(article.source_count) || 1);
+    const reading = buildMirsadReading(article);
 
     const relatedMarkup = related.length ? `
       <section class="mirsad-reader__section" aria-labelledby="mirsadRelatedTitle">
@@ -104,12 +143,29 @@
       </div>
       <h2 id="mirsadReaderTitle" class="mirsad-reader__title">${escapeHtml(title)}</h2>
       <p class="mirsad-reader__summary">${escapeHtml(summary || 'لا يتوفر ملخص لهذا الخبر.')}</p>
-      <div class="mirsad-reader__stats">
+
+      <section class="mirsad-analysis" aria-labelledby="mirsadAnalysisTitle">
+        <div class="mirsad-analysis__header">
+          <div>
+            <span class="mirsad-analysis__eyebrow">إضافة مِرصاد</span>
+            <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
+          </div>
+          <span class="mirsad-analysis__confidence">ثقة ${reading.confidence}%</span>
+        </div>
+        <p class="mirsad-analysis__claim">${escapeHtml(reading.claim)}</p>
+        <div class="mirsad-analysis__points">
+          <div class="mirsad-analysis__point"><strong>الأهمية</strong><span>${escapeHtml(reading.significance)}</span></div>
+          <div class="mirsad-analysis__point"><strong>المصادر</strong><span>${escapeHtml(reading.evidence)}</span></div>
+          <div class="mirsad-analysis__point"><strong>التحديث</strong><span>${escapeHtml(reading.freshness)}</span></div>
+        </div>
+      </section>
+
+      <div class="mirsad-reader__stats mirsad-reader__stats--compact">
         <div class="mirsad-reader__stat"><span>الأهمية</span><strong>${importance}</strong></div>
         <div class="mirsad-reader__stat"><span>الثقة</span><strong>${confidence}%</strong></div>
-        <div class="mirsad-reader__stat"><span>التحديثات</span><strong>${updates}</strong></div>
         <div class="mirsad-reader__stat"><span>المصادر</span><strong>${sources}</strong></div>
-        <div class="mirsad-reader__stat"><span>وقت النشر</span><strong>${escapeHtml(formatTime(article.published_at))}</strong></div>
+        <div class="mirsad-reader__stat"><span>التحديثات</span><strong>${updates}</strong></div>
+        <div class="mirsad-reader__stat"><span>النشر</span><strong>${escapeHtml(formatTime(article.published_at))}</strong></div>
         <div class="mirsad-reader__stat"><span>آخر مزامنة</span><strong>${escapeHtml(formatTime(article.updated_at || article.created_at))}</strong></div>
       </div>
       ${relatedMarkup}`;
@@ -126,7 +182,7 @@
 
   async function loadArticle(id) {
     const params = new URLSearchParams({
-      select: 'id,source_name,source_url,agency_urls,headline,summary,category,importance_score,sentiment,update_count,source_count,confidence_score,published_at,created_at,updated_at,cluster_id,is_pending_verification',
+      select: 'id,source_name,source_url,agency_urls,headline,summary,category,importance_score,sentiment,update_count,source_count,confidence_score,published_at,created_at,updated_at,cluster_id,is_pending_verification,claim_digest',
       id: `eq.${id}`,
       is_pending_verification: 'eq.false',
       limit: '1',
