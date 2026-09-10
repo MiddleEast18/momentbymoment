@@ -1,0 +1,25 @@
+.mirsad-auth-gate{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at top left,rgba(201,162,39,.06),transparent 45%),var(--bg);color:var(--text)}
+.mirsad-auth-card{width:min(420px,100%);text-align:center;padding:34px 24px}
+.mirsad-auth-logo{width:72px;height:72px;margin:0 auto 18px;display:grid;place-items:center;border:1px solid var(--gold);border-radius:50%;color:var(--gold)}
+.mirsad-auth-logo svg{width:54px;height:54px}
+.mirsad-auth-title{margin:0;font-family:var(--font-display);font-size:28px}
+.mirsad-auth-subtitle{margin:8px 0 26px;color:var(--text-dim);font-size:14px}
+.mirsad-auth-actions{display:grid;gap:12px}
+.mirsad-auth-button,.mirsad-auth-input{width:100%;min-height:48px;border-radius:999px;font:inherit}
+.mirsad-auth-button{border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text);cursor:pointer}
+.mirsad-auth-button.primary{border-color:var(--gold);background:var(--gold-soft);color:var(--gold)}
+.mirsad-auth-input{padding:0 16px;border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text);text-align:center;outline:none}
+.mirsad-auth-input:focus{border-color:var(--gold)}
+.mirsad-auth-divider{margin:4px 0;color:var(--text-faint);font-family:var(--font-mono);font-size:12px}
+.mirsad-auth-status{min-height:24px;margin-top:14px;color:var(--text-dim);font-size:13px}
+.mirsad-auth-secondary{margin-top:14px;border:0;background:none;color:var(--text-dim);cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+.mirsad-profile-banner{position:fixed;left:16px;right:16px;bottom:16px;z-index:2200;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border:1px solid var(--panel-border-strong);border-radius:14px;background:rgba(16,21,28,.96);box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.mirsad-profile-banner__actions{display:flex;gap:8px;flex-shrink:0}
+.mirsad-profile-modal{position:fixed;inset:0;z-index:3100;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.7)}
+.mirsad-profile-panel{width:min(520px,100%);max-height:90vh;overflow:auto;padding:24px;border:1px solid var(--panel-border-strong);border-radius:22px;background:linear-gradient(180deg,rgba(22,29,39,.99),rgba(11,15,20,.99))}
+.mirsad-profile-panel h2{margin:0 0 18px;font-family:var(--font-display)}
+.mirsad-profile-grid{display:grid;gap:12px}
+.mirsad-profile-grid label{display:grid;gap:6px;color:var(--text-dim);font-size:13px}
+.mirsad-profile-grid input{min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text)}
+.mirsad-profile-footer{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+@media(max-width:700px){.mirsad-auth-card{padding:24px 12px}.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}}
