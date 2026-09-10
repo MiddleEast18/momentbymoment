@@ -2,7 +2,28 @@
   'use strict';
   const CONFIG={SUPABASE_URL:'https://dndlkenyfymlrjnslyzb.supabase.co',SUPABASE_KEY:'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx',PROFILE_TABLE:'profiles',GUEST_KEY:'mirsad.guest.v1'};
   if(!window.supabase)return;
-  const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY);
+  const AUTH_OPTIONS={auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}};
+  const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS);
+  const redirectTo=()=>new URL('/', window.location.origin).href;
+  const AUTH_QUERY_KEYS=['code','state','error','error_code','error_description'];
+  const AUTH_HASH_KEYS=['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','provider_token','provider_refresh_token'];
+  function cleanAuthUrl(){
+    const url=new URL(window.location.href);
+    let changed=false;
+    AUTH_QUERY_KEYS.forEach(k=>{if(url.searchParams.has(k)){url.searchParams.delete(k);changed=true}});
+    if(url.hash){
+      const hash=new URLSearchParams(url.hash.replace(/^#/,''));
+      AUTH_HASH_KEYS.forEach(k=>{if(hash.has(k)){hash.delete(k);changed=true}});
+      const next=hash.toString();
+      url.hash=next?next:'';
+    }
+    if(changed)history.replaceState({},document.title,url.pathname+url.search+(url.hash||''));
+  }
+  function readOAuthError(){
+    const url=new URL(window.location.href);
+    const hash=new URLSearchParams(window.location.hash.replace(/^#/,''));
+    return url.searchParams.get('error_description')||url.searchParams.get('error')||hash.get('error_description')||hash.get('error')||'';
+  }
   const isGuest=()=>localStorage.getItem(CONFIG.GUEST_KEY)==='1';
   const maskEmail=e=>{const[n,d]=String(e||'').split('@');return d?(`${(n||'').slice(0,1)}•••@${d}`):e};
   const logo=()=>'<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 13v9M32 42v9M13 32h9M42 32h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.5" fill="currentColor"/></svg>';
@@ -69,8 +90,8 @@
   function showGate(){
     injectStyles();let gate=document.getElementById('mirsadAuthGate');if(!gate){gate=document.createElement('div');gate.id='mirsadAuthGate';gate.className='mirsad-auth-gate';document.body.appendChild(gate);}gate.innerHTML=gateMarkup();removeGuestExit();
     const status=gate.querySelector('#mirsadAuthStatus'),email=gate.querySelector('#mirsadEmail');
-    gate.querySelector('#mirsadGoogle').addEventListener('click',async()=>{const btn=gate.querySelector('#mirsadGoogle');btn.disabled=true;statusText(status,'جارٍ فتح Google…');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});if(error){btn.disabled=false;statusText(status,'تعذر تسجيل الدخول عبر Google. تأكد من تفعيل المزود في Supabase.');}});
-    const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
+    gate.querySelector('#mirsadGoogle').addEventListener('click',async()=>{const btn=gate.querySelector('#mirsadGoogle');btn.disabled=true;statusText(status,'جارٍ فتح Google…');const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirectTo(),queryParams:{prompt:'select_account'},skipBrowserRedirect:false}});if(error){btn.disabled=false;statusText(status,'تعذر تسجيل الدخول عبر Google. تأكد من تفعيل المزود في Supabase.');}});
+    const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true,emailRedirectTo:redirectTo()}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
     gate.querySelector('#mirsadEmailContinue').addEventListener('click',sendOtp);email.addEventListener('keydown',e=>{if(e.key==='Enter')sendOtp()});
     gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();});
   }
@@ -82,17 +103,23 @@
     const timer=setInterval(()=>{if(!document.getElementById('mirsadAuthGate')){clearInterval(timer);return;}remaining-=1;resend.textContent=remaining>0?`إعادة إرسال الرمز (${remaining})`:'إعادة إرسال الرمز';if(remaining<=0){clearInterval(timer);resend.disabled=false}},1000);
     inputs.forEach((input,i)=>{input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(-1);if(input.value&&inputs[i+1])inputs[i+1].focus()});input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&inputs[i-1])inputs[i-1].focus()});input.addEventListener('paste',e=>{const v=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,6);if(!v)return;e.preventDefault();[...v].forEach((n,j)=>{if(inputs[j])inputs[j].value=n});inputs[Math.min(v.length,6)-1]?.focus()})});
     gate.querySelector('#mirsadOtpBack').addEventListener('click',showGate);
-    resend.addEventListener('click',async()=>{resend.disabled=true;statusText(status,'جارٍ إرسال رمز جديد…');const{error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});if(error){statusText(status,'تعذر إعادة إرسال الرمز. حاول لاحقًا.');resend.disabled=false;return;}remaining=30;statusText(status,'تم إرسال رمز جديد.');const tick=setInterval(()=>{remaining-=1;resend.textContent=remaining>0?`إعادة إرسال الرمز (${remaining})`:'إعادة إرسال الرمز';if(remaining<=0){clearInterval(tick);resend.disabled=false}},1000)});
+    resend.addEventListener('click',async()=>{resend.disabled=true;statusText(status,'جارٍ إرسال رمز جديد…');const{error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true,emailRedirectTo:redirectTo()}});if(error){statusText(status,'تعذر إعادة إرسال الرمز. حاول لاحقًا.');resend.disabled=false;return;}remaining=30;statusText(status,'تم إرسال رمز جديد.');const tick=setInterval(()=>{remaining-=1;resend.textContent=remaining>0?`إعادة إرسال الرمز (${remaining})`:'إعادة إرسال الرمز';if(remaining<=0){clearInterval(tick);resend.disabled=false}},1000)});
     gate.querySelector('#mirsadOtpVerify').addEventListener('click',async()=>{const token=inputs.map(x=>x.value).join('');if(!/^\d{6}$/.test(token)){statusText(status,'أدخل رمز التحقق المكوّن من 6 أرقام.');return;}const btn=gate.querySelector('#mirsadOtpVerify');btn.disabled=true;statusText(status,'جارٍ التحقق…');const{data,error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error||!data?.session?.user){btn.disabled=false;statusText(status,'رمز التحقق غير صحيح أو منتهي.');return;}await finishAuthenticated(data.session.user)});
     inputs[0]?.focus();
   }
 
   async function ensureProfile(user){
     const meta=user.user_metadata||{};
-    const{data:existing}=await sb.from(CONFIG.PROFILE_TABLE).select('id,display_name,username,bio,onboarding_completed').eq('id',user.id).maybeSingle();
+    const selectCols='id,display_name,username,bio,onboarding_completed';
+    const{data:existing}=await sb.from(CONFIG.PROFILE_TABLE).select(selectCols).eq('id',user.id).maybeSingle();
     if(existing)return existing;
-    const{data,error}=await sb.from(CONFIG.PROFILE_TABLE).insert({id:user.id,display_name:meta.full_name||meta.name||'',avatar_url:meta.avatar_url||meta.picture||null}).select('id,display_name,username,bio,onboarding_completed').single();
-    if(error)throw error;return data;
+    const payload={id:user.id,display_name:meta.full_name||meta.name||'',avatar_url:meta.avatar_url||meta.picture||null};
+    const{data,error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'}).select(selectCols).maybeSingle();
+    if(data)return data;
+    const{data:again}=await sb.from(CONFIG.PROFILE_TABLE).select(selectCols).eq('id',user.id).maybeSingle();
+    if(again)return again;
+    if(error)throw error;
+    return {id:user.id,display_name:payload.display_name,username:null,bio:null,onboarding_completed:false};
   }
 
   async function openProfile(user){
@@ -100,7 +127,7 @@
     const safe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     modal.innerHTML=`<section class="mirsad-profile-panel" role="dialog" aria-modal="true" aria-labelledby="mirsadProfileTitle"><h2 id="mirsadProfileTitle">ملفي الشخصي</h2><div class="mirsad-profile-grid"><label>البريد الإلكتروني<input value="${safe(user.email||'')}" disabled></label><label>الاسم<input id="profileName" maxlength="80" value="${safe(p.display_name||'')}" placeholder="اسمك"></label><label>اسم المستخدم<input id="profileUsername" maxlength="30" value="${safe(p.username||'')}" placeholder="اسم مستخدم"></label><label>نبذة قصيرة<input id="profileBio" maxlength="160" value="${safe(p.bio||'')}" placeholder="اختياري"></label></div><div class="mirsad-profile-footer"><button class="mirsad-auth-button primary" type="button" data-save>حفظ</button><button class="mirsad-auth-button" type="button" data-close>إغلاق</button></div><div id="mirsadProfileStatus" class="mirsad-auth-status" role="status" aria-live="polite"></div></section>`;
     document.body.appendChild(modal);modal.querySelector('[data-close]').addEventListener('click',()=>modal.remove());modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
-    modal.querySelector('[data-save]').addEventListener('click',async()=>{const status=modal.querySelector('#mirsadProfileStatus'),btn=modal.querySelector('[data-save]');const payload={display_name:modal.querySelector('#profileName').value.trim(),username:modal.querySelector('#profileUsername').value.trim()||null,bio:modal.querySelector('#profileBio').value.trim(),onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).update(payload).eq('id',user.id);btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من اسم المستخدم وحاول مجددًا.');return;}modal.remove()});
+    modal.querySelector('[data-save]').addEventListener('click',async()=>{const status=modal.querySelector('#mirsadProfileStatus'),btn=modal.querySelector('[data-save]');const payload={id:user.id,display_name:modal.querySelector('#profileName').value.trim(),username:modal.querySelector('#profileUsername').value.trim()||null,bio:modal.querySelector('#profileBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من اسم المستخدم وحاول مجددًا.');return;}document.getElementById('mirsadProfileBanner')?.remove();modal.remove()});
   }
 
   function showProfileBanner(user){
@@ -130,32 +157,45 @@
   window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
 
-  async function init(){
-    injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
-    const url = new URL(window.location.href);
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/,'?'));
-    const oauthError = url.searchParams.get('error') || hash.get('error');
-    if(oauthError){
-      history.replaceState({}, document.title, url.pathname + url.search);
-      document.body.classList.remove('mirsad-auth-required');
-      showGate();
-      statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
-      return;
+  async function recoverSession(){
+    const url=new URL(window.location.href);
+    const code=url.searchParams.get('code');
+    if(code){
+      const{data,error}=await sb.auth.exchangeCodeForSession(code);
+      if(error)console.error('[mirsad auth] oauth exchange failed',error);
+      if(data?.session?.user)return data.session;
     }
     let {data,error}=await sb.auth.getSession();
     if(error)console.error('[mirsad auth] session lookup failed',error);
-    if(!data?.session?.user && (window.location.hash.includes('access_token=') || url.searchParams.get('code'))){
-      for(let i=0;i<10 && !data?.session?.user;i++){
-        await new Promise(resolve=>setTimeout(resolve,100));
+    if(data?.session?.user)return data.session;
+    if(window.location.hash.includes('access_token=')){
+      for(let i=0;i<20 && !data?.session?.user;i++){
+        await new Promise(resolve=>setTimeout(resolve,150));
         ({data}=await sb.auth.getSession());
       }
     }
-    if(data?.session?.user){
-      history.replaceState({}, document.title, url.pathname + url.search);
-      await finishAuthenticated(data.session.user);return;
+    return data?.session||null;
+  }
+
+  sb.auth.onAuthStateChange((event,session)=>{
+    if((event==='SIGNED_IN'||event==='USER_UPDATED') && session?.user){
+      if(document.getElementById('mirsadAuthGate') || document.body.classList.contains('mirsad-auth-required')){
+        void finishAuthenticated(session.user);
+      }
+    }
+  });
+
+  async function init(){
+    injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
+    const oauthError=readOAuthError();
+    const session=await recoverSession();
+    cleanAuthUrl();
+    if(session?.user){
+      await finishAuthenticated(session.user);return;
     }
     if(isGuest()){document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
     showGate();
+    if(oauthError)statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
   }
   const start=()=>{if(document.body)void init()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

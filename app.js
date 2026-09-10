@@ -31,7 +31,7 @@
   const insightTrustedSourcesEl = document.getElementById('insightTrustedSources');
   const cardTemplate = document.getElementById('cardTemplate');
   if (!window.supabase) throw new Error('Supabase JS not loaded');
-  const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   const state = { articles: [], activeFilter: 'all', searchQuery: '', sortMode: 'priority', channel: null, pollTimer: null };
   const STORAGE_KEY = 'mirsad.ui.state.v1';
   const SELECT_COLUMNS = 'id,source_name,source_url,agency_urls,headline,summary,category,importance_score,sentiment,layout_size,cluster_id,update_count,source_count,source_trust_score,confidence_score,is_pending_verification,verification_notes,inherited_from_cache,llm_model_used,claim_digest,raw_payload,published_at,created_at,updated_at';
