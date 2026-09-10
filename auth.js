@@ -117,8 +117,28 @@
 
   async function init(){
     injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
-    const{data,error}=await sb.auth.getSession();if(error)console.error('[mirsad auth] session lookup failed',error);
-    if(data?.session?.user){await finishAuthenticated(data.session.user);return;}
+    const url = new URL(window.location.href);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/,'?'));
+    const oauthError = url.searchParams.get('error') || hash.get('error');
+    if(oauthError){
+      history.replaceState({}, document.title, url.pathname + url.search);
+      document.body.classList.remove('mirsad-auth-required');
+      showGate();
+      statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
+      return;
+    }
+    let {data,error}=await sb.auth.getSession();
+    if(error)console.error('[mirsad auth] session lookup failed',error);
+    if(!data?.session?.user && (window.location.hash.includes('access_token=') || url.searchParams.get('code'))){
+      for(let i=0;i<10 && !data?.session?.user;i++){
+        await new Promise(resolve=>setTimeout(resolve,100));
+        ({data}=await sb.auth.getSession());
+      }
+    }
+    if(data?.session?.user){
+      history.replaceState({}, document.title, url.pathname + url.search);
+      await finishAuthenticated(data.session.user);return;
+    }
     if(isGuest()){document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
     showGate();
   }
