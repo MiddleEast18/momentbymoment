@@ -80,13 +80,17 @@ button, input, select { font: inherit; }
 .card[data-sentiment="Positive"]::before { box-shadow: inset 0 0 0 1px var(--positive-glow), 0 0 24px -8px var(--positive-glow); }
 .card-large { grid-column: span 2; grid-row: span 2; padding: 26px; background: linear-gradient(180deg, rgba(11,15,20,0) 0%, rgba(11,15,20,0.84) 78%), var(--panel); }
 .card-large .card__headline { font-size: 24px; line-height: 1.4; } .card-medium { grid-column: span 2; } .card-medium .card__headline { font-size: 18px; }
-.card__importance { position: absolute; top: 16px; left: 16px; display: flex; align-items: flex-end; gap: 3px; }
+.card__importance { position: absolute; top: 16px; right: 16px; left: auto; display: flex; align-items: flex-end; gap: 3px; }
 .card__bar { width: 3px; height: 6px; background: var(--panel-border-strong); border-radius: 1px; } .card__bar:nth-child(2) { height: 9px; } .card__bar:nth-child(3) { height: 12px; } .card__bar:nth-child(4) { height: 15px; } .card__bar:nth-child(5) { height: 18px; }
 .card[data-tier="1"] .card__bar:nth-child(1), .card[data-tier="2"] .card__bar:nth-child(-n+2), .card[data-tier="3"] .card__bar:nth-child(-n+3), .card[data-tier="4"] .card__bar:nth-child(-n+4), .card[data-tier="5"] .card__bar { background: var(--gold); }
 .card__score { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); margin-right: 4px; }
-.card__update-badge, .card__verification-badge { position: absolute; top: 14px; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-family: var(--font-mono); }
-.card__update-badge { left: 14px; background: rgba(251,191,36,.12); color: #fde68a; border: 1px solid rgba(251,191,36,.22); } .card__verification-badge { right: 14px; background: rgba(245,158,11,.12); color: #fcd34d; border: 1px solid rgba(245,158,11,.22); }
-.card__eyebrow { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); } .card__dot { width: 7px; height: 7px; border-radius: 50%; } .card__source { color: var(--text-faint); } .card__source::before { content: '· '; }
+.card__update-badge, .card__verification-badge { position: absolute; top: 0; border-radius: 0 0 10px 0; padding: 6px 11px; font-size: 11px; line-height: 1.2; font-family: var(--font-mono); }
+.card__update-badge { left: 0; background: rgba(251,191,36,.10); color: #fde68a; border: 1px solid rgba(251,191,36,.28); border-top: 0; border-left: 0; }
+.card__verification-badge { right: 14px; background: rgba(245,158,11,.12); color: #fcd34d; border: 1px solid rgba(245,158,11,.22); }
+.card__eyebrow { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); }
+.card__dot { width: 7px; height: 7px; border-radius: 50%; }
+.card__source { color: var(--text-faint); }
+.card__source::before { content: '· '; }
 .card__headline { margin: 0; font-family: var(--font-display); font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .card__summary { margin: 0; font-size: 13.5px; color: var(--text-dim); line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .card__evidence { margin: 0; color: var(--gold); font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
