@@ -10,12 +10,6 @@
   let snapshot = null;
   let applying = false;
 
-  const escapeHtml = (value) => {
-    const div = document.createElement('div');
-    div.textContent = String(value ?? '');
-    return div.innerHTML;
-  };
-
   const stripHtml = (value) => {
     const box = document.createElement('div');
     box.innerHTML = String(value || '');
@@ -113,8 +107,8 @@
     if (summary) summary.textContent = stripHtml(data.summary) || 'لا يتوفر ملخص لهذا الخبر.';
     if (meta) {
       const parts = [...meta.children];
-      if (parts[2]) parts[2].textContent = data.source_name || 'مصدر';
-      if (parts[4]) parts[4].textContent = relative(data.published_at);
+      if (parts[3]) parts[3].textContent = data.source_name || 'مصدر';
+      if (parts[5]) parts[5].textContent = relative(data.published_at);
     }
     const sourceBtn = document.querySelector('.mirsad-reader__source');
     if (sourceBtn) {
@@ -139,15 +133,13 @@
         ? 'الأصل'
         : `تحديث ${Math.max(1, Number(revision.revision_number || 1) - 1)}`,
       time: revision.captured_at,
-      revision,
     }));
     const missingTabs = Array.from({ length: missing }, (_, index) => ({
       kind: 'missing',
       label: `تحديث ${updates.length + index + 1}`,
       time: null,
-      revision: null,
     }));
-    const currentTab = { kind: 'current', label: 'الحالي', time: article.updated_at, revision: null };
+    const currentTab = { kind: 'current', label: 'الحالي', time: article.updated_at };
     const tabs = [...savedTabs, ...missingTabs, currentTab];
 
     section.innerHTML = `
@@ -170,13 +162,13 @@
             role="tab"
             aria-selected="${tab.kind === 'current'}"
             ${tab.kind === 'missing' ? 'disabled aria-disabled="true"' : ''}>
-            <span>${escapeHtml(tab.label)}</span>
-            <small>${escapeHtml(tab.time ? relative(tab.time) : 'غير محفوظ')}</small>
+            <span>${tab.label}</span>
+            <small>${tab.time ? relative(tab.time) : 'غير محفوظ'}</small>
           </button>`).join('')}
       </div>
       <div class="mirsad-revisions__active">
         <span>الحالي</span>
-        <time datetime="${escapeHtml(article.updated_at || '')}">${escapeHtml(formatTime(article.updated_at))}</time>
+        <time datetime="${article.updated_at || ''}">${formatTime(article.updated_at)}</time>
       </div>`;
 
     return section;
@@ -186,8 +178,7 @@
     const content = document.querySelector('.mirsad-reader__content');
     if (!content) return;
     const tabs = [...section.querySelectorAll('[data-compat-revision-index]')];
-    const updates = savedUpdates(snapshot);
-    const currentIndex = snapshot.revisions.length + Math.max(0, (Number(snapshot.article.update_count) || 0) - updates.length);
+    const currentIndex = snapshot.revisions.length + Math.max(0, (Number(snapshot.article.update_count) || 0) - savedUpdates(snapshot).length);
 
     tabs.forEach((button) => {
       button.addEventListener('click', () => {
@@ -198,7 +189,6 @@
           tab.setAttribute('aria-selected', String(tab === button));
         });
         const active = content.querySelector('.mirsad-revisions__active');
-        const item = index < snapshot.revisions.length ? snapshot.revisions[index] : null;
         if (index === currentIndex) {
           setReaderText(snapshot.article);
           if (active) {
@@ -207,6 +197,7 @@
           }
           return;
         }
+        const item = snapshot.revisions[index];
         if (!item) return;
         setReaderText(displayData(item));
         if (active) {
@@ -226,8 +217,7 @@
 
     applying = true;
     try {
-      const existing = content.querySelector('.mirsad-revisions');
-      if (existing) existing.remove();
+      content.querySelector('.mirsad-revisions')?.remove();
       const section = buildCompatSection();
       anchor.insertAdjacentElement('afterend', section);
       setReaderText(snapshot.article);
