@@ -1,19 +1,47 @@
+.card {
+  overflow: visible;
+}
+
+.card__importance {
+  top: 16px;
+  left: 16px;
+  right: auto;
+  z-index: 2;
+}
+
 .card__update-badge {
+  top: 0;
   left: 0;
   right: auto;
-  top: 0;
-  z-index: 3;
-  border-radius: 0 0 10px 0;
+  transform: translateY(-50%);
+  z-index: 4;
+  border-radius: 8px 8px 8px 0;
   padding: 6px 11px;
-  border-top: 0;
-  border-left: 0;
+  border: 1px solid rgba(251,191,36,.28);
 }
+
 .card__verification-badge {
   top: 47px;
   right: 14px;
   z-index: 2;
 }
+
 @media (max-width: 700px) {
-  .card__update-badge { left: 0; right: auto; top: 0; }
-  .card__verification-badge { right: 12px; top: 47px; }
+  .card__importance {
+    top: 16px;
+    left: 16px;
+    right: auto;
+  }
+
+  .card__update-badge {
+    top: 0;
+    left: 0;
+    right: auto;
+    transform: translateY(-50%);
+  }
+
+  .card__verification-badge {
+    right: 12px;
+    top: 47px;
+  }
 }
