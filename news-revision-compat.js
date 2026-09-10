@@ -220,12 +220,14 @@
   function applyCompatPatch() {
     if (applying || !snapshot || !needsCompat(snapshot)) return;
     const content = document.querySelector('.mirsad-reader__content');
-    if (!content) return;
+    if (!content || content.querySelector('.mirsad-revisions--compat')) return;
+    const anchor = content.querySelector('.mirsad-reader__summary');
+    if (!anchor) return;
+
     applying = true;
     try {
-      content.querySelector('.mirsad-revisions')?.remove();
-      const anchor = content.querySelector('.mirsad-reader__summary');
-      if (!anchor) return;
+      const existing = content.querySelector('.mirsad-revisions');
+      if (existing) existing.remove();
       const section = buildCompatSection();
       anchor.insertAdjacentElement('afterend', section);
       setReaderText(snapshot.article);
@@ -250,7 +252,8 @@
   document.addEventListener('click', captureTarget, true);
 
   const observer = new MutationObserver(() => {
-    if (document.querySelector('.mirsad-reader__content')) window.requestAnimationFrame(reconcile);
+    const content = document.querySelector('.mirsad-reader__content');
+    if (content && !content.querySelector('.mirsad-revisions--compat')) window.requestAnimationFrame(reconcile);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 })();
