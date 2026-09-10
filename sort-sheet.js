@@ -10,9 +10,16 @@
   const labels = { priority: 'الأولوية', latest: 'الأحدث', updates: 'الأكثر تحديثًا' };
   let lastFocus = null;
 
+  const currentValue = () => {
+    const value = trigger.matches('select') ? trigger.value : trigger.dataset.sortMode;
+    return ['priority', 'latest', 'updates'].includes(value) ? value : 'priority';
+  };
+
   const syncOptions = () => {
-    const value = trigger.value || 'priority';
-    trigger.textContent = labels[value] || labels.priority;
+    const value = currentValue();
+    trigger.textContent = labels[value];
+    trigger.dataset.sortMode = value;
+    trigger.setAttribute('aria-label', `ترتيب الأخبار: ${labels[value]}`);
     options.forEach((option) => {
       option.setAttribute('aria-checked', String(option.dataset.sortOption === value));
     });
@@ -39,9 +46,10 @@
   options.forEach((option) => {
     option.addEventListener('click', () => {
       const value = option.dataset.sortOption;
-      if (!value) return;
-      trigger.value = value;
+      if (!['priority', 'latest', 'updates'].includes(value)) return;
+      trigger.dataset.sortMode = value;
       trigger.dispatchEvent(new Event('change', { bubbles: true }));
+      trigger.dispatchEvent(new CustomEvent('sortchange', { bubbles: true, detail: { value } }));
       syncOptions();
       close();
     });
