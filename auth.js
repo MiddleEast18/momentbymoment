@@ -115,6 +115,21 @@
     if(!profile?.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
+  function resetOAuthButtonAfterReturn(){
+    const gate=document.getElementById('mirsadAuthGate');
+    if(!gate)return;
+    const btn=gate.querySelector('#mirsadGoogle');
+    if(btn){btn.disabled=false;}
+    const status=gate.querySelector('#mirsadAuthStatus');
+    if(status && status.textContent==='جارٍ فتح Google…')status.textContent='';
+  }
+
+  // Mobile browsers often restore the page from the back/forward cache after leaving for Google.
+  // Reset transient loading state so the Google button can be used again without a full reload.
+  window.addEventListener('pageshow',()=>resetOAuthButtonAfterReturn());
+  window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
+
   async function init(){
     injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
     const url = new URL(window.location.href);
