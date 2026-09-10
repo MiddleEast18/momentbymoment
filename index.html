@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=202609092300">
   <link rel="stylesheet" href="logo.css?v=202609100020">
+  <link rel="stylesheet" href="controls-fix.css?v=202609100035">
   <link rel="stylesheet" href="news-reader.css?v=202609100020">
   <link rel="stylesheet" href="news-pagination.css?v=202609100005">
 </head>
@@ -28,7 +29,7 @@
   <nav class="control-bar" aria-label="لوحة التصفية">
     <div class="control-bar__left">
       <input class="search-box" id="searchBox" type="search" placeholder="ابحث في العناوين والملخصات…">
-      <button class="sort-box sort-trigger" id="sortBox" type="button" aria-haspopup="dialog" aria-expanded="false">الأولوية</button>
+      <button class="sort-box sort-trigger" id="sortBox" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="ترتيب الأخبار: الأولوية" data-sort-mode="priority">الأولوية</button>
     </div>
     <div class="control-bar__filters" id="categoryFilters"><button class="chip is-active" data-category="all" type="button">الكل</button><button class="chip" data-category="Politics" type="button"><span class="chip__dot chip__dot--politics"></span>سياسة</button><button class="chip" data-category="Economy" type="button"><span class="chip__dot chip__dot--economy"></span>اقتصاد</button><button class="chip" data-category="Tech" type="button"><span class="chip__dot chip__dot--tech"></span>تقنية</button><button class="chip" data-category="Society" type="button"><span class="chip__dot chip__dot--society"></span>مجتمع</button><button class="chip" data-category="Sports" type="button"><span class="chip__dot chip__dot--sports"></span>رياضة</button></div>
     <div class="control-bar__count" id="liveCount">0 خبر معروض</div>
@@ -52,9 +53,9 @@
   <footer class="wire-footer"><p>مِرصاد — واجهة عرض للرصد الإخباري. الأخبار المعلقة للتحقق لا تظهر حتى تُراجع، وتبقى حقوق المواد الأصلية لأصحابها.</p><nav aria-label="روابط معلومات الموقع"><a href="about.html">من نحن</a><span>·</span><a href="contact.html">اتصل بنا</a><span>·</span><a href="privacy.html">سياسة الخصوصية</a><span>·</span><a href="terms.html">شروط الاستخدام</a></nav></footer>
   <template id="cardTemplate"><article class="card" tabindex="0" role="button" aria-label="فتح الخبر"><div class="card__importance" aria-hidden="true"><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__score"></span></div><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=202609092345"></script>
+  <script src="app.js?v=202609100035"></script>
   <script src="ticker-fix.js?v=202609092300"></script>
-  <script src="sort-sheet.js?v=202609092000"></script>
+  <script src="sort-sheet.js?v=202609100035"></script>
   <script src="news-reader.js?v=202609100020"></script>
   <script src="news-pagination.js?v=202609100005"></script>
 </body>
