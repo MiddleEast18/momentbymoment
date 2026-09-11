@@ -278,6 +278,7 @@
         : 'تعذر فتح الخبر حاليًا.';
       throw new Error(message);
     }
+    window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining: Number(result?.remaining_unlocks || 0), unlimited: Boolean(result?.unlimited) } }));
     return result;
   }
 
