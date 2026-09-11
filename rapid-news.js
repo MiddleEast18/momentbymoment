@@ -25,8 +25,9 @@
   const refreshUnread = async () => { if (!currentUser) return; const { data, error } = await sb.rpc('rapid_news_unread_count'); if (!error) setBadge(Number(data || 0)); };
   const markSeen = async () => { if (!currentUser) return; const { error } = await sb.rpc('rapid_news_mark_seen'); if (!error) setBadge(0); };
   const open = async () => { opened = true; rail.hidden = false; toggle.setAttribute('aria-expanded', 'true'); await load(); await markSeen(); };
-  more.addEventListener('click', () => { visibleCount += 3; render(currentRows); });
-  all.addEventListener('click', () => { visibleCount = currentRows.length; render(currentRows); });
+  const consume = async (kind) => { if (!window.mirsadViewAccess) return false; more.disabled = true; all.disabled = true; const result = await window.mirsadViewAccess.consume(kind); more.disabled = false; all.disabled = false; if (!result.allowed) { status.textContent = result.error?.message === 'not_authenticated' ? 'سجّل الدخول لاستخدام الفتحات' : 'لا توجد فتحات كافية'; return false; } status.textContent = result.charged ? `تم خصم ${kind === 'more' ? 5 : 100} فتحات` : 'الاستخدام مجاني في هذه الدورة'; return true; };
+  more.addEventListener('click', async () => { if (!(await consume('more'))) return; visibleCount += 5; render(currentRows); });
+  all.addEventListener('click', async () => { if (!(await consume('all'))) return; visibleCount = currentRows.length; render(currentRows); });
   toggle.addEventListener('click', () => { if (opened) { opened = false; rail.hidden = true; toggle.setAttribute('aria-expanded', 'false'); } else void open(); });
   const start = async () => { await load(); const { data: { session } } = await sb.auth.getSession(); currentUser = Boolean(session?.user); await refreshUnread(); channel = sb.channel('mirsad-rapid-news-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rapid_news' }, () => { void load(); if (opened) void markSeen(); else void refreshUnread(); }).subscribe(); timer = setInterval(async () => { await load(); if (!opened) await refreshUnread(); }, 60000); };
   sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });

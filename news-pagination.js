@@ -18,9 +18,14 @@
 
   const moreButton = controls.querySelector('[data-action="more"]');
   const allButton = controls.querySelector('[data-action="all"]');
+  const status = document.createElement('span');
+  status.className = 'news-pagination__status';
+  status.setAttribute('role', 'status');
+  controls.appendChild(status);
   let shown = INITIAL_COUNT;
   let showAll = false;
   let reconcileQueued = false;
+  let busy = false;
 
   function cards() {
     return [...grid.querySelectorAll(':scope > .card')];
@@ -57,14 +62,31 @@
     });
   }
 
-  moreButton.addEventListener('click', () => {
+  async function consume(kind) {
+    if (busy || !window.mirsadViewAccess) return false;
+    busy = true;
+    moreButton.disabled = true;
+    allButton.disabled = true;
+    status.textContent = 'جارٍ التحقق…';
+    const result = await window.mirsadViewAccess.consume(kind);
+    busy = false;
+    moreButton.disabled = false;
+    allButton.disabled = false;
+    if (!result.allowed) { status.textContent = result.error?.message === 'not_authenticated' ? 'سجّل الدخول لاستخدام الفتحات' : 'لا توجد فتحات كافية'; return false; }
+    status.textContent = result.charged ? `تم خصم ${kind === 'more' ? 5 : 100} فتحات` : 'الاستخدام مجاني في هذه الدورة';
+    return true;
+  }
+
+  moreButton.addEventListener('click', async () => {
+    if (!(await consume('more'))) return;
     shown += MORE_COUNT;
     showAll = false;
     apply();
     window.scrollBy({ top: 1, behavior: 'instant' });
   });
 
-  allButton.addEventListener('click', () => {
+  allButton.addEventListener('click', async () => {
+    if (!(await consume('all'))) return;
     showAll = true;
     apply();
   });
