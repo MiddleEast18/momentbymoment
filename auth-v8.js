@@ -174,10 +174,12 @@
   
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
-    let profile;try{profile=await ensureProfile(user)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
+    // Authentication success must reveal the app immediately; profile hydration is non-blocking.
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
     showUserMenu(user);
-    if(!profile?.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    let profile=null;
+    try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
+    if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
@@ -194,25 +196,32 @@
   window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
 
+  const AUTH_RECOVERY_TIMEOUT_MS=8000;
+  const withAuthTimeout=(promise,ms)=>Promise.race([promise,new Promise(resolve=>setTimeout(()=>resolve(null),ms))]);
   async function recoverSession(){
     if(!sb)return null;
-    const url=new URL(window.location.href);
-    const code=url.searchParams.get('code');
-    if(code){
-      const{data,error}=await sb.auth.exchangeCodeForSession(code);
-      if(error)console.error('[mirsad auth] oauth exchange failed',error);
-      if(data?.session?.user)return data.session;
-    }
-    let {data,error}=await sb.auth.getSession();
-    if(error)console.error('[mirsad auth] session lookup failed',error);
-    if(data?.session?.user)return data.session;
-    if(window.location.hash.includes('access_token=')){
-      for(let i=0;i<20 && !data?.session?.user;i++){
-        await new Promise(resolve=>setTimeout(resolve,150));
-        ({data}=await sb.auth.getSession());
+    try{
+      const url=new URL(window.location.href);
+      const code=url.searchParams.get('code');
+      if(code){
+        const{data,error}=await sb.auth.exchangeCodeForSession(code);
+        if(error)console.error('[mirsad auth] oauth exchange failed',error);
+        if(data?.session?.user)return data.session;
       }
+      let {data,error}=await sb.auth.getSession();
+      if(error)console.error('[mirsad auth] session lookup failed',error);
+      if(data?.session?.user)return data.session;
+      if(window.location.hash.includes('access_token=')){
+        for(let i=0;i<20 && !data?.session?.user;i++){
+          await new Promise(resolve=>setTimeout(resolve,150));
+          ({data}=await sb.auth.getSession());
+        }
+      }
+      return data?.session||null;
+    }catch(error){
+      console.error('[mirsad auth] session recovery failed',error);
+      return null;
     }
-    return data?.session||null;
   }
 
   if(sb)sb.auth.onAuthStateChange((event,session)=>{
@@ -231,7 +240,7 @@
       return;
     }
     const oauthError=readOAuthError();
-    const session=await recoverSession();
+    const session=await withAuthTimeout(recoverSession(),AUTH_RECOVERY_TIMEOUT_MS);
     cleanAuthUrl();
     if(session?.user){
       await finishAuthenticated(session.user);return;
