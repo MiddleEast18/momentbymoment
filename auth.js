@@ -133,7 +133,7 @@
 
   async function ensureProfile(user){
     const meta=user.user_metadata||{};
-    const selectCols='id,display_name,username,bio,onboarding_completed';
+    const selectCols='id,display_name,username,bio,avatar_url,onboarding_completed';
     const{data:existing}=await sb.from(CONFIG.PROFILE_TABLE).select(selectCols).eq('id',user.id).maybeSingle();
     if(existing)return existing;
     const payload={id:user.id,display_name:meta.full_name||meta.name||'',avatar_url:meta.avatar_url||meta.picture||null};
@@ -145,12 +145,24 @@
     return {id:user.id,display_name:payload.display_name,username:null,bio:null,onboarding_completed:false};
   }
 
-  async function openProfile(user){
-    const{data:profile}=await sb.from(CONFIG.PROFILE_TABLE).select('display_name,username,bio').eq('id',user.id).maybeSingle();const p=profile||{};const modal=document.createElement('div');modal.className='mirsad-profile-modal';
+  const isProfilePage=()=>window.location.pathname.endsWith('/profile.html');
+  const profilePageUrl=()=>new URL('profile.html',window.location.href).href;
+  function renderProfilePage(user,profile){
+    const root=document.getElementById('mirsadProfilePage');if(!root)return;
     const safe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    modal.innerHTML=`<section class="mirsad-profile-panel" role="dialog" aria-modal="true" aria-labelledby="mirsadProfileTitle"><h2 id="mirsadProfileTitle">ملفي الشخصي</h2><div class="mirsad-profile-grid"><label>البريد الإلكتروني<input value="${safe(user.email||'')}" disabled></label><label>الاسم<input id="profileName" maxlength="80" value="${safe(p.display_name||'')}" placeholder="اسمك"></label><label>اسم المستخدم<input id="profileUsername" maxlength="30" value="${safe(p.username||'')}" placeholder="اسم مستخدم"></label><label>نبذة قصيرة<input id="profileBio" maxlength="160" value="${safe(p.bio||'')}" placeholder="اختياري"></label></div><div class="mirsad-profile-footer"><button class="mirsad-auth-button primary" type="button" data-save>حفظ</button><button class="mirsad-auth-button" type="button" data-close>إغلاق</button></div><div id="mirsadProfileStatus" class="mirsad-auth-status" role="status" aria-live="polite"></div></section>`;
-    document.body.appendChild(modal);modal.querySelector('[data-close]').addEventListener('click',()=>modal.remove());modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
-    modal.querySelector('[data-save]').addEventListener('click',async()=>{const status=modal.querySelector('#mirsadProfileStatus'),btn=modal.querySelector('[data-save]');const payload={id:user.id,display_name:modal.querySelector('#profileName').value.trim(),username:modal.querySelector('#profileUsername').value.trim()||null,bio:modal.querySelector('#profileBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من اسم المستخدم وحاول مجددًا.');return;}document.getElementById('mirsadProfileBanner')?.remove();modal.remove()});
+    const avatar=profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'';
+    const initial=(profile?.display_name||user.email||'مِ').trim().charAt(0).toUpperCase();
+    root.innerHTML=`<div class="mirsad-profile-page__shell"><header class="mirsad-profile-page__header"><div class="mirsad-profile-page__brand"><span aria-hidden="true">◉</span><span>مِرصاد</span></div><button class="mirsad-profile-page__back" type="button" data-back>العودة للأخبار</button></header><section class="mirsad-profile-page__card"><div class="mirsad-profile-page__avatar">${avatar?`<img src="${safe(avatar)}" alt="" loading="lazy">`:`<span>${safe(initial)}</span>`}</div><h1 class="mirsad-profile-page__title">ملفي الشخصي</h1><p class="mirsad-profile-page__intro">إدارة معلوماتك وتجربتك في مِرصاد.</p><div class="mirsad-profile-grid"><label>البريد الإلكتروني<input value="${safe(user.email||'')}" disabled></label><label>الاسم<input id="profilePageName" maxlength="80" value="${safe(profile?.display_name||'')}" placeholder="اسمك"></label><label>رابط الصورة<input id="profilePageAvatar" maxlength="500" value="${safe(profile?.avatar_url||'')}" placeholder="رابط صورة اختياري"></label><label>اسم المستخدم<input id="profilePageUsername" maxlength="30" value="${safe(profile?.username||'')}" placeholder="اسم مستخدم"></label><label>نبذة قصيرة<input id="profilePageBio" maxlength="160" value="${safe(profile?.bio||'')}" placeholder="اختياري"></label></div><div class="mirsad-profile-page__actions"><button class="mirsad-auth-button primary" type="button" data-save>حفظ ومتابعة</button><button class="mirsad-auth-button" type="button" data-signout>تسجيل الخروج</button></div><div id="mirsadProfilePageStatus" class="mirsad-auth-status" role="status" aria-live="polite"></div><div class="mirsad-profile-page__danger"><button class="mirsad-auth-button" type="button" data-delete>حذف الحساب</button></div></section></div>`;
+    root.hidden=false;
+    root.querySelector('[data-back]').addEventListener('click',()=>{window.location.href=new URL('index.html',window.location.href).href});
+    root.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){statusText(root.querySelector('#mirsadProfilePageStatus'),'تعذر تسجيل الخروج. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
+    root.querySelector('[data-save]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus'),btn=root.querySelector('[data-save]');const payload={id:user.id,display_name:root.querySelector('#profilePageName').value.trim(),avatar_url:root.querySelector('#profilePageAvatar').value.trim()||null,username:root.querySelector('#profilePageUsername').value.trim()||null,bio:root.querySelector('#profilePageBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من البيانات وحاول مجددًا.');return}statusText(status,'تم حفظ الملف بنجاح.')});
+    root.querySelector('[data-delete]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus');if(!window.confirm('هل أنت متأكد من حذف حسابك؟ سيتم حذف بيانات ملفك وتسجيل خروجك.'))return;const{error}=await sb.functions.invoke('delete-account',{body:{}});if(error){statusText(status,'تعذر حذف الحساب. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
+  }
+
+  async function openProfile(user){
+    if(isProfilePage()){renderProfilePage(user,await ensureProfile(user));return}
+    window.location.href=profilePageUrl();
   }
 
   function showProfileBanner(user){
@@ -167,7 +179,7 @@
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
     btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
-    wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;openProfile(user)});
+    wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
     wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.add('mirsad-auth-required');showGate()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
@@ -177,7 +189,7 @@
     let profile;try{profile=await ensureProfile(user)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
     showUserMenu(user);
-    if(!profile?.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(!profile?.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
@@ -236,7 +248,7 @@
     if(session?.user){
       await finishAuthenticated(session.user);return;
     }
-    if(isGuest()){document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
+    if(isGuest()){if(isProfilePage()){localStorage.removeItem(CONFIG.GUEST_KEY);showGate();return;}document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
     showGate();
     if(oauthError)statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
   }
