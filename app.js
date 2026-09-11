@@ -121,7 +121,8 @@
       featuredRailEl.appendChild(card);
     });
   }
-  function renderWithFlip(justUpdatedId) {
+  function renderWithFlip(justUpdatedId, options = {}) {
+    const animateNew = options.animateNew !== false;
     const visible = sortArticles(getVisibleArticles());
     const visibleIds = new Set(visible.map((a) => a.id));
     const firstRects = new Map();
@@ -156,10 +157,12 @@
     gridEl.querySelectorAll('.card').forEach((el) => {
       const id = el.dataset.id;
       if (newlyCreatedIds.has(id)) {
-        el.animate(
-          [{ transform: 'translateY(-16px) scale(0.98)', opacity: 0 }, { transform: 'translateY(0) scale(1)', opacity: 1 }],
-          { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }
-        );
+        if (animateNew) {
+          el.animate(
+            [{ transform: 'translateY(-16px) scale(0.98)', opacity: 0 }, { transform: 'translateY(0) scale(1)', opacity: 1 }],
+            { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }
+          );
+        }
         return;
       }
       const first = firstRects.get(id);
@@ -187,7 +190,7 @@
   async function refreshFromServer() { const rows = await fetchInitialBatch(); if (rows.length) { state.articles = rows.slice(0, CONFIG.MAX_KEPT_ARTICLES).sort(compareLatest); renderWithFlip(); touchLastSync(); } }
   function startPollingFallback() { if (state.pollTimer) clearInterval(state.pollTimer); state.pollTimer = setInterval(refreshFromServer, CONFIG.POLL_FALLBACK_INTERVAL_MS); }
   function handleSortChange(value) { const next = ['priority','latest','updates'].includes(value) ? value : 'priority'; if (state.sortMode === next) return; state.sortMode = next; savePreferences(); syncControlsFromState(); renderWithFlip(); }
-  function wireControls() { searchBoxEl.addEventListener('input', () => { state.searchQuery = searchBoxEl.value; savePreferences(); renderWithFlip(); }); categoryFiltersEl.addEventListener('click', (event) => { const button = event.target.closest('[data-category]'); if (!button) return; state.activeFilter = button.dataset.category || 'all'; savePreferences(); syncControlsFromState(); renderWithFlip(); }); sortBoxEl?.addEventListener('change', () => handleSortChange(sortBoxEl.matches('select') ? sortBoxEl.value : sortBoxEl.dataset.sortMode)); sortBoxEl?.addEventListener('sortchange', (event) => handleSortChange(event.detail?.value)); }
+  function wireControls() { searchBoxEl.addEventListener('input', () => { state.searchQuery = searchBoxEl.value; savePreferences(); renderWithFlip(); }); categoryFiltersEl.addEventListener('click', (event) => { const button = event.target.closest('[data-category]'); if (!button) return; state.activeFilter = button.dataset.category || 'all'; savePreferences(); syncControlsFromState(); renderWithFlip(undefined, { animateNew: false }); }); sortBoxEl?.addEventListener('change', () => handleSortChange(sortBoxEl.matches('select') ? sortBoxEl.value : sortBoxEl.dataset.sortMode)); sortBoxEl?.addEventListener('sortchange', (event) => handleSortChange(event.detail?.value)); }
   loadPreferences();
   wireControls();
   syncControlsFromState();
