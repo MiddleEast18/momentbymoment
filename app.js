@@ -123,6 +123,7 @@
   }
   function renderWithFlip(justUpdatedId, options = {}) {
     const animateNew = options.animateNew !== false;
+    const animateMoves = options.animateMoves !== false;
     const visible = sortArticles(getVisibleArticles());
     const visibleIds = new Set(visible.map((a) => a.id));
     const firstRects = new Map();
@@ -165,6 +166,7 @@
         }
         return;
       }
+      if (!animateMoves) return;
       const first = firstRects.get(id);
       if (!first) return;
       const last = el.getBoundingClientRect();
@@ -190,7 +192,7 @@
   async function refreshFromServer() { const rows = await fetchInitialBatch(); if (rows.length) { state.articles = rows.slice(0, CONFIG.MAX_KEPT_ARTICLES).sort(compareLatest); renderWithFlip(); touchLastSync(); } }
   function startPollingFallback() { if (state.pollTimer) clearInterval(state.pollTimer); state.pollTimer = setInterval(refreshFromServer, CONFIG.POLL_FALLBACK_INTERVAL_MS); }
   function handleSortChange(value) { const next = ['priority','latest','updates'].includes(value) ? value : 'priority'; if (state.sortMode === next) return; state.sortMode = next; savePreferences(); syncControlsFromState(); renderWithFlip(); }
-  function wireControls() { searchBoxEl.addEventListener('input', () => { state.searchQuery = searchBoxEl.value; savePreferences(); renderWithFlip(); }); categoryFiltersEl.addEventListener('click', (event) => { const button = event.target.closest('[data-category]'); if (!button) return; state.activeFilter = button.dataset.category || 'all'; savePreferences(); syncControlsFromState(); renderWithFlip(undefined, { animateNew: false }); }); sortBoxEl?.addEventListener('change', () => handleSortChange(sortBoxEl.matches('select') ? sortBoxEl.value : sortBoxEl.dataset.sortMode)); sortBoxEl?.addEventListener('sortchange', (event) => handleSortChange(event.detail?.value)); }
+  function wireControls() { searchBoxEl.addEventListener('input', () => { state.searchQuery = searchBoxEl.value; savePreferences(); renderWithFlip(); }); categoryFiltersEl.addEventListener('click', (event) => { const button = event.target.closest('[data-category]'); if (!button) return; state.activeFilter = button.dataset.category || 'all'; savePreferences(); syncControlsFromState(); renderWithFlip(undefined, { animateNew: false, animateMoves: false }); }); sortBoxEl?.addEventListener('change', () => handleSortChange(sortBoxEl.matches('select') ? sortBoxEl.value : sortBoxEl.dataset.sortMode)); sortBoxEl?.addEventListener('sortchange', (event) => handleSortChange(event.detail?.value)); }
   loadPreferences();
   wireControls();
   syncControlsFromState();

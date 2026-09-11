@@ -59,34 +59,6 @@
     if (event.target.closest('[data-sort-close]')) close();
   });
 
-  // Category changes are a filter state change, not a card animation state.
-  // Suppress both the grid FLIP and the featured-card entrance animation for
-  // the whole render turn, so a newly rendered card cannot flash at the top.
-  const categoryFiltersEl = document.getElementById('categoryFilters');
-  const cancelCategoryCardMotion = () => {
-    document.querySelectorAll('#newsGrid .card, #featuredRail .card').forEach((card) => {
-      card.getAnimations().forEach((animation) => animation.cancel());
-      card.style.transform = 'none';
-      card.style.animation = 'none';
-      card.style.transition = 'none';
-    });
-  };
-
-  categoryFiltersEl?.addEventListener('click', () => {
-    cancelCategoryCardMotion();
-    requestAnimationFrame(() => {
-      cancelCategoryCardMotion();
-      requestAnimationFrame(() => {
-        cancelCategoryCardMotion();
-        document.querySelectorAll('#newsGrid .card, #featuredRail .card').forEach((card) => {
-          card.style.transform = '';
-          card.style.animation = '';
-          card.style.transition = '';
-        });
-      });
-    });
-  }, true);
-
   document.addEventListener('keydown', (event) => {
     if (sheet.hidden) return;
     if (event.key === 'Escape') {
