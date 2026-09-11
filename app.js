@@ -57,7 +57,52 @@
   function compareLatest(a, b) { return getTime(b, 'published_at') - getTime(a, 'published_at') || getTime(b, 'updated_at') - getTime(a, 'updated_at') || getTime(b, 'created_at') - getTime(a, 'created_at') || String(b?.id || '').localeCompare(String(a?.id || '')); }
   function comparePriority(a, b) { return (Number(b?.importance_score) || 0) - (Number(a?.importance_score) || 0) || (Number(b?.update_count) || 0) - (Number(a?.update_count) || 0) || getTime(b, 'updated_at') - getTime(a, 'updated_at') || getTime(b, 'published_at') - getTime(a, 'published_at') || getTime(b, 'created_at') - getTime(a, 'created_at') || String(b?.id || '').localeCompare(String(a?.id || '')); }
   function compareUpdates(a, b) { return (Number(b?.update_count) || 0) - (Number(a?.update_count) || 0) || getTime(b, 'updated_at') - getTime(a, 'updated_at') || getTime(b, 'published_at') - getTime(a, 'published_at') || getTime(b, 'created_at') - getTime(a, 'created_at') || String(b?.id || '').localeCompare(String(a?.id || '')); }
-  function sortArticles(items) { const copy = [...items]; if (state.sortMode === 'latest') return copy.sort(compareLatest); if (state.sortMode === 'updates') return copy.sort(compareUpdates); return copy.sort(comparePriority); }
+
+  function rankingSignal(article) {
+    const importance = Math.max(0, Math.min(100, Number(article?.importance_score) || 0));
+    const confidence = Math.max(0, Math.min(100, Number(article?.confidence_score) || 0));
+    const trust = Math.max(0, Math.min(1, Number(article?.source_trust_score) || 0)) * 100;
+    const sources = Math.max(1, Number(article?.source_count) || 1);
+    const updates = Math.max(0, Number(article?.update_count) || 0);
+    const published = getTime(article, 'published_at') || getTime(article, 'created_at');
+    const ageHours = Math.max(0, (Date.now() - published) / 3600000);
+    const freshness = 100 * Math.exp(-ageHours / 18);
+    const momentum = 100 * (1 - Math.exp(-(updates * 1.5 + Math.max(0, sources - 1)) / 3));
+    const independentEvidence = Math.min(100, (sources - 1) * 20);
+    const evidence = Math.min(100, confidence * 0.65 + trust * 0.20 + independentEvidence * 0.15);
+    return importance * 0.34 + freshness * 0.20 + evidence * 0.18 + momentum * 0.12 + trust * 0.06 + Math.min(100, sources * 12) * 0.05 + (article?.cluster_id ? 3 : 0);
+  }
+
+  function sortPriorityIntelligently(items) {
+    const ranked = [...items].map((article) => ({ article, base: rankingSignal(article) })).sort((a, b) => b.base - a.base || compareLatest(a.article, b.article));
+    const selected = [];
+    const clusterCounts = new Map();
+    const sourceCounts = new Map();
+    const remaining = ranked.slice();
+
+    while (remaining.length) {
+      let bestIndex = 0;
+      let bestScore = -Infinity;
+      for (let i = 0; i < remaining.length; i += 1) {
+        const { article, base } = remaining[i];
+        const clusterKey = article.cluster_id || 'article:' + article.id;
+        const sourceKey = String(article.source_name || article.source_url || '').trim().toLowerCase();
+        const clusterPenalty = Math.min(18, (clusterCounts.get(clusterKey) || 0) * 8);
+        const sourcePenalty = Math.min(8, (sourceCounts.get(sourceKey) || 0) * 2);
+        const adjusted = base - clusterPenalty - sourcePenalty;
+        if (adjusted > bestScore) { bestScore = adjusted; bestIndex = i; }
+      }
+      const [picked] = remaining.splice(bestIndex, 1);
+      selected.push(picked.article);
+      const clusterKey = picked.article.cluster_id || 'article:' + picked.article.id;
+      const sourceKey = String(picked.article.source_name || picked.article.source_url || '').trim().toLowerCase();
+      clusterCounts.set(clusterKey, (clusterCounts.get(clusterKey) || 0) + 1);
+      if (sourceKey) sourceCounts.set(sourceKey, (sourceCounts.get(sourceKey) || 0) + 1);
+    }
+    return selected;
+  }
+
+  function sortArticles(items) { const copy = [...items]; if (state.sortMode === 'latest') return copy.sort(compareLatest); if (state.sortMode === 'updates') return copy.sort(compareUpdates); return sortPriorityIntelligently(copy); }
 
   function getUrgentRows() { const candidates = state.articles.filter((a) => !a.is_pending_verification && isArabicHeadline(a.headline)); const rows = []; const seen = new Set(); for (const article of [...candidates].sort(compareLatest)) { const key = normalizeForSearch(article.headline).replace(/\s+/g, ' ').trim(); if (!key || seen.has(key)) continue; seen.add(key); rows.push(article); if (rows.length >= 4) break; } return rows; }
   function renderTicker() { const rows = getUrgentRows(); tickerTrackEl.innerHTML = ''; const items = rows.length ? rows : [{ headline: 'لا توجد أخبار عاجلة جديدة — آخر المستجدات معروضة أدناه' }]; for (const item of items) { const span = document.createElement('span'); span.className = 'ticker-strip__item'; span.textContent = item.headline || item.title || 'خبر جديد'; tickerTrackEl.appendChild(span); } }
