@@ -64,6 +64,19 @@
     `;document.head.appendChild(s);
   }
 
+  async function ensureUnlockAccount(){
+    if(!sb)return null;
+    try{const{data,error}=await sb.rpc('ensure_unlock_account');if(error)throw error;return Array.isArray(data)?data[0]:data}
+    catch(error){console.warn('[mirsad unlocks] account setup failed',error);return null}
+  }
+  function rememberReferralCode(){
+    try{const code=new URL(window.location.href).searchParams.get('ref');if(code&&/^[A-Za-z0-9_-]{4,64}$/.test(code.trim()))localStorage.setItem('mirsad.pendingReferral.v1',code.trim().toUpperCase())}catch{}
+  }
+  async function registerPendingReferral(){
+    const code=localStorage.getItem('mirsad.pendingReferral.v1');if(!code||!sb)return;
+    try{const{error}=await sb.rpc('register_referral',{p_code:code});if(!error)localStorage.removeItem('mirsad.pendingReferral.v1')}
+    catch(error){console.warn('[mirsad referral] registration failed',error)}
+  }
   function removeGuestExit(){document.getElementById('mirsadGuestExit')?.remove();}
   function showGuestExit(){
     injectStyles();if(document.getElementById('mirsadGuestExit'))return;
@@ -178,12 +191,12 @@
     const b=document.createElement('aside');b.id='mirsadProfileBanner';b.className='mirsad-profile-banner';b.innerHTML=`<div class="mirsad-profile-banner__text"><strong>أكمل ملفك الشخصي</strong><span>أضف معلوماتك لتخصيص تجربتك في مِرصاد.</span></div><div class="mirsad-profile-banner__actions"><button class="mirsad-auth-button primary" type="button" data-open>إكمال الملف</button><button class="mirsad-auth-button" type="button" data-later>لاحقًا</button></div>`;document.body.appendChild(b);b.querySelector('[data-open]').addEventListener('click',()=>openProfile(user));b.querySelector('[data-later]').addEventListener('click',()=>b.remove());
   }
 
-  function showUserMenu(user,profile=null){
+  function showUserMenu(user,profile=null,unlockAccount=null){
     document.getElementById('mirsadUserMenu')?.remove();
     const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
     const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
     const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
-    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance">${unlockAccount?.unlimited_unlocks?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
     btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
@@ -198,7 +211,7 @@
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
-    showUserMenu(user,profile);
+    const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount);
     if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
@@ -253,6 +266,7 @@
   });
 
   async function init(){
+    rememberReferralCode();
     injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
     if(!supabaseReady){
       showGate();
