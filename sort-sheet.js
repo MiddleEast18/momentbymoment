@@ -59,6 +59,20 @@
     if (event.target.closest('[data-sort-close]')) close();
   });
 
+  // Category changes are a filter state change, not a card animation state.
+  // Cancel any FLIP animation started by app.js during the same click event,
+  // so an existing card cannot briefly fly from its previous position.
+  const categoryFiltersEl = document.getElementById('categoryFilters');
+  categoryFiltersEl?.addEventListener('click', () => {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('#newsGrid .card').forEach((card) => {
+        card.getAnimations().forEach((animation) => animation.cancel());
+        card.style.transform = '';
+        card.style.opacity = '';
+      });
+    });
+  });
+
   document.addEventListener('keydown', (event) => {
     if (sheet.hidden) return;
     if (event.key === 'Escape') {
