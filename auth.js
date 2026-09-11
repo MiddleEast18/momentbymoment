@@ -4,9 +4,9 @@
   if(!window.supabase)return;
   const AUTH_OPTIONS={auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}};
   const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS);
-  // OAuth must return to a reachable origin. A phone opening a local dev server sees its own localhost,
-  // so never send the Google callback back to localhost; production always returns to Mirsad.
-  const redirectTo=()=>/^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i.test(window.location.hostname)?CONFIG.PRODUCTION_ORIGIN:new URL('/',window.location.origin).href;
+  // OAuth always returns to the canonical production site.
+  // This prevents local previews/dev servers from becoming the final callback target.
+  const redirectTo=()=>CONFIG.PRODUCTION_ORIGIN;
   const AUTH_QUERY_KEYS=['code','state','error','error_code','error_description'];
   let googleFlowActive=false;
   let googleFlowStartedAt=0;
