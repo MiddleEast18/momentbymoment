@@ -265,10 +265,27 @@
     wireRevisions();
   }
 
+  async function authorizeArticleOpen(id) {
+    const client = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
+    if (!client) throw new Error('supabase_unavailable');
+    const { data, error } = await client.rpc('open_article', { p_article_id: id });
+    if (error) throw error;
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result?.opened) {
+      const remaining = Number(result?.remaining_unlocks ?? 0);
+      const message = remaining <= 0
+        ? 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.'
+        : 'تعذر فتح الخبر حاليًا.';
+      throw new Error(message);
+    }
+    return result;
+  }
+
   async function showArticle(id) {
     body.scrollTop = 0;
     renderLoading();
     try {
+      await authorizeArticleOpen(id);
       const { article, related, revisions } = await loadArticle(id);
       state.article = article;
       state.related = related;
@@ -278,7 +295,9 @@
       body.scrollTop = 0;
     } catch (error) {
       console.error('[mirsad reader] load failed', error);
-      renderError();
+      const message = error?.message || 'تعذر تحميل تفاصيل الخبر. حاول مرة أخرى.';
+      content.innerHTML = `<div class="mirsad-reader__error">${escapeHtml(message)}</div>`;
+      sourceBtn.hidden = true;
     }
   }
 
