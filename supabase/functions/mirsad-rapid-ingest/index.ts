@@ -10,6 +10,7 @@ const canonical = (raw: string) => { try { const u = new URL(raw); for (const k 
 const published = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); const d = new Date(v); if (v && Number.isFinite(d.getTime())) return d.toISOString(); } return null; };
 const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
 const importance = (s: string) => Math.min(100, 35 + (/(عاجل|عاجلة|هجوم|حرب|انفجار|زلزال|قتلى|وفيات|اغتيال)/.test(s) ? 25 : 0) + (/(رئيس|حكومة|انتخابات|اتفاق|تصعيد|إيران|إسرائيل|أمريكا)/.test(s) ? 10 : 0));
+const cleanRichText = (value: string) => String(value || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h[1-6])>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (req) => {
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
         const headline = field(item, "title");
         const url = canonical(field(item, "link") || field(item, "guid"));
         if (!headline || !isArabic(headline) || !url || seen.has(url)) continue;
-        const result = await db.from("rapid_news").insert({ source_key: source.source_key, source_name: source.name, source_url: url, headline, summary: field(item, "description") || field(item, "summary") || headline, published_at: published(item), importance_score: importance(headline) }).select("id").single();
+        const result = await db.from("rapid_news").insert({ source_key: source.source_key, source_name: source.name, source_url: url, headline: cleanRichText(headline), summary: cleanRichText(field(item, "description") || field(item, "summary") || headline), published_at: published(item), importance_score: importance(headline) }).select("id").single();
         if (!result.error || result.error.code === "23505") { seen.add(url); if (!result.error) inserted.push(result.data.id); }
         else errors.push(`${source.source_key}: ${result.error.message}`);
       }
