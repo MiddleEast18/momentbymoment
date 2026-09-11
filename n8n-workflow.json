@@ -106,7 +106,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const body = $json.body || {}; return [{ json: { ...$json, promptContext: { mode: body.mode, headline: body.headline, body: body.body, sourceName: body.sourceName, sourceTrust: body.sourceTrust || 0, aiHints: body.aiHints || {}, clusterId: body.clusterId, aggregatedClusterTexts: body.aggregatedClusterTexts || [body.body || ''] } } }];"
+        "jsCode": "const body = $json.body || {}; return [{ json: { ...$json, promptContext: { mode: body.mode, headline: body.headline, body: body.body, sourceName: body.sourceName, sourceTrust: body.sourceTrust || 0, sourceCount: body.sourceCount || body.aiHints?.sourceCount || 1, sourceDiversity: body.sourceDiversity || body.aiHints?.sourceDiversity || 1, aiHints: body.aiHints || {}, eventAnalysis: body.eventAnalysis || {}, clusterId: body.clusterId, aggregatedClusterTexts: body.aggregatedClusterTexts || [body.body || ''] } } }];"
       }
     },
     {
@@ -122,7 +122,7 @@
         "resource": "chat",
         "model": "={{$json.body.model || 'gpt-4o'}}",
         "responseFormat": "json_object",
-        "systemMessage": "أنت محرر أخبار متخصص في الشرق الأوسط. أعد JSON فقط بالمفاتيح التالية: category, importanceScore, sentiment, summary, claimDigest, confidenceScore. category يكون واحدًا من Politics|Economy|Tech|Society|Sports. importanceScore عدد صحيح 1-100. sentiment واحد من Negative|Positive|Neutral. summary جملتان بالفصحى المبسطة. claimDigest كائن يحوي entities[], dates[], locations[], numbers[], main_claim. confidenceScore عدد 0-100.",
+        "systemMessage": "أنت محرر أخبار متخصص في الشرق الأوسط. أعد JSON فقط بالمفاتيح التالية: category, importanceScore, sentiment, summary, claimDigest, confidenceScore, eventType. category يكون واحدًا من Politics|Economy|Tech|Society|Sports. importanceScore عدد صحيح 1-100 يقيس أثر الحدث وسرعته واتساعه، لا مجرد وجود كلمات مثيرة. sentiment واحد من Negative|Positive|Neutral. summary جملتان بالفصحى المبسطة. claimDigest كائن يحوي entities[], dates[], locations[], numbers[], main_claim. eventType واحد من new|update|duplicate، واستخدم update فقط عند وجود معلومة جديدة لحدث قائم، وduplicate عند عدم وجود إضافة. confidenceScore عدد 0-100 يعكس موثوقية المصدر واتفاق المصادر المستقلة وتنوعها، ولا تمنح خبرًا منفردًا ثقة تأكيد متعدد المصادر.",
         "prompt": "={{JSON.stringify($json.promptContext)}}"
       }
     },
@@ -136,7 +136,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const out = $json || {}; const categories = new Set(['Politics','Economy','Tech','Society','Sports']); const sentiments = new Set(['Negative','Positive','Neutral']); if (!categories.has(out.category)) throw new Error('Invalid category'); if (!sentiments.has(out.sentiment)) throw new Error('Invalid sentiment'); out.importanceScore = Math.max(1, Math.min(100, Number(out.importanceScore || 50))); out.layoutSize = out.importanceScore > 85 ? 'large' : out.importanceScore >= 60 ? 'medium' : 'small'; out.confidenceScore = Math.max(0, Math.min(100, Number(out.confidenceScore ?? 0))); out.claimDigest = out.claimDigest || {}; return [{ json: out }];"
+        "jsCode": "const out = $json || {}; const body = $('Code: Build AI Context').first().json.promptContext || {}; const categories = new Set(['Politics','Economy','Tech','Society','Sports']); const sentiments = new Set(['Negative','Positive','Neutral']); const eventTypes = new Set(['new','update','duplicate']); if (!categories.has(out.category)) throw new Error('Invalid category'); if (!sentiments.has(out.sentiment)) throw new Error('Invalid sentiment'); out.importanceScore = Math.max(1, Math.min(100, Number(out.importanceScore || 50))); out.layoutSize = out.importanceScore > 85 ? 'large' : out.importanceScore >= 60 ? 'medium' : 'small'; const trust = Math.max(0, Math.min(1, Number(body.sourceTrust || 0))); const sourceCount = Math.max(1, Number(body.sourceCount || 1)); const sourceDiversity = Math.max(1, Number(body.sourceDiversity || 1)); const evidenceBonus = Math.min(22, (sourceCount - 1) * 7 + (sourceDiversity - 1) * 4); const modelConfidence = Math.max(0, Math.min(100, Number(out.confidenceScore ?? 0))); out.confidenceScore = Math.max(0, Math.min(100, Math.min(modelConfidence, trust * 100 + evidenceBonus + 6))); out.eventType = eventTypes.has(out.eventType) ? out.eventType : (body.mode === 'cluster_update' ? 'update' : 'new'); out.claimDigest = { ...(out.claimDigest || {}), eventType: out.eventType, sourceCount, sourceDiversity, analysisVersion: 'event-v2' }; return [{ json: out }];"
       }
     },
     {
@@ -423,7 +423,7 @@
             },
             {
               "name": "ai_hints",
-              "value": "={{JSON.stringify($json.body.aiHints || {})}}"
+              "value": "={{JSON.stringify({...($json.body.aiHints || {}), eventType: $json.eventType || 'new', sourceCount: $json.body.sourceCount || $json.body.aiHints?.sourceCount || 1, sourceDiversity: $json.body.sourceDiversity || $json.body.aiHints?.sourceDiversity || 1, analysisVersion: 'event-v2'})}}"
             },
             {
               "name": "claim_digest",

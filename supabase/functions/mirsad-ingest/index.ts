@@ -7,10 +7,18 @@ const reply = (x: unknown, status = 200) => new Response(JSON.stringify(x), { st
 const decode = (s: string) => s.replaceAll("<![CDATA[", "").replaceAll("]]>", "").replaceAll("&amp;", "&").replaceAll("&quot;", '"').replaceAll("&apos;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").trim();
 const field = (b: string, n: string) => { const s = b.indexOf("<" + n), o = b.indexOf(">", s), e = b.indexOf("</" + n + ">", o); return s >= 0 && o >= 0 && e > o ? decode(b.slice(o + 1, e)) : ""; };
 const items = (xml: string) => { const out: string[] = []; for (const tag of ["item", "entry"]) { let p = 0; while (true) { const s = xml.indexOf("<" + tag, p); if (s < 0) break; const o = xml.indexOf(">", s), e = xml.indexOf("</" + tag + ">", o); if (o < 0 || e < 0) break; out.push(xml.slice(s, e + tag.length + 3)); p = e + tag.length + 3; } } return out; };
-const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(x => x.length > 2);
+const STOP = new Set(["في","من","الى","إلى","على","عن","مع","هذا","هذه","هناك","بعد","قبل","وقد","خبر","اخبار","تقرير","مصدر","اليوم","أمس","الآن","بحسب"]);
+const words = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(x => x.length > 2 && !STOP.has(x));
+const unique = (xs: string[]) => [...new Set(xs)];
+const EVENT_ANCHORS = ["حرب","هجوم","انفجار","زلزال","انتخابات","اتفاق","عقوبات","احتجاج","مفاوضات","تصعيد","هدنه","اغتيال","قتلى","وفيات","نفط","بنك","استثمار"];
+const PLACE_ANCHORS = ["ايران","اسرائيل","لبنان","سوريا","العراق","اليمن","السعوديه","الاردن","غزه","فلسطين","امريكا","روسيا","اوكرانيا","الصين","اوروبا","المانيا","بريطانيا","فرنسا","تركيا","السودان","ليبيا"];
+const signature = (s: string) => { const normalized = s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه"); return { tokens: unique(words(s)).slice(0, 36), anchors: EVENT_ANCHORS.filter(x => normalized.includes(x)), places: PLACE_ANCHORS.filter(x => normalized.includes(x)), numbers: unique((s.match(/\b\d+(?:[\.,]\d+)?\b/g) || []).map(x => x.replace(",", "."))) }; };
+const compatibility = (a: any, b: any) => { const share = (x: string[], y: string[]) => !x.length || !y.length || x.some(v => y.includes(v)); if (a.numbers.length && b.numbers.length && !share(a.numbers, b.numbers)) return 0.35; if (a.places.length && b.places.length && !share(a.places, b.places)) return 0.45; if (a.anchors.length && b.anchors.length && !share(a.anchors, b.anchors)) return 0.55; return 1; };
 const overlap = (a: string, b: string) => { const aa = new Set(words(a)), bb = new Set(words(b)); let n = 0; for (const x of aa) if (bb.has(x)) n++; return n / Math.max(1, Math.min(aa.size, bb.size)); };
+const eventSimilarity = (a: string, b: string) => { const aa = signature(a), bb = signature(b); const sa = new Set(aa.tokens), sb = new Set(bb.tokens); let n = 0; for (const x of sa) if (sb.has(x)) n++; const jaccard = n / Math.max(1, new Set([...sa, ...sb]).size); return (overlap(a, b) * 0.55 + jaccard * 0.45) * compatibility(aa, bb); };
 const classify = (s: string) => { const groups: Record<string, string[]> = { Economy: ["اقتصاد", "اقتصادي", "مال", "سوق", "نفط", "دولار", "بنك", "تجارة", "أسهم", "بورصة", "أسعار"], Tech: ["تقنية", "تكنولوجيا", "ذكاء اصطناعي", "إنترنت", "رقمنة", "هاتف", "آيفون", "أبل", "جوجل", "مايكروسوفت", "روبوت", "برمجيات"], Sports: ["رياضة", "رياضي", "كرة", "دوري", "بطولة", "منتخب", "مباراة", "هدف", "لاعب", "أهلي", "الهلال", "النصر"], Society: ["مجتمع", "صحة", "تعليم", "بيئة", "ثقافة", "جامعة", "مدرسة", "طب", "مناخ", "فنون", "منوعات"] }; let best = "Politics", score = 0; for (const key of Object.keys(groups)) { const n = groups[key].filter(x => s.includes(x)).length; if (n > score) { score = n; best = key; } } return best; };
-const importance = (s: string) => { let n = 35; for (const x of ["عاجل", "عاجلة", "هجوم", "حرب", "انفجار", "زلزال", "إطلاق نار", "قتلى", "وفيات", "اغتيال"]) if (s.includes(x)) n += 12; for (const x of ["رئيس", "حكومة", "انتخابات", "اتفاق", "تصعيد", "إيران", "إسرائيل", "أمريكا"]) if (s.includes(x)) n += 5; return Math.min(95, n); };
+const importance = (s: string, published = "") => { const t = s.toLowerCase(); let n = 30; for (const [rx, add] of [[/عاجل|طارئ|فوري|مباشر/,18],[/قتيل|قتلى|وفيات|جرحى|ضحايا|خسائر|تدمير/,16],[/حرب|هجوم|انفجار|قصف|صاروخ|اغتيال|تصعيد|اشتباك/,14],[/رئيس|حكومه|انتخابات|اتفاق|عقوبات|قرار|برلمان/,10],[/نفط|دولار|بنك|اسعار|استثمار|اقتصاد|تجاره/,8]] as const) if (rx.test(t)) n += add; if (/\b\d+(?:[\.,]\d+)?\b/.test(t)) n += 4; const age = Date.now() - new Date(published || Date.now()).getTime(); if (Number.isFinite(age) && age >= 0 && age < 3 * 60 * 60 * 1000) n += 6; return Math.max(1, Math.min(95, n)); };
+const confidence = (trust: number, text: string) => Math.max(0, Math.min(100, trust * 100 + (signature(text).numbers.length ? 3 : 0) + (words(text).length >= 8 ? 2 : 0)));
 const sentiment = (s: string) => s.includes("حرب") || s.includes("هجوم") || s.includes("قتلى") || s.includes("أزمة") || s.includes("انفجار") ? "Negative" : s.includes("اتفاق") || s.includes("فوز") || s.includes("نمو") ? "Positive" : "Neutral";
 const canonicalUrl = (raw: string) => { try { const u = new URL(raw); for (const k of [...u.searchParams.keys()]) if (/^(utm_|fbclid|gclid|ref|source)$/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
 const publishedAt = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); if (v) { const d = new Date(v); if (Number.isFinite(d.getTime())) return d.toISOString(); } } return new Date().toISOString(); };
@@ -41,8 +49,9 @@ Deno.serve(async req => {
         if (known.has(link)) { duplicates++; continue; }
         const summary = field(item, "description") || field(item, "summary") || title;
         const all = `${title} ${summary}`;
-        const match = (existing.data || []).map((x: any) => ({ x, score: overlap(title, x.headline || "") })).sort((a: any, b: any) => b.score - a.score)[0];
-        if (match && match.score >= 0.55 && match.x.cluster_id) {
+        const category = source.default_category || classify(all);
+        const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
+        if (match && match.score >= 0.66 && match.x.cluster_id) {
           const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
           if (!merged.error) { clusterUpdates++; known.add(link); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
@@ -53,22 +62,22 @@ Deno.serve(async req => {
           agency_urls: [link],
           headline: title,
           summary,
-          category: source.default_category || classify(all),
-          importance_score: importance(all),
+          category,
+          importance_score: importance(all, publishedAt(item)),
           sentiment: sentiment(all),
           cluster_id: crypto.randomUUID(),
           source_trust_score: Number(source.trust_weight),
-          confidence_score: Math.min(100, Number(source.trust_weight) * 100),
+          confidence_score: confidence(Number(source.trust_weight), all),
           is_pending_verification: false,
           inherited_from_cache: false,
           llm_model_used: "rss-rule-based-v5",
-          ai_hints: { ingested_by: "mirsad-ingest", source_key: source.source_key },
+          ai_hints: { ingested_by: "mirsad-ingest", source_key: source.source_key, source_count: 1, source_diversity: 1, event_signature: signature(all), analysis_version: "event-v2" },
           claim_digest: { main_claim: title },
           raw_payload: rawPayload(source.source_key, item, title, link, summary),
           published_at: publishedAt(item),
         };
         const result = await db.from("news_articles").insert(row);
-        if (!result.error) { written++; known.add(link); } else if (result.error.code === "23505") duplicates++; else errors.push(`${source.source_key}: ${result.error.message}`);
+        if (!result.error) { written++; known.add(link); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") duplicates++; else errors.push(`${source.source_key}: ${result.error.message}`);
       }
     } catch (error) { errors.push(`${source.source_key}: ${String(error)}`); }
   }

@@ -33,7 +33,8 @@ const CONFIG = {
 
   CACHE_WINDOW_MS: 2 * 60 * 60_000,
   KEYWORD_MATCH_THRESHOLD: 0.90,
-  CLUSTER_SIMILARITY_THRESHOLD: 0.72,
+  CLUSTER_SIMILARITY_THRESHOLD: 0.70,
+  HIGH_CONFIDENCE_MATCH_THRESHOLD: 0.86,
 
   SOURCE_TIMEOUT_MS: 15_000,
   MAX_CLUSTER_AGE_MS: 2 * 60 * 60_000,
@@ -55,7 +56,8 @@ const seenUrls = new Set();
 
 const STOP_WORDS = new Set([
   'في','من','الى','إلى','على','عن','مع','و','او','أو','هذا','هذه','هناك','بعد','قبل','كما','لكن','وقد','قد','تم','كان','كانت',
-  'the','and','for','with','from','that','this','have','has','had','new','news','arabic','arabia'
+  'the','and','for','with','from','that','this','have','has','had','new','news','arabic','arabia',
+  'خبر','أخبار','تقرير','تقارير','مصدر','مصادر','اليوم','أمس','الآن','بحسب','حول','ضمن','خلال'
 ]);
 
 function stripDiacritics(text = '') {
@@ -110,11 +112,61 @@ function countNumbers(text = '') {
   return matches ? matches.length : 0;
 }
 
+const EVENT_ANCHORS = ['حرب','هجوم','انفجار','زلزال','انتخابات','اتفاق','عقوبات','احتجاج','مفاوضات','تصعيد','وقف اطلاق النار','هدنه','اغتيال','قتلى','وفيات','نفط','بنك','استثمار'];
+const PLACE_ANCHORS = ['ايران','اسرائيل','لبنان','سوريا','العراق','اليمن','السعوديه','الاردن','غزه','فلسطين','امريكا','روسيا','اوكرانيا','الصين','اوروبا','المانيا','بريطانيا','فرنسا','تركيا','السودان','ليبيا'];
+
+function extractEventSignature(headline = '', body = '') {
+  const text = `${headline} ${body}`;
+  const normalized = stripDiacritics(text);
+  const numbers = unique((text.match(/\b\d+(?:[\.,]\d+)?\b/g) || []).map((value) => value.replace(',', '.')));
+  return {
+    anchors: EVENT_ANCHORS.filter((word) => normalized.includes(word)),
+    places: PLACE_ANCHORS.filter((word) => normalized.includes(word)),
+    numbers,
+    tokens: unique(tokenize(text)).slice(0, 36),
+  };
+}
+
+function signatureCompatibility(a = {}, b = {}) {
+  const comparable = (left = [], right = []) => left.length && right.length ? left.some((value) => right.includes(value)) : true;
+  if (a.numbers?.length && b.numbers?.length && !comparable(a.numbers, b.numbers)) return 0.35;
+  if (a.places?.length && b.places?.length && !comparable(a.places, b.places)) return 0.45;
+  if (a.anchors?.length && b.anchors?.length && !comparable(a.anchors, b.anchors)) return 0.55;
+  return 1;
+}
+
+function mergeSignatures(a = {}, b = {}) {
+  return {
+    anchors: unique([...(a.anchors || []), ...(b.anchors || [])]).slice(0, 8),
+    places: unique([...(a.places || []), ...(b.places || [])]).slice(0, 8),
+    numbers: unique([...(a.numbers || []), ...(b.numbers || [])]).slice(0, 12),
+    tokens: unique([...(a.tokens || []), ...(b.tokens || [])]).slice(0, 36),
+  };
+}
+
+function analyzeEvent(headline = '', body = '', publishedAt = '') {
+  const text = stripDiacritics(`${headline} ${body}`);
+  const signature = extractEventSignature(headline, body);
+  let score = 30;
+  const signals = [];
+  const add = (amount, label, condition) => { if (condition) { score += amount; signals.push(label); } };
+  add(18, 'urgent', /عاجل|طارئ|فوري|مباشر/.test(text));
+  add(16, 'casualties_or_damage', /قتيل|قتلى|وفيات|جرحى|ضحايا|خسائر|دمر|تدمير/.test(text));
+  add(14, 'security_escalation', /حرب|هجوم|انفجار|قصف|صاروخ|اغتيال|تصعيد|اشتباك/.test(text));
+  add(10, 'political_decision', /رئيس|حكومه|انتخابات|اتفاق|عقوبات|قرار|برلمان/.test(text));
+  add(8, 'economic_impact', /نفط|دولار|بنك|اسعار|استثمار|اقتصاد|تجاره/.test(text));
+  add(4, 'quantified_claim', signature.numbers.length > 0);
+  const ageMs = Date.now() - new Date(publishedAt || Date.now()).getTime();
+  add(6, 'fresh', Number.isFinite(ageMs) && ageMs >= 0 && ageMs < 3 * 60 * 60_000);
+  return { importanceScore: Math.max(1, Math.min(95, score)), signature, signals };
+}
+
 function extractAiHints(headline, body, sourceName) {
   const text = `${headline || ''} ${body || ''}`;
   const tokens = tokenize(text);
   const numberCount = countNumbers(text);
   const keywordHead = tokenize(headline || '').slice(0, 10);
+  const analysis = analyzeEvent(headline, body);
 
   return {
     sourceName,
@@ -124,6 +176,9 @@ function extractAiHints(headline, body, sourceName) {
     hasNames: /[A-Z\u0600-\u06FF]/.test(headline || ''),
     titleLength: (headline || '').length,
     bodyLength: (body || '').length,
+    eventSignature: analysis.signature,
+    eventSignals: analysis.signals,
+    analysisVersion: 'event-v2',
   };
 }
 
@@ -165,13 +220,16 @@ function clusterSimilarity(candidateText, cluster) {
   const candidateTokens = tokenize(candidateText);
   if (!candidateTokens.length) return 0;
 
-  const headScore = overlapScore(candidateTokens, cluster.headlineTokens || []);
+  const headScore = jaccard(candidateTokens, cluster.headlineTokens || []);
   const bodyScores = cluster.texts.map((t) => jaccard(candidateTokens, tokenize(t)));
   const bestBody = bodyScores.length ? Math.max(...bodyScores) : 0;
+  const candidateSignature = extractEventSignature(candidateText, '');
+  const signatures = cluster.signatures?.length ? cluster.signatures : [cluster.signature || {}];
+  const compatibility = Math.max(...signatures.map((signature) => signatureCompatibility(candidateSignature, signature)));
   const recencyBoost = Math.max(0, 1 - (Date.now() - cluster.lastSeenAt) / CONFIG.MAX_CLUSTER_AGE_MS) * 0.08;
-  const sourceBoost = Math.min(0.08, (cluster.sources?.size || 0) * 0.02);
+  const sourceBoost = Math.min(0.04, Math.max(0, (cluster.sources?.size || 0) - 1) * 0.02);
 
-  return Math.min(1, headScore * 0.45 + bestBody * 0.45 + recencyBoost + sourceBoost);
+  return Math.min(1, (headScore * 0.42 + bestBody * 0.42 + recencyBoost + sourceBoost) * compatibility);
 }
 
 async function withTimeout(factory, timeoutMs, label) {
@@ -284,6 +342,7 @@ async function syncRecentResolvedRows() {
         confidenceScore: row.confidence_score,
         resolvedAt: new Date(row.published_at || Date.now()).getTime(),
         tokens: tokenize(row.headline),
+        signature: extractEventSignature(row.headline, row.summary || ''),
       });
 
       if (recentRecords.length > 300) recentRecords.shift();
@@ -293,11 +352,16 @@ async function syncRecentResolvedRows() {
         headlineTokens: [],
         sources: new Set(),
         lastSeenAt: 0,
+        signature: { anchors: [], places: [], numbers: [], tokens: [] },
+        signatures: [],
       };
       cluster.texts.push(row.summary || row.headline || '');
       cluster.headlineTokens = unique([...(cluster.headlineTokens || []), ...tokenize(row.headline)]);
       cluster.sources.add(row.source_name || row.source_url || 'unknown');
       cluster.lastSeenAt = Math.max(cluster.lastSeenAt, new Date(row.published_at || Date.now()).getTime());
+      const rowSignature = extractEventSignature(row.headline, row.summary || '');
+      cluster.signature = mergeSignatures(cluster.signature, rowSignature);
+      cluster.signatures = [...(cluster.signatures || []), rowSignature].slice(-12);
       activeClusters.set(row.cluster_id, cluster);
     }
   } catch (error) {
@@ -331,9 +395,10 @@ function chooseCacheMatch(item) {
   let best = null;
   let bestScore = 0;
   const itemTokens = tokenize(item.headline);
+  const itemSignature = extractEventSignature(item.headline, item.body);
 
   for (const record of recentRecords) {
-    const score = overlapScore(itemTokens, record.tokens || tokenize(record.headline || ''));
+    const score = overlapScore(itemTokens, record.tokens || tokenize(record.headline || '')) * signatureCompatibility(itemSignature, record.signature || {});
     if (score > bestScore) {
       bestScore = score;
       best = record;
@@ -365,6 +430,7 @@ async function processItem(item) {
   pruneCaches();
 
   const aiHints = extractAiHints(item.headline, item.body, item.sourceName);
+  const analysis = analyzeEvent(item.headline, item.body, item.publishedAt);
 
   const { best, bestScore } = chooseCacheMatch(item);
   if (best && bestScore >= CONFIG.KEYWORD_MATCH_THRESHOLD) {
@@ -381,15 +447,16 @@ async function processItem(item) {
       publishedAt: item.publishedAt,
       sourceTrust: item.sourceTrust,
       aiHints,
-      inheritedFrom: {
+        inheritedFrom: {
         category: best.category,
         importanceScore: best.importanceScore,
         layoutSize: best.layoutSize,
         sentiment: best.sentiment,
         confidenceScore: best.confidenceScore ?? 75,
-        clusterId,
-      },
-    });
+          clusterId,
+        },
+        eventAnalysis: analysis,
+      });
     return;
   }
 
@@ -402,6 +469,8 @@ async function processItem(item) {
       cluster.headlineTokens = unique([...(cluster.headlineTokens || []), ...tokenize(item.headline)]);
       cluster.sources.add(item.sourceName);
       cluster.lastSeenAt = Date.now();
+      cluster.signature = mergeSignatures(cluster.signature, analysis.signature);
+      cluster.signatures = [...(cluster.signatures || []), analysis.signature].slice(-12);
     }
 
     console.log(`[cluster-update] ${item.headline.slice(0, 72)} -> ${matchedClusterId} (${matchedScore.toFixed(2)})`);
@@ -417,6 +486,7 @@ async function processItem(item) {
       aggregatedClusterTexts: cluster ? cluster.texts : [item.body],
       sourceTrust: item.sourceTrust,
       aiHints,
+      eventAnalysis: analysis,
       clusterScore: matchedScore,
     });
     return;
@@ -428,6 +498,8 @@ async function processItem(item) {
     headlineTokens: tokenize(item.headline),
     sources: new Set([item.sourceName]),
     lastSeenAt: Date.now(),
+    signature: analysis.signature,
+    signatures: [analysis.signature],
   });
 
   console.log(`[new-article] ${item.headline.slice(0, 72)} -> ${clusterId}`);
@@ -443,6 +515,7 @@ async function processItem(item) {
     aggregatedClusterTexts: [item.body],
     sourceTrust: item.sourceTrust,
     aiHints,
+    eventAnalysis: analysis,
     clusterScore: matchedScore,
   });
 }
