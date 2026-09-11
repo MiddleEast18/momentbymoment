@@ -1,5 +1,23 @@
 .card {
   overflow: visible;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.card__eyebrow,
+.card__headline,
+.card__summary,
+.card__evidence,
+.card__meta {
+  min-width: 0;
+  max-width: 100%;
+}
+.card__eyebrow {
+  flex-wrap: wrap;
+}
+.card__source {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Update badge: centered on the card's upper edge, half inside / half outside. */
