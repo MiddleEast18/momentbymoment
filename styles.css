@@ -25,8 +25,8 @@
   --radius: 10px;
 }
 * { box-sizing: border-box; }
-html { color-scheme: dark; }
-body { margin: 0; background: radial-gradient(ellipse at top left, rgba(201,162,39,0.05), transparent 45%), var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+html { color-scheme: dark; overflow-x: clip; }
+body { margin: 0; max-width: 100%; overflow-x: clip; background: radial-gradient(ellipse at top left, rgba(201,162,39,0.05), transparent 45%), var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 button, input, select { font: inherit; }
 .skip-link { position: absolute; right: -999px; top: 0; background: var(--gold); color: #1a1400; padding: 10px 16px; border-radius: 0 0 0 8px; z-index: 100; }
 .skip-link:focus { right: 0; }
