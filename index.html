@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609100005">
   <link rel="stylesheet" href="auth.css?v=202609111110">
+  <link rel="stylesheet" href="rapid-news.css?v=202609112315">
   <style>
     @media (max-width: 700px), (pointer: coarse) {
       .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
@@ -45,6 +46,14 @@
     <div class="control-bar__count" id="liveCount">0 خبر معروض</div>
   </nav>
 
+  <section class="rapid-news__bar" aria-label="أولًا بأول">
+    <button id="rapidNewsToggle" class="rapid-news__toggle" type="button" aria-expanded="false" aria-controls="rapidNews" aria-label="فتح الأخبار الفورية">أولًا بأول <span id="rapidNewsBadge" class="rapid-news__badge" hidden>0</span></button>
+    <span id="rapidNewsStatus" class="rapid-news__status" role="status" aria-live="polite">جارٍ تحميل الأخبار الفورية…</span>
+  </section>
+  <section id="rapidNews" class="rapid-news__panel" hidden aria-labelledby="rapidNewsToggle">
+    <div id="rapidNewsList" class="rapid-news__list"></div>
+  </section>
+
   <div class="sort-sheet" id="sortSheet" hidden>
     <div class="sort-sheet__backdrop" data-sort-close></div>
     <section class="sort-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="sortSheetTitle" tabindex="-1">
@@ -70,5 +79,6 @@
   <script src="news-pagination.js?v=202609100005"></script>
   <script src="news-revision-compat.js?v=202609101030"></script>
   <script src="auth-v8.js?v=202609112130"></script>
+  <script src="rapid-news.js?v=202609112315"></script>
 </body>
 </html>

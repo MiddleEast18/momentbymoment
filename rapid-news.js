@@ -1,0 +1,28 @@
+(() => {
+  'use strict';
+  const CONFIG = { url: 'https://dndlkenyfymlrjnslyzb.supabase.co', key: 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx' };
+  const rail = document.getElementById('rapidNews');
+  const list = document.getElementById('rapidNewsList');
+  const badge = document.getElementById('rapidNewsBadge');
+  const status = document.getElementById('rapidNewsStatus');
+  const toggle = document.getElementById('rapidNewsToggle');
+  if (!rail || !list || !badge || !toggle || !window.supabase?.createClient) return;
+  const sb = window.supabase.createClient(CONFIG.url, CONFIG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+  const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const relative = (value) => { const time = new Date(value || 0).getTime(); if (!Number.isFinite(time)) return ''; const mins = Math.round((time - Date.now()) / 60000); const formatter = new Intl.RelativeTimeFormat('ar', { numeric: 'auto' }); return Math.abs(mins) < 60 ? formatter.format(mins, 'minute') : formatter.format(Math.round(mins / 60), 'hour'); };
+  let opened = false;
+  let currentUser = false;
+  let channel = null;
+  let timer = null;
+  const setBadge = (count) => { badge.textContent = count > 99 ? '99+' : String(Math.max(0, count)); badge.hidden = count <= 0; };
+  const render = (rows) => { list.innerHTML = rows.length ? rows.map((row) => `<article class="rapid-news__item"><div class="rapid-news__meta"><span>${escapeHtml(row.source_name)}</span><time datetime="${escapeHtml(row.received_at)}">وصل ${escapeHtml(relative(row.received_at))}</time></div><h3>${escapeHtml(row.headline)}</h3><p>${escapeHtml(row.summary)}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`).join('') : '<p class="rapid-news__empty">لا توجد أخبار فورية جديدة حاليًا.</p>'; };
+  const load = async () => { const { data, error } = await sb.from('rapid_news').select('id,source_name,source_url,headline,summary,published_at,received_at').order('received_at', { ascending: false }).limit(80); if (error) { status.textContent = 'تعذر تحميل الأخبار الفورية'; return; } render(data || []); status.textContent = data?.length ? `${data.length} خبرًا محفوظًا` : 'بانتظار الأخبار الجديدة'; };
+  const refreshUnread = async () => { if (!currentUser) return; const { data, error } = await sb.rpc('rapid_news_unread_count'); if (!error) setBadge(Number(data || 0)); };
+  const markSeen = async () => { if (!currentUser) return; const { error } = await sb.rpc('rapid_news_mark_seen'); if (!error) setBadge(0); };
+  const open = async () => { opened = true; rail.hidden = false; toggle.setAttribute('aria-expanded', 'true'); await load(); await markSeen(); };
+  toggle.addEventListener('click', () => { if (opened) { opened = false; rail.hidden = true; toggle.setAttribute('aria-expanded', 'false'); } else void open(); });
+  const start = async () => { await load(); const { data: { session } } = await sb.auth.getSession(); currentUser = Boolean(session?.user); await refreshUnread(); channel = sb.channel('mirsad-rapid-news-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rapid_news' }, () => { void load(); if (opened) void markSeen(); else void refreshUnread(); }).subscribe(); timer = setInterval(async () => { await load(); if (!opened) await refreshUnread(); }, 60000); };
+  sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });
+  window.addEventListener('pagehide', () => { if (timer) clearInterval(timer); if (channel) sb.removeChannel(channel); });
+  void start();
+})();
