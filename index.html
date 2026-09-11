@@ -16,6 +16,14 @@
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609100005">
   <link rel="stylesheet" href="auth.css?v=202609111110">
+  <style>
+    @media (max-width: 700px), (pointer: coarse) {
+      .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
+      .featured-rail > .card { flex: 0 0 86% !important; width: 86% !important; min-width: 86% !important; max-width: 86% !important; scroll-snap-align: center; }
+      .featured-rail > .card:first-of-type { border-color: rgba(201,162,39,.24); box-shadow: inset 0 0 0 1px rgba(201,162,39,.08), 0 10px 30px -18px rgba(201,162,39,.22); }
+      .featured-rail .card__headline { font-size: 22px; line-height: 1.42; }
+    }
+  </style>
 </head>
 <body class="mirsad-auth-required">
   <header class="wire-header">
