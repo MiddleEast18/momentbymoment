@@ -121,7 +121,64 @@
       featuredRailEl.appendChild(card);
     });
   }
-  function renderWithFlip(justUpdatedId) { const visible = sortArticles(getVisibleArticles()); const visibleIds = new Set(visible.map((a) => a.id)); const firstRects = new Map(); gridEl.querySelectorAll('.card').forEach((el) => { el.getAnimations().forEach((animation) => animation.cancel()); el.style.transform = ''; firstRects.set(el.dataset.id, el.getBoundingClientRect()); }); gridEl.querySelectorAll('.card').forEach((el) => { if (!visibleIds.has(el.dataset.id)) el.remove(); }); const existingById = new Map(); gridEl.querySelectorAll('.card').forEach((el) => existingById.set(el.dataset.id, el)); const newlyCreatedIds = new Set(); visible.forEach((article) => { let el = existingById.get(article.id); if (!el) { el = createCardElement(article); el.style.opacity = '0'; newlyCreatedIds.add(article.id); } else populateCard(el, article); gridEl.appendChild(el); }); emptyStateEl.hidden = visible.length > 0; gridEl.querySelectorAll('.card').forEach((el) => { const id = el.dataset.id; if (newlyCreatedIds.has(id)) { el.style.opacity = ''; el.animate([{ transform: 'translateY(-16px) scale(0.98)', opacity: 0 }, { transform: 'translateY(0) scale(1)', opacity: 1 }], { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }); return; } const first = firstRects.get(id); if (!first) return; const last = el.getBoundingClientRect(); const dx = first.left - last.left, dy = first.top - last.top; if (dx || dy) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }], { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }); }); renderFeaturedRail(visible); renderTicker(); updateInsights(); if (justUpdatedId) flashUpdateBadge(justUpdatedId); }
+  function renderWithFlip(justUpdatedId) {
+    const visible = sortArticles(getVisibleArticles());
+    const visibleIds = new Set(visible.map((a) => a.id));
+    const firstRects = new Map();
+    gridEl.querySelectorAll('.card').forEach((el) => {
+      el.getAnimations().forEach((animation) => animation.cancel());
+      el.style.transform = '';
+      firstRects.set(el.dataset.id, el.getBoundingClientRect());
+    });
+    gridEl.querySelectorAll('.card').forEach((el) => { if (!visibleIds.has(el.dataset.id)) el.remove(); });
+
+    // Keep the grid's existing nodes and only apply FLIP when content/order actually changes.
+    // This prevents a category change from temporarily retaining cards from the previous filter.
+    const existingById = new Map();
+    gridEl.querySelectorAll('.card').forEach((el) => existingById.set(el.dataset.id, el));
+    const fragment = document.createDocumentFragment();
+    const newlyCreatedIds = new Set();
+
+    visible.forEach((article) => {
+      let el = existingById.get(article.id);
+      if (!el) {
+        el = createCardElement(article);
+        newlyCreatedIds.add(article.id);
+      } else {
+        populateCard(el, article);
+      }
+      fragment.appendChild(el);
+    });
+    gridEl.replaceChildren(fragment);
+
+    emptyStateEl.hidden = visible.length > 0;
+
+    gridEl.querySelectorAll('.card').forEach((el) => {
+      const id = el.dataset.id;
+      if (newlyCreatedIds.has(id)) {
+        el.animate(
+          [{ transform: 'translateY(-16px) scale(0.98)', opacity: 0 }, { transform: 'translateY(0) scale(1)', opacity: 1 }],
+          { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }
+        );
+        return;
+      }
+      const first = firstRects.get(id);
+      if (!first) return;
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (dx || dy) el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+        { duration: CONFIG.FLIP_DURATION_MS, easing: CONFIG.FLIP_EASING }
+      );
+    });
+
+    // These always derive from the newly filtered list.
+    renderFeaturedRail(visible);
+    renderTicker();
+    updateInsights();
+    if (justUpdatedId) flashUpdateBadge(justUpdatedId);
+  }
   function upsertArticle(row) { if (!row || !row.id || !isArabicHeadline(row.headline || row.title)) return; const idx = state.articles.findIndex((a) => a.id === row.id); if (idx !== -1) state.articles.splice(idx, 1); state.articles.unshift(row); state.articles.sort(compareLatest); if (state.articles.length > CONFIG.MAX_KEPT_ARTICLES) state.articles.length = CONFIG.MAX_KEPT_ARTICLES; }
   async function fetchInitialBatch() { const { data, error } = await sb.from(CONFIG.TABLE).select(SELECT_COLUMNS).eq('is_pending_verification', false).order('published_at', { ascending: false, nullsFirst: false }).order('updated_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false, nullsFirst: false }).limit(CONFIG.INITIAL_FETCH_LIMIT); if (error) { console.error('[mirsad] initial fetch failed', error); return []; } return (data || []).filter((row) => isArabicHeadline(row.headline || row.title)).sort(compareLatest); }
   async function fetchLatestViaRest() { const params = new URLSearchParams({ select: SELECT_COLUMNS, is_pending_verification: 'eq.false', order: 'published_at.desc.nullslast,updated_at.desc.nullslast,created_at.desc.nullslast', limit: String(CONFIG.INITIAL_FETCH_LIMIT) }); try { const response = await fetch(`${CONFIG.SUPABASE_URL}/rest/v1/${CONFIG.TABLE}?${params.toString()}`, { headers: { apikey: CONFIG.SUPABASE_ANON_KEY, Authorization: `Bearer ${CONFIG.SUPABASE_ANON_KEY}` } }); if (!response.ok) throw new Error(`HTTP ${response.status}`); return (await response.json()).filter((row) => isArabicHeadline(row.headline || row.title)).sort(compareLatest); } catch (error) { console.error('[mirsad] REST fetch failed', error); return []; } }
