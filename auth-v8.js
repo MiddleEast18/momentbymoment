@@ -147,16 +147,18 @@
 
   const isProfilePage=()=>window.location.pathname.endsWith('/profile.html');
   const profilePageUrl=()=>new URL('profile.html',window.location.href).href;
+  const avatarUrl=value=>{try{const url=new URL(String(value||'').trim());return ['https:','http:'].includes(url.protocol)?url.href:''}catch{return ''}};
   function renderProfilePage(user,profile){
     const root=document.getElementById('mirsadProfilePage');if(!root)return;
     const safe=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const avatar=profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'';
+    const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
     const initial=(profile?.display_name||user.email||'مِ').trim().charAt(0).toUpperCase();
     root.innerHTML=`<div class="mirsad-profile-page__shell"><header class="mirsad-profile-page__header"><div class="mirsad-profile-page__brand"><span aria-hidden="true">◉</span><span>مِرصاد</span></div><button class="mirsad-profile-page__back" type="button" data-back>العودة للأخبار</button></header><section class="mirsad-profile-page__card"><div class="mirsad-profile-page__avatar">${avatar?`<img src="${safe(avatar)}" alt="" loading="lazy">`:`<span>${safe(initial)}</span>`}</div><h1 class="mirsad-profile-page__title">ملفي الشخصي</h1><p class="mirsad-profile-page__intro">إدارة معلوماتك وتجربتك في مِرصاد.</p><div class="mirsad-profile-grid"><label>البريد الإلكتروني<input value="${safe(user.email||'')}" disabled></label><label>الاسم<input id="profilePageName" maxlength="80" value="${safe(profile?.display_name||'')}" placeholder="اسمك"></label><label>رابط الصورة<input id="profilePageAvatar" maxlength="500" value="${safe(profile?.avatar_url||'')}" placeholder="رابط صورة اختياري"></label><label>اسم المستخدم<input id="profilePageUsername" maxlength="30" value="${safe(profile?.username||'')}" placeholder="اسم مستخدم"></label><label>نبذة قصيرة<input id="profilePageBio" maxlength="160" value="${safe(profile?.bio||'')}" placeholder="اختياري"></label></div><div class="mirsad-profile-page__actions"><button class="mirsad-auth-button primary" type="button" data-save>حفظ ومتابعة</button><button class="mirsad-auth-button" type="button" data-signout>تسجيل الخروج</button></div><div id="mirsadProfilePageStatus" class="mirsad-auth-status" role="status" aria-live="polite"></div><div class="mirsad-profile-page__danger"><button class="mirsad-auth-button" type="button" data-delete>حذف الحساب</button></div></section></div>`;
     root.hidden=false;
+    root.querySelector('.mirsad-profile-page__avatar img')?.addEventListener('error',event=>{event.currentTarget.remove();const fallback=document.createElement('span');fallback.textContent=initial;root.querySelector('.mirsad-profile-page__avatar')?.appendChild(fallback)});
     root.querySelector('[data-back]').addEventListener('click',()=>{window.location.href=new URL('index.html',window.location.href).href});
     root.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){statusText(root.querySelector('#mirsadProfilePageStatus'),'تعذر تسجيل الخروج. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
-    root.querySelector('[data-save]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus'),btn=root.querySelector('[data-save]');const payload={id:user.id,display_name:root.querySelector('#profilePageName').value.trim(),avatar_url:root.querySelector('#profilePageAvatar').value.trim()||null,username:root.querySelector('#profilePageUsername').value.trim()||null,bio:root.querySelector('#profilePageBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من البيانات وحاول مجددًا.');return}statusText(status,'تم حفظ الملف بنجاح.')});
+    root.querySelector('[data-save]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus'),btn=root.querySelector('[data-save]');const payload={id:user.id,display_name:root.querySelector('#profilePageName').value.trim(),avatar_url:avatarUrl(root.querySelector('#profilePageAvatar').value)||null,username:root.querySelector('#profilePageUsername').value.trim()||null,bio:root.querySelector('#profilePageBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){statusText(status,'تعذر حفظ الملف. تحقق من البيانات وحاول مجددًا.');return}statusText(status,'تم حفظ الملف بنجاح.')});
     root.querySelector('[data-delete]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus');if(!window.confirm('هل أنت متأكد من حذف حسابك؟ سيتم حذف بيانات ملفك وتسجيل خروجك.'))return;const{error}=await sb.functions.invoke('delete-account',{body:{}});if(error){statusText(status,'تعذر حذف الحساب. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
   }
 
@@ -170,11 +172,11 @@
     const b=document.createElement('aside');b.id='mirsadProfileBanner';b.className='mirsad-profile-banner';b.innerHTML=`<div class="mirsad-profile-banner__text"><strong>أكمل ملفك الشخصي</strong><span>أضف معلوماتك لتخصيص تجربتك في مِرصاد.</span></div><div class="mirsad-profile-banner__actions"><button class="mirsad-auth-button primary" type="button" data-open>إكمال الملف</button><button class="mirsad-auth-button" type="button" data-later>لاحقًا</button></div>`;document.body.appendChild(b);b.querySelector('[data-open]').addEventListener('click',()=>openProfile(user));b.querySelector('[data-later]').addEventListener('click',()=>b.remove());
   }
 
-  function showUserMenu(user){
+  function showUserMenu(user,profile=null){
     document.getElementById('mirsadUserMenu')?.remove();
     const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
     const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
-    const avatar=user.user_metadata?.avatar_url||user.user_metadata?.picture||'';
+    const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
     wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
@@ -188,9 +190,9 @@
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
     // Authentication success must reveal the app immediately; profile hydration is non-blocking.
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
-    showUserMenu(user);
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
+    showUserMenu(user,profile);
     if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
