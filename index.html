@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609100005">
   <link rel="stylesheet" href="auth.css?v=202609111110">
-  <link rel="stylesheet" href="rapid-news.css?v=202609112347">
+  <link rel="stylesheet" href="rapid-news.css?v=202609112355">
   <style>
     @media (max-width: 700px), (pointer: coarse) {
       .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
@@ -52,6 +52,10 @@
   </section>
   <section id="rapidNews" class="rapid-news__panel" hidden aria-labelledby="rapidNewsToggle">
     <div id="rapidNewsList" class="rapid-news__list"></div>
+    <div id="rapidNewsControls" class="rapid-news__controls" role="group" aria-label="خيارات عرض الأخبار الملتقطة">
+      <button id="rapidNewsAll" class="rapid-news__control" type="button">عرض الكل</button>
+      <button id="rapidNewsMore" class="rapid-news__control" type="button">عرض المزيد</button>
+    </div>
   </section>
 
   <div class="sort-sheet" id="sortSheet" hidden>
@@ -79,6 +83,6 @@
   <script src="news-pagination.js?v=202609100005"></script>
   <script src="news-revision-compat.js?v=202609101030"></script>
   <script src="auth-v8.js?v=202609112130"></script>
-  <script src="rapid-news.js?v=202609112352"></script>
+  <script src="rapid-news.js?v=202609112355"></script>
 </body>
 </html>

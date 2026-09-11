@@ -6,7 +6,9 @@
   const badge = document.getElementById('rapidNewsBadge');
   const status = document.getElementById('rapidNewsStatus');
   const toggle = document.getElementById('rapidNewsToggle');
-  if (!rail || !list || !badge || !toggle || !window.supabase?.createClient) return;
+  const more = document.getElementById('rapidNewsMore');
+  const all = document.getElementById('rapidNewsAll');
+  if (!rail || !list || !badge || !toggle || !more || !all || !window.supabase?.createClient) return;
   const sb = window.supabase.createClient(CONFIG.url, CONFIG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const cleanRichText = (value) => { const source = String(value || ''); const doc = new DOMParser().parseFromString(`<div>${source}</div>`, 'text/html'); doc.querySelectorAll('br').forEach((node) => node.replaceWith('\n')); doc.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6').forEach((node) => node.append('\n')); return (doc.body.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); };
@@ -15,12 +17,16 @@
   let currentUser = false;
   let channel = null;
   let timer = null;
+  let currentRows = [];
+  let visibleCount = 3;
   const setBadge = (count) => { badge.textContent = count > 99 ? '99+' : String(Math.max(0, count)); badge.hidden = count <= 0; };
-  const render = (rows) => { const ordered = [...(rows || [])].sort((a, b) => Number(b.importance_score || 0) - Number(a.importance_score || 0) || new Date(b.received_at) - new Date(a.received_at)); list.innerHTML = ordered.length ? ordered.map((row, index) => `<article class="rapid-news__item${index === 0 ? ' is-pinned' : ''}">${index === 0 ? '<span class="rapid-news__pin" title="الأهم حاليًا" aria-label="الخبر الأهم حاليًا">📌</span>' : ''}<div class="rapid-news__meta"><span>${escapeHtml(row.source_name)}</span><time datetime="${escapeHtml(row.received_at)}">وصل ${escapeHtml(relative(row.received_at))}</time></div><h3>${escapeHtml(cleanRichText(row.headline))}</h3><p>${escapeHtml(cleanRichText(row.summary))}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`).join('') : '<p class="rapid-news__empty">لا توجد أخبار ملتقطة حاليًا.</p>'; };
+  const render = (rows) => { const ordered = [...(rows || [])].sort((a, b) => Number(b.importance_score || 0) - Number(a.importance_score || 0) || new Date(b.received_at) - new Date(a.received_at)); currentRows = ordered; visibleCount = Math.min(Math.max(visibleCount, ordered.length ? 3 : 0), ordered.length); const visible = ordered.slice(0, visibleCount); list.innerHTML = visible.length ? visible.map((row, index) => `<article class="rapid-news__item${index === 0 ? ' is-pinned' : ''}">${index === 0 ? '<span class="rapid-news__pin" title="الأهم حاليًا" aria-label="الخبر الأهم حاليًا">📌</span>' : ''}<div class="rapid-news__meta"><span>${escapeHtml(row.source_name)}</span><time datetime="${escapeHtml(row.received_at)}">وصل ${escapeHtml(relative(row.received_at))}</time></div><h3>${escapeHtml(cleanRichText(row.headline))}</h3><p>${escapeHtml(cleanRichText(row.summary))}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`).join('') : '<p class="rapid-news__empty">لا توجد أخبار ملتقطة حاليًا.</p>'; more.hidden = visibleCount >= ordered.length; all.hidden = visibleCount >= ordered.length; };
   const load = async () => { const { data, error } = await sb.from('rapid_news').select('id,source_name,source_url,headline,summary,published_at,received_at,importance_score').order('importance_score', { ascending: false }).order('received_at', { ascending: false }).limit(100); if (error) { status.textContent = 'تعذر تحميل الأخبار الملتقطة'; return; } render(data || []); status.textContent = data?.length ? `${data.length} خبرًا محفوظًا` : 'بانتظار الأخبار الملتقطة'; };
   const refreshUnread = async () => { if (!currentUser) return; const { data, error } = await sb.rpc('rapid_news_unread_count'); if (!error) setBadge(Number(data || 0)); };
   const markSeen = async () => { if (!currentUser) return; const { error } = await sb.rpc('rapid_news_mark_seen'); if (!error) setBadge(0); };
   const open = async () => { opened = true; rail.hidden = false; toggle.setAttribute('aria-expanded', 'true'); await load(); await markSeen(); };
+  more.addEventListener('click', () => { visibleCount += 3; render(currentRows); });
+  all.addEventListener('click', () => { visibleCount = currentRows.length; render(currentRows); });
   toggle.addEventListener('click', () => { if (opened) { opened = false; rail.hidden = true; toggle.setAttribute('aria-expanded', 'false'); } else void open(); });
   const start = async () => { await load(); const { data: { session } } = await sb.auth.getSession(); currentUser = Boolean(session?.user); await refreshUnread(); channel = sb.channel('mirsad-rapid-news-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rapid_news' }, () => { void load(); if (opened) void markSeen(); else void refreshUnread(); }).subscribe(); timer = setInterval(async () => { await load(); if (!opened) await refreshUnread(); }, 60000); };
   sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });
