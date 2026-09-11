@@ -9,6 +9,7 @@ const items = (xml: string) => { const out: string[] = []; for (const tag of ["i
 const canonical = (raw: string) => { try { const u = new URL(raw); for (const k of [...u.searchParams.keys()]) if (/^(utm_|fbclid|gclid|ref|source)$/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
 const published = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); const d = new Date(v); if (v && Number.isFinite(d.getTime())) return d.toISOString(); } return null; };
 const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
+const importance = (s: string) => Math.min(100, 35 + (/(عاجل|عاجلة|هجوم|حرب|انفجار|زلزال|قتلى|وفيات|اغتيال)/.test(s) ? 25 : 0) + (/(رئيس|حكومة|انتخابات|اتفاق|تصعيد|إيران|إسرائيل|أمريكا)/.test(s) ? 10 : 0));
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (req) => {
@@ -29,7 +30,7 @@ Deno.serve(async (req) => {
         const headline = field(item, "title");
         const url = canonical(field(item, "link") || field(item, "guid"));
         if (!headline || !isArabic(headline) || !url || seen.has(url)) continue;
-        const result = await db.from("rapid_news").insert({ source_key: source.source_key, source_name: source.name, source_url: url, headline, summary: field(item, "description") || field(item, "summary") || headline, published_at: published(item) }).select("id").single();
+        const result = await db.from("rapid_news").insert({ source_key: source.source_key, source_name: source.name, source_url: url, headline, summary: field(item, "description") || field(item, "summary") || headline, published_at: published(item), importance_score: importance(headline) }).select("id").single();
         if (!result.error || result.error.code === "23505") { seen.add(url); if (!result.error) inserted.push(result.data.id); }
         else errors.push(`${source.source_key}: ${result.error.message}`);
       }
