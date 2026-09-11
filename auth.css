@@ -1,3 +1,4 @@
+body.mirsad-auth-required > :not(#mirsadAuthGate){visibility:hidden!important}
 .mirsad-auth-gate{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at top left,rgba(201,162,39,.06),transparent 45%),var(--bg);color:var(--text)}
 .mirsad-auth-card{width:min(420px,100%);text-align:center;padding:34px 24px}
 .mirsad-auth-logo{width:72px;height:72px;margin:0 auto 18px;display:grid;place-items:center;border:1px solid var(--gold);border-radius:50%;color:var(--gold)}
