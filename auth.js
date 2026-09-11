@@ -1,9 +1,10 @@
 (() => {
   'use strict';
   const CONFIG={SUPABASE_URL:'https://dndlkenyfymlrjnslyzb.supabase.co',SUPABASE_KEY:'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx',PROFILE_TABLE:'profiles',GUEST_KEY:'mirsad.guest.v1',PRODUCTION_ORIGIN:'https://marsad.website/'};
-  if(!window.supabase)return;
   const AUTH_OPTIONS={auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,flowType:'pkce'}};
-  const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS);
+  let sb=null;
+  try{if(window.supabase?.createClient)sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,AUTH_OPTIONS)}catch(error){console.error('[mirsad auth] Supabase initialization failed',error)}
+  const supabaseReady=Boolean(sb);
   // OAuth always returns to the canonical production site.
   // This prevents local previews/dev servers from becoming the final callback target.
   const redirectTo=()=>CONFIG.PRODUCTION_ORIGIN;
@@ -194,6 +195,7 @@
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
 
   async function recoverSession(){
+    if(!sb)return null;
     const url=new URL(window.location.href);
     const code=url.searchParams.get('code');
     if(code){
@@ -213,7 +215,7 @@
     return data?.session||null;
   }
 
-  sb.auth.onAuthStateChange((event,session)=>{
+  if(sb)sb.auth.onAuthStateChange((event,session)=>{
     if((event==='SIGNED_IN'||event==='USER_UPDATED') && session?.user){
       if(document.getElementById('mirsadAuthGate') || document.body.classList.contains('mirsad-auth-required')){
         void finishAuthenticated(session.user);
@@ -223,6 +225,11 @@
 
   async function init(){
     injectStyles();installGuestCardGuard();document.body.classList.add('mirsad-auth-required');
+    if(!supabaseReady){
+      showGate();
+      statusText(document.getElementById('mirsadAuthStatus'),'تعذر تحميل خدمة تسجيل الدخول. أعد تحديث الصفحة للمحاولة مرة أخرى.');
+      return;
+    }
     const oauthError=readOAuthError();
     const session=await recoverSession();
     cleanAuthUrl();
