@@ -52,6 +52,11 @@
       .mirsad-profile-panel h2{margin:0 0 16px;font-family:var(--font-display)}.mirsad-profile-grid{display:grid;gap:11px}.mirsad-profile-grid label{display:grid;gap:6px;color:var(--text-dim);font-size:12px}.mirsad-profile-grid input{min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text)}.mirsad-profile-footer{display:flex;gap:10px;margin-top:16px}.mirsad-profile-footer button{flex:1}
       .mirsad-guest-exit{position:fixed;top:12px;left:12px;z-index:5400;display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:28px;padding:0 9px;border:1px solid var(--panel-border-strong);border-radius:999px;background:rgba(16,21,28,.82);backdrop-filter:blur(8px);color:var(--text-dim);font:500 10px var(--font-sans,inherit);cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.14)}
       .mirsad-guest-exit:hover{color:var(--text);border-color:var(--gold)}.mirsad-guest-exit:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+      .mirsad-user-menu{position:fixed;top:10px;left:10px;z-index:5400}
+      .mirsad-user-button{width:34px;height:34px;padding:0;border-radius:50%;border:1px solid var(--gold);background:rgba(16,21,28,.88);color:var(--gold);display:grid;place-items:center;overflow:hidden;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+      .mirsad-user-button img{width:100%;height:100%;object-fit:cover}.mirsad-user-initial{font-size:12px;font-weight:700}
+      .mirsad-user-dropdown{position:absolute;top:42px;left:0;min-width:150px;padding:6px;border:1px solid var(--panel-border-strong);border-radius:12px;background:rgba(16,21,28,.98);box-shadow:0 10px 30px rgba(0,0,0,.28)}
+      .mirsad-user-item{display:block;width:100%;padding:9px 10px;border:0;border-radius:8px;background:none;color:var(--text);text-align:right;font:inherit;cursor:pointer}.mirsad-user-item:hover{background:rgba(255,255,255,.06)}
       .mirsad-guest-lock-toast{position:fixed;left:16px;right:16px;bottom:18px;z-index:5500;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--panel-border-strong);border-radius:14px;background:rgba(16,21,28,.97);color:var(--text);box-shadow:0 10px 35px rgba(0,0,0,.3);opacity:0;transform:translateY(12px);transition:opacity .2s ease,transform .2s ease}
       .mirsad-guest-lock-toast.is-visible{opacity:1;transform:translateY(0)}.mirsad-guest-lock-toast__text{font-size:13px}.mirsad-guest-lock-toast__text small{display:block;color:var(--text-dim);margin-top:3px}.mirsad-guest-lock-toast__button{border:1px solid var(--gold);background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:8px 13px;font:inherit;cursor:pointer;white-space:nowrap}
       @media(max-width:700px){.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}.mirsad-guest-exit{top:8px;left:8px;min-width:32px;height:26px;padding:0 8px;font-size:9px}.mirsad-guest-lock-toast{bottom:12px;left:10px;right:10px}}
@@ -152,10 +157,25 @@
     const b=document.createElement('aside');b.id='mirsadProfileBanner';b.className='mirsad-profile-banner';b.innerHTML=`<div class="mirsad-profile-banner__text"><strong>أكمل ملفك الشخصي</strong><span>أضف معلوماتك لتخصيص تجربتك في مِرصاد.</span></div><div class="mirsad-profile-banner__actions"><button class="mirsad-auth-button primary" type="button" data-open>إكمال الملف</button><button class="mirsad-auth-button" type="button" data-later>لاحقًا</button></div>`;document.body.appendChild(b);b.querySelector('[data-open]').addEventListener('click',()=>openProfile(user));b.querySelector('[data-later]').addEventListener('click',()=>b.remove());
   }
 
+  function showUserMenu(user){
+    document.getElementById('mirsadUserMenu')?.remove();
+    const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
+    const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
+    const avatar=user.user_metadata?.avatar_url||user.user_metadata?.picture||'';
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    document.body.appendChild(wrap);
+    const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
+    btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
+    wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;openProfile(user)});
+    wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.add('mirsad-auth-required');showGate()});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
+  }
+  
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
     let profile;try{profile=await ensureProfile(user)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
+    showUserMenu(user);
     if(!profile?.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
