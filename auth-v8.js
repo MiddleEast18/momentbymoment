@@ -204,6 +204,7 @@
     wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.add('mirsad-auth-required');showGate()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
+  window.addEventListener('mirsad:unlock-balance',event=>{const el=document.querySelector('#mirsadUserMenu .mirsad-user-balance');if(!el)return;const detail=event.detail||{};el.textContent=detail.unlimited?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Math.max(0,Number(detail.remaining)||0)}`;});
   
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
