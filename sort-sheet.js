@@ -60,18 +60,32 @@
   });
 
   // Category changes are a filter state change, not a card animation state.
-  // Cancel any FLIP animation started by app.js during the same click event,
-  // so an existing card cannot briefly fly from its previous position.
+  // Suppress both the grid FLIP and the featured-card entrance animation for
+  // the whole render turn, so a newly rendered card cannot flash at the top.
   const categoryFiltersEl = document.getElementById('categoryFilters');
+  const cancelCategoryCardMotion = () => {
+    document.querySelectorAll('#newsGrid .card, #featuredRail .card').forEach((card) => {
+      card.getAnimations().forEach((animation) => animation.cancel());
+      card.style.transform = 'none';
+      card.style.animation = 'none';
+      card.style.transition = 'none';
+    });
+  };
+
   categoryFiltersEl?.addEventListener('click', () => {
+    cancelCategoryCardMotion();
     requestAnimationFrame(() => {
-      document.querySelectorAll('#newsGrid .card').forEach((card) => {
-        card.getAnimations().forEach((animation) => animation.cancel());
-        card.style.transform = '';
-        card.style.opacity = '';
+      cancelCategoryCardMotion();
+      requestAnimationFrame(() => {
+        cancelCategoryCardMotion();
+        document.querySelectorAll('#newsGrid .card, #featuredRail .card').forEach((card) => {
+          card.style.transform = '';
+          card.style.animation = '';
+          card.style.transition = '';
+        });
       });
     });
-  });
+  }, true);
 
   document.addEventListener('keydown', (event) => {
     if (sheet.hidden) return;
