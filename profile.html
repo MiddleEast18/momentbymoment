@@ -24,6 +24,7 @@
     .mirsad-profile-page__avatar{width:76px;height:76px;margin:0 0 18px;border:1px solid var(--gold);border-radius:50%;display:grid;place-items:center;overflow:hidden;background:rgba(255,255,255,.04);color:var(--gold);font-size:25px;font-weight:700}
     .mirsad-profile-page__avatar img{width:100%;height:100%;object-fit:cover}
     .mirsad-profile-page__actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}.mirsad-profile-page__actions button{flex:1;min-width:140px}
+    .mirsad-profile-field{position:relative;transition:transform .22s ease,opacity .22s ease}.mirsad-profile-field.is-saving{animation:mirsad-field-save .46s ease both}.mirsad-profile-field.is-saved{animation:mirsad-field-settle .34s ease both}.mirsad-profile-field-card{min-height:44px;display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid rgba(201,162,39,.45);border-radius:12px;background:linear-gradient(135deg,rgba(201,162,39,.12),rgba(255,255,255,.035));box-shadow:0 6px 18px rgba(0,0,0,.12)}.mirsad-profile-field-card__icon{width:30px;height:30px;display:grid;place-items:center;flex:0 0 30px;border:1px solid var(--gold);border-radius:9px;color:var(--gold);font-family:var(--font-mono);font-size:13px}.mirsad-profile-field-card__content{min-width:0;display:grid;gap:2px;flex:1}.mirsad-profile-field-card__content small{color:var(--text-faint);font-size:10px}.mirsad-profile-field-card__content strong{overflow:hidden;color:var(--text);font-size:14px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}.mirsad-profile-field-card button{border:0;background:none;color:var(--gold);font:inherit;font-size:12px;cursor:pointer}.mirsad-profile-field-card button:hover{text-decoration:underline;text-underline-offset:3px}@keyframes mirsad-field-save{0%{transform:scale(1);filter:brightness(1)}45%{transform:scale(.985);filter:brightness(1.3)}100%{transform:scale(1);filter:brightness(1)}}@keyframes mirsad-field-settle{0%{opacity:.45;transform:translateY(5px) scale(.985)}70%{opacity:1;transform:translateY(-1px) scale(1.01)}100%{transform:translateY(0) scale(1)}}
     .mirsad-profile-page__danger{margin-top:24px;padding-top:18px;border-top:1px solid var(--panel-border);}.mirsad-profile-page__danger button{color:#fca5a5;border-color:rgba(248,113,113,.35)}
     @media(max-width:520px){.mirsad-profile-page{padding:68px 12px 28px}.mirsad-profile-page__card{padding:20px 16px;border-radius:18px}.mirsad-profile-page__header{align-items:flex-start}.mirsad-profile-page__title{font-size:22px}}
   </style>
@@ -31,6 +32,6 @@
 <body class="mirsad-auth-required">
   <main id="mirsadProfilePage" class="mirsad-profile-page" hidden></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="auth-v8.js?v=202609111620"></script>
+  <script src="auth-v8.js?v=202609111646"></script>
 </body>
 </html>
