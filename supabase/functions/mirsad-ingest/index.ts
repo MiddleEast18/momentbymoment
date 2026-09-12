@@ -36,45 +36,9 @@ const classify = (text: string, url = "") => {
   candidates.sort((a,b) => Number(b[1])-Number(a[1]));
   const best = candidates[0];
   return Number(best[1]) >= 1 ? String(best[0]) : "Politics";
-};mport "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+};
 
-const db = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
-const headers = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type", "Content-Type": "application/json" };
-const reply = (x: unknown, status = 200) => new Response(JSON.stringify(x), { status, headers });
-const decode = (s: string) => s.replaceAll("<![CDATA[", "").replaceAll("]]>", "").replace(/&(amp|quot|apos|lt|gt);/g, (_m, n) => ({ amp: "&", quot: '"', apos: "'", lt: "<", gt: ">" }[n] || _m)).trim();
-const field = (b: string, n: string) => { const s = b.indexOf("<" + n), o = b.indexOf(">", s), e = b.indexOf("</" + n + ">", o); return s >= 0 && o >= 0 && e > o ? decode(b.slice(o + 1, e)) : ""; };
-const items = (xml: string) => { const out: string[] = []; for (const tag of ["item", "entry"]) { const re = new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}>`, "gi"); let match: RegExpExecArray | null; while ((match = re.exec(xml))) out.push(match[0]); } return out; };
-const STOP = new Set(["في","من","الى","إلى","على","عن","مع","هذا","هذه","هناك","بعد","قبل","وقد","خبر","اخبار","تقرير","مصدر","اليوم","أمس","الآن","بحسب"]);
-const words = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(x => x.length > 2 && !STOP.has(x));
-const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
-const unique = (xs: string[]) => [...new Set(xs)];
-const EVENT_ANCHORS = ["حرب","هجوم","انفجار","زلزال","انتخابات","اتفاق","عقوبات","احتجاج","مفاوضات","تصعيد","هدنه","اغتيال","قتلى","وفيات","نفط","بنك","استثمار"];
-const PLACE_ANCHORS = ["ايران","اسرائيل","لبنان","سوريا","العراق","اليمن","السعوديه","الاردن","غزه","فلسطين","امريكا","روسيا","اوكرانيا","الصين","اوروبا","المانيا","بريطانيا","فرنسا","تركيا","السودان","ليبيا"];
-const signature = (s: string) => { const normalized = s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه"); return { tokens: unique(words(s)).slice(0, 36), anchors: EVENT_ANCHORS.filter(x => normalized.includes(x)), places: PLACE_ANCHORS.filter(x => normalized.includes(x)), numbers: unique((s.match(/\b\d+(?:[\.,]\d+)?\b/g) || []).map(x => x.replace(",", "."))) }; };
-const compatibility = (a: any, b: any) => { const share = (x: string[], y: string[]) => !x.length || !y.length || x.some(v => y.includes(v)); if (a.numbers.length && b.numbers.length && !share(a.numbers, b.numbers)) return 0.35; if (a.places.length && b.places.length && !share(a.places, b.places)) return 0.45; if (a.anchors.length && b.anchors.length && !share(a.anchors, b.anchors)) return 0.55; return 1; };
-const overlap = (a: string, b: string) => { const aa = new Set(words(a)), bb = new Set(words(b)); let n = 0; for (const x of aa) if (bb.has(x)) n++; return n / Math.max(1, Math.min(aa.size, bb.size)); };
-const eventSimilarity = (a: string, b: string) => { const aa = signature(a), bb = signature(b); const sa = new Set(aa.tokens), sb = new Set(bb.tokens); let n = 0; for (const x of sa) if (sb.has(x)) n++; const jaccard = n / Math.max(1, new Set([...sa, ...sb]).size); return (overlap(a, b) * 0.55 + jaccard * 0.45) * compatibility(aa, bb); };
-const classify = (text: string, url = "") => {
-  const t = text.toLowerCase();
-  const u = url.toLowerCase();
-  if (/\/(sport|sports)\//.test(u)) return "Sports";
-  if (/\/(technology|tech|science)\//.test(u)) return "Tech";
-  if (/\/(economy|business|ebusiness|money|markets)\//.test(u)) return "Economy";
-  if (/\/(health|society|culture|lifestyle|varieties|women)\//.test(u)) return "Society";
-
-  const score = (terms: string[]) => terms.reduce((n, term) => n + (t.includes(term) ? 1 : 0), 0);
-  const economy = score(["اقتصاد","اقتصادي","مال","سوق","اسواق","نفط","غاز","دولار","يورو","بنك","مصرف","تجارة","تجاري","اسهم","بورصة","استثمار","وظائف","رواتب","تضخم","فائدة","اسعار","برميل"]);
-  const tech = score(["تقنية","تكنولوجيا","ذكاء اصطناعي","انترنت","رقمنة","هاتف","آيفون","ايفون","ابل","أبل","جوجل","غوغل","مايكروسوفت","روبوت","برمجيات","رقائق","معالج","فضاء","اكتشاف علمي"]);
-  const sports = score(["رياضة","رياضي","كرة","دوري","بطولة","منتخب","مباراة","هدف","لاعب","لاعبة","مدرب","كأس","ريال مدريد","برشلونة","الهلال","النصر","الاهلي","الأهلي","ليفربول"]);
-  const society = score(["صحة","مرض","سرطان","علاج","مستشفى","دواء","تعليم","مدرسة","جامعة","بيئة","مناخ","ثقافة","فنون","سينما","موسيقى","منوعات","مجتمع","زواج","أسرة","طفل","حياة"]);
-
-  const candidates = [
-    ["Economy", economy], ["Tech", tech], ["Sports", sports], ["Society", society],
-  ];
-  candidates.sort((a, b) => Number(b[1]) - Number(a[1]));
-  return Number(candidates[0][1]) >= 1 ? String(candidates[0][0]) : "Politics";
-};const importance = (s: string, published = "") => { const t = s.toLowerCase(); let n = 30; for (const [rx, add] of [[/عاجل|طارئ|فوري|مباشر/,18],[/قتيل|قتلى|وفيات|جرحى|ضحايا|خسائر|تدمير/,16],[/حرب|هجوم|انفجار|قصف|صاروخ|اغتيال|تصعيد|اشتباك/,14],[/رئيس|حكومه|انتخابات|اتفاق|عقوبات|قرار|برلمان/,10],[/نفط|دولار|بنك|اسعار|استثمار|اقتصاد|تجاره/,8]] as const) if (rx.test(t)) n += add; if (/\b\d+(?:[\.,]\d+)?\b/.test(t)) n += 4; const age = Date.now() - new Date(published || Date.now()).getTime(); if (Number.isFinite(age) && age >= 0 && age < 3 * 60 * 60 * 1000) n += 6; return Math.max(1, Math.min(95, n)); };
+const importance = (s: string, published = "") => { const t = s.toLowerCase(); let n = 30; for (const [rx, add] of [[/عاجل|طارئ|فوري|مباشر/,18],[/قتيل|قتلى|وفيات|جرحى|ضحايا|خسائر|تدمير/,16],[/حرب|هجوم|انفجار|قصف|صاروخ|اغتيال|تصعيد|اشتباك/,14],[/رئيس|حكومه|انتخابات|اتفاق|عقوبات|قرار|برلمان/,10],[/نفط|دولار|بنك|اسعار|استثمار|اقتصاد|تجاره/,8]] as const) if (rx.test(t)) n += add; if (/\b\d+(?:[\.,]\d+)?\b/.test(t)) n += 4; const age = Date.now() - new Date(published || Date.now()).getTime(); if (Number.isFinite(age) && age >= 0 && age < 3 * 60 * 60 * 1000) n += 6; return Math.max(1, Math.min(95, n)); };
 const confidence = (trust: number, text: string) => Math.max(0, Math.min(100, trust * 100 + (signature(text).numbers.length ? 3 : 0) + (words(text).length >= 8 ? 2 : 0)));
 const sentiment = (s: string) => s.includes("حرب") || s.includes("هجوم") || s.includes("قتلى") || s.includes("أزمة") || s.includes("انفجار") ? "Negative" : s.includes("اتفاق") || s.includes("فوز") || s.includes("نمو") ? "Positive" : "Neutral";
 const canonicalUrl = (raw: string) => { try { const u = new URL(decode(raw)); for (const k of [...u.searchParams.keys()]) if (/^(utm_|at_|fbclid|gclid|ref$|source$|maca|ocid|ns_|ito|cmpid|ncid)/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
