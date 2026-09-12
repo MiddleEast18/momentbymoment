@@ -33,13 +33,16 @@
     n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();n.click()}});
     return n;
   }
-  async function load(){
-    status.hidden=false;status.textContent='جارٍ التحقق من فتحات الأخبار…';
-    if(!window.mirsadViewAccess){ status.textContent='تعذر التحقق من فتحات الأخبار.'; return; }
-    const access=await window.mirsadViewAccess.consume('24h');
-    if(!access.allowed){
-      status.textContent=access.error?.message==='not_authenticated'?'سجّل الدخول لاستخدام أخبار 24 ساعة.':'لا توجد فتحات كافية لفتح أخبار 24 ساعة.';
-      return;
+  async function load(enforceAccess = false){
+    status.hidden=false;
+    if(enforceAccess){
+      status.textContent='جارٍ التحقق من فتحات الأخبار…';
+      if(!window.mirsadViewAccess){ status.textContent='تعذر التحقق من فتحات الأخبار.'; return; }
+      const access=await window.mirsadViewAccess.consume('24h');
+      if(!access.allowed){
+        status.textContent=access.error?.message==='not_authenticated'?'سجّل الدخول لاستخدام أخبار 24 ساعة.':'لا توجد فتحات كافية لفتح أخبار 24 ساعة.';
+        return;
+      }
     }
     status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
     const now=new Date();const cutoff=new Date(now.getTime()-24*60*60*1000).toISOString();
@@ -50,5 +53,5 @@
     count.textContent=`${(data||[]).length} خبر · حتى 20 من كل مصدر`;
     status.textContent=(data||[]).length?`آخر تحديث للصفحة: ${new Intl.DateTimeFormat('ar',{hour:'2-digit',minute:'2-digit'}).format(now)}`:'لا توجد أخبار منشورة خلال آخر 24 ساعة.';
   }
-  load();setInterval(load,5*60*1000);
+  load(true);setInterval(()=>load(false),5*60*1000);
 })();
