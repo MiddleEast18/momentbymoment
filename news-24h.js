@@ -27,28 +27,21 @@
     badge.hidden=Number(a.update_count||0)<=0;
     if(!badge.hidden)badge.textContent=`+${a.update_count} تحديث`;
     n.addEventListener('click',async()=>{
-      try{
-        const {error}=await sb.rpc('open_article',{p_article_id:a.id});
-        if(error)throw error;
-        window.open(a.source_url,'_blank','noopener,noreferrer');
-      }catch(error){
-        console.warn('[mirsad 24h] open failed',error);
-        window.open(a.source_url,'_blank','noopener,noreferrer');
-      }
+      try{const {error}=await sb.rpc('open_article',{p_article_id:a.id});if(error)throw error;window.open(a.source_url,'_blank','noopener,noreferrer')}
+      catch(error){console.warn('[mirsad 24h] open failed',error);window.open(a.source_url,'_blank','noopener,noreferrer')}
     });
     n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();n.click()}});
     return n;
   }
   async function load(){
-    status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
-    const cutoff=new Date(Date.now()-24*60*60*1000).toISOString();
-    const {data,error}=await sb.from('news_24h_articles').select('id,source_name,source_url,headline,summary,category,importance_score,update_count,confidence_score,published_at').gte('published_at',cutoff).lte('published_at',new Date().toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false});
+    status.hidden=false;status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
+    const now=new Date();const cutoff=new Date(now.getTime()-24*60*60*1000).toISOString();
+    const {data,error}=await sb.from('news_24h_articles').select('id,source_name,source_url,headline,summary,category,importance_score,update_count,confidence_score,published_at').gte('published_at',cutoff).lte('published_at',now.toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false});
     if(error){console.error(error);status.textContent='تعذر تحميل أخبار آخر 24 ساعة.';return}
     grid.innerHTML='';
     (data||[]).forEach(a=>grid.appendChild(card(a)));
     count.textContent=`${(data||[]).length} خبر · حتى 20 من كل مصدر`;
-    status.textContent=`آخر 24 ساعة · ${new Intl.DateTimeFormat('ar',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
+    status.textContent=(data||[]).length?`آخر تحديث للصفحة: ${new Intl.DateTimeFormat('ar',{hour:'2-digit',minute:'2-digit'}).format(now)}`:'لا توجد أخبار منشورة خلال آخر 24 ساعة.';
   }
-  load();
-  setInterval(load,5*60*1000);
+  load();setInterval(load,5*60*1000);
 })();
