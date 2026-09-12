@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>مِرصاد — أخبار 24 ساعة</title>
+<meta name="description" content="آخر 24 ساعة من الأخبار، بحد أقصى 20 خبرًا من كل مصدر موثوق.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=202609112155"><link rel="stylesheet" href="logo.css?v=202609100020"><link rel="stylesheet" href="auth.css?v=202609111110"><link rel="stylesheet" href="news-card-fixes.css?v=202609111549">
+<style>
+.news24-head{max-width:1200px;margin:28px auto 18px;padding:0 22px;display:flex;align-items:end;justify-content:space-between;gap:16px}.news24-head h2{margin:0;font:700 clamp(25px,4vw,38px) var(--font-display);color:var(--text)}.news24-head p{margin:8px 0 0;color:var(--text-dim);font-size:13px}.news24-meta{color:var(--gold);font-size:12px;white-space:nowrap}.news24-grid{max-width:1200px;margin:0 auto;padding:0 22px 48px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.news24-grid .card{cursor:pointer}.news24-empty{max-width:1200px;margin:60px auto;padding:0 22px;text-align:center;color:var(--text-dim)}.news24-back{display:inline-flex;align-items:center;gap:7px;margin-top:18px;color:var(--gold);text-decoration:none;font-size:13px}.news24-back:hover{text-decoration:underline}@media(max-width:900px){.news24-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.news24-head{padding:0 14px;margin-top:22px;align-items:start;flex-direction:column}.news24-grid{grid-template-columns:1fr;padding:0 14px 38px;gap:14px}.news24-grid .card__headline{font-size:22px}}
+</style>
+</head>
+<body class="mirsad-auth-required">
+<header class="wire-header"><div class="wire-header__brand"><a href="index.html" aria-label="العودة إلى مِرصاد" style="color:inherit;text-decoration:none"><span class="wire-header__mark" aria-hidden="true"><svg viewBox="0 0 64 64" focusable="false"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 13v9M32 42v9M13 32h9M42 32h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.5" fill="currentColor"/></svg></span></a><div class="wire-header__title"><h1>مِرصاد</h1><p class="wire-header__tagline">أخبار 24 ساعة</p></div></div><div class="wire-header__status"><span class="status-dot" data-state="live"></span><span class="status-text">أرشيف متجدد</span></div></header>
+<main>
+<section class="news24-head"><div><h2>أخبار 24 ساعة</h2><p>أحدث الأخبار المنشورة خلال آخر 24 ساعة، بحد أقصى 20 خبرًا من كل مصدر.</p><a class="news24-back" href="index.html">← العودة إلى الرصد الرئيسي</a></div><div id="news24Count" class="news24-meta">جارٍ التحميل…</div></section>
+<section id="news24Grid" class="news24-grid" aria-live="polite"></section><p id="news24Status" class="news24-empty">جارٍ تحميل أخبار آخر 24 ساعة…</p>
+</main>
+<footer class="wire-footer"><p>مِرصاد — واجهة عرض للرصد الإخباري. الأخبار المعلقة للتحقق لا تظهر، وتبقى حقوق المواد الأصلية لأصحابها.</p><nav aria-label="روابط معلومات الموقع"><a href="about.html">من نحن</a><span>·</span><a href="contact.html">اتصل بنا</a><span>·</span><a href="privacy.html">سياسة الخصوصية</a><span>·</span><a href="terms.html">شروط الاستخدام</a></nav></footer>
+<template id="news24CardTemplate"><article class="card" tabindex="0" role="link" aria-label="فتح الخبر"><div class="card__importance" aria-hidden="true"><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__score"></span></div><span class="card__update-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="auth-v8.js?v=202609120049"></script><script src="news-24h.js?v=202609121351"></script>
+</body></html>
