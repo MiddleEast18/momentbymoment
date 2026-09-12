@@ -208,8 +208,8 @@ Deno.serve(async (req) => {
   }
 
   // Keep the independent layer bounded at 400 rows.
-  await db.from("rapid_news").delete()
-    .not("id", "in", `(${"select id from public.rapid_news order by received_at desc limit 400"})`);
+  const trim = await db.rpc("mirsad_trim_rapid_news_to_400");
+  if (trim.error) errors.push(`trim: ${trim.error.message}`);
 
   const finishedAt = new Date().toISOString();
   return reply({
