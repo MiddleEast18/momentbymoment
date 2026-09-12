@@ -114,8 +114,50 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("CURRENTS_API_KEY") || "";
   if (!apiKey) return reply({ error: "currents_api_key_missing" }, 500);
 
+  const [sourcesResult, healthResult, focusResult] = await Promise.all([
+    db.from("news_sources")
+      .select("source_key,name,feed_url,domain")
+      .eq("is_active", true)
+      .eq("source_kind", "rss"),
+    db.from("source_health")
+      .select("source_key,last_item_at,last_attempt_at,last_success_at,last_http_status,last_items_seen,last_items_written,consecutive_failures,consecutive_empty_runs"),
+    db.from("currents_focus_state")
+      .select("source_key,last_focused_at,focus_count"),
+  ]);
+  if (sourcesResult.error) return reply({ error: sourcesResult.error.message }, 500);
+
+  const now = Date.now();
+  const health = new Map((healthResult.data || []).map((row: any) => [row.source_key, row]));
+  const focus = new Map((focusResult.data || []).map((row: any) => [row.source_key, row]));
+  const candidatesBySource = (sourcesResult.data || []).map((source: any) => {
+    const h = health.get(source.source_key) || {};
+    const f = focus.get(source.source_key) || {};
+    const ageHours = h.last_item_at ? Math.max(0, (now - new Date(h.last_item_at).getTime()) / 3600000) : 72;
+    const failureScore = Math.min(80, Number(h.consecutive_failures || 0) * 25);
+    const emptyScore = Math.min(40, Number(h.consecutive_empty_runs || 0) * 10);
+    const staleScore = Math.min(70, ageHours * 14);
+    const recentFocusHours = f.last_focused_at
+      ? Math.max(0, (now - new Date(f.last_focused_at).getTime()) / 3600000)
+      : 999;
+    const focusPenalty = recentFocusHours < 2 ? 40 : recentFocusHours < 8 ? 15 : 0;
+    const requestPriority = staleScore + failureScore + emptyScore + focusPenalty;
+    return { source, health: h, focus: f, score: requestPriority };
+  }).sort((a: any,b: any) => b.score-a.score);
+
+  if (!candidatesBySource.length) {
+    return reply({ ok: true, skipped: "no_active_sources" });
+  }
+
+  const selected = candidatesBySource[0];
+  const selectedSource = selected.source;
+  const sourceDomain = (() => {
+    try { return new URL(selectedSource.feed_url || "").hostname.replace(/^www\./, ""); }
+    catch { return String(selectedSource.domain || "").replace(/^www\./, ""); }
+  })();
+
   const endpoint =
-    "https://api.currentsapi.services/v1/latest-news?language=ar&page_size=20";
+    "https://api.currentsapi.services/v1/latest-news?language=ar&page_size=20" +
+    (sourceDomain ? `&domain=${encodeURIComponent(sourceDomain)}` : "");
 
   const startedAt = Date.now();
   let response: Response;
@@ -268,6 +310,13 @@ Deno.serve(async (req) => {
     }
   }
 
+  await db.from("currents_focus_state").upsert({
+    source_key: selectedSource.source_key,
+    last_focused_at: new Date().toISOString(),
+    focus_count: Number(selected.focus?.focus_count || 0) + 1,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "source_key" });
+
   await db.rpc("mirsad_sync_ledger_main_status");
   await db.rpc("mirsad_trim_news_to_400");
 
@@ -277,6 +326,7 @@ Deno.serve(async (req) => {
     duplicates,
     candidates: candidates.length,
     quota: q,
+    focus: { source_key: selectedSource.source_key, source_name: selectedSource.name, domain: sourceDomain, score: selected.score },
     duration_ms: Date.now() - startedAt,
     errors: errors.slice(0, 10),
   });
