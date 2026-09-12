@@ -162,16 +162,14 @@ Deno.serve(async (req) => {
       }
 
       if (rows.length) {
-        const resultInsert = await db.from("rapid_news").insert(rows).select("id");
+        const resultInsert = await db.from("rapid_news")
+          .upsert(rows, { onConflict: "source_url", ignoreDuplicates: true })
+          .select("id");
         if (resultInsert.error) {
-          // A concurrent run can legitimately race on the unique URL.
-          if (resultInsert.error.code !== "23505") {
-            throw new Error(resultInsert.error.message);
-          }
-        } else {
-          sourceInserted = resultInsert.data?.length || rows.length;
-          totalInserted += sourceInserted;
+          throw new Error(resultInsert.error.message);
         }
+        sourceInserted = resultInsert.data?.length || 0;
+        totalInserted += sourceInserted;
       }
 
       await db.rpc("record_source_health", {
