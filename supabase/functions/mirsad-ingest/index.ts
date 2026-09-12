@@ -24,6 +24,25 @@ const canonicalUrl = (raw: string) => { try { const u = new URL(raw); for (const
 const publishedAt = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); if (v) { const d = new Date(v); if (Number.isFinite(d.getTime())) return d.toISOString(); } } return new Date().toISOString(); };
 const rawPayload = (sourceKey: string, item: string, title: string, link: string, summary: string) => ({ source_key: sourceKey, title, link, description: summary, published: field(item, "pubDate") || field(item, "published") || field(item, "updated") || field(item, "dc:date") || null, author: field(item, "author") || field(item, "dc:creator") || null, category: field(item, "category") || null, guid: field(item, "guid") || null });
 
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const fetchFeed = async (source: any) => {
+  let lastError = "";
+  let status: number | null = null;
+  const started = Date.now();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(source.feed_url, { headers: { "user-agent": "MirsadRSS/2.0" }, signal: AbortSignal.timeout(10000) });
+      status = response.status;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return { source, xml: await response.text(), status, duration: Date.now() - started, error: "" };
+    } catch (error) {
+      lastError = String(error);
+      if (attempt === 0) await wait(250);
+    }
+  }
+  return { source, xml: "", status, duration: Date.now() - started, error: lastError || "feed_fetch_failed" };
+};
+
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
@@ -36,24 +55,33 @@ Deno.serve(async req => {
   const existing = await db.from("news_articles").select("source_url,headline,cluster_id,category").eq("is_pending_verification", false).order("updated_at", { ascending: false }).limit(400);
   const known = new Set((existing.data || []).map((x: any) => canonicalUrl(x.source_url)));
 
-  for (const source of sources.data || []) {
+  const fetchedSources = await Promise.all((sources.data || []).map(fetchFeed));
+  for (const fetched of fetchedSources) {
+    const source = fetched.source;
+    let sourceSeen = 0, sourceWritten = 0, sourceUpdated = 0, sourceDuplicates = 0;
+    if (fetched.error) {
+      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: fetched.error });
+      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: fetched.status, last_duration_ms: fetched.duration, last_items_seen: 0, last_items_written: 0, last_items_updated: 0, last_duplicates: 0 }).eq("source_key", source.source_key);
+      errors.push(`${source.source_key}: ${fetched.error}`);
+      continue;
+    }
     try {
-      const r = await fetch(source.feed_url, { headers: { "user-agent": "MirsadRSS/2.0" }, signal: AbortSignal.timeout(10000) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const xml = await r.text();
-      for (const item of items(xml).slice(0, 30)) {
+      const xml = fetched.xml;
+      const sourceItems = items(xml).slice(0, 30);
+      for (const item of sourceItems) {
         const title = field(item, "title");
         const link = canonicalUrl(field(item, "link") || field(item, "guid"));
         if (!title || !link) continue;
         seen++;
-        if (known.has(link)) { duplicates++; continue; }
+        sourceSeen++;
+        if (known.has(link)) { duplicates++; sourceDuplicates++; continue; }
         const summary = field(item, "description") || field(item, "summary") || title;
         const all = `${title} ${summary}`;
         const category = source.default_category || classify(all);
         const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
         if (match && match.score >= 0.66 && match.x.cluster_id) {
           const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
-          if (!merged.error) { clusterUpdates++; known.add(link); continue; }
+          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.add(link); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
         }
         const row = {
@@ -77,12 +105,17 @@ Deno.serve(async req => {
           published_at: publishedAt(item),
         };
         const result = await db.from("news_articles").insert(row);
-        if (!result.error) { written++; known.add(link); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") duplicates++; else errors.push(`${source.source_key}: ${result.error.message}`);
+        if (!result.error) { written++; sourceWritten++; known.add(link); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);
       }
-    } catch (error) { errors.push(`${source.source_key}: ${String(error)}`); }
+      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
+      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: fetched.status, last_duration_ms: fetched.duration, last_item_at: sourceItems.map((item: string) => publishedAt(item)).sort().at(-1) || null, last_items_seen: sourceSeen, last_items_written: sourceWritten, last_items_updated: sourceUpdated, last_duplicates: sourceDuplicates, consecutive_empty_runs: sourceSeen === 0 ? 1 : 0 }).eq("source_key", source.source_key);
+    } catch (error) {
+      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: String(error) });
+      errors.push(`${source.source_key}: ${String(error)}`);
+    }
   }
   const cleanup = await db.rpc("mirsad_trim_news_to_400");
   if (cleanup.error) errors.push(`cleanup: ${cleanup.error.message}`);
-  if (run.data?.id) await db.from("ingest_runs").update({ status: "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) }) }).eq("id", run.data.id);
+  if (run.data?.id) await db.from("ingest_runs").update({ status: errors.length ? "partial" : "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) }) }).eq("id", run.data.id);
   return reply({ ok: true, seen, written, duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) });
 });
