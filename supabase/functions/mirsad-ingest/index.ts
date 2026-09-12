@@ -88,7 +88,16 @@ Deno.serve(async req => {
   const stateMap = new Map((feedStates.data || []).map((x: any) => [x.source_key, x]));
   const known = new Map((existing.data || []).map((x: any) => [canonicalUrl(x.source_url), x]));
 
-  const fetchedSources = await Promise.all((sources.data || []).map((source) => fetchFeed(source, stateMap.get(source.source_key))));
+  const fetchedSources: any[] = [];
+  const activeSources = sources.data || [];
+  // Keep fetch concurrency bounded so the expanded source set cannot exhaust
+  // Edge Function worker resources while every active source is still checked.
+  const FETCH_BATCH_SIZE = 4;
+  for (let i = 0; i < activeSources.length; i += FETCH_BATCH_SIZE) {
+    const batch = activeSources.slice(i, i + FETCH_BATCH_SIZE);
+    const results = await Promise.all(batch.map((source) => fetchFeed(source, stateMap.get(source.source_key))));
+    fetchedSources.push(...results);
+  }
   for (const fetched of fetchedSources) {
     const source = fetched.source;
     let sourceSeen = 0, sourceWritten = 0, sourceUpdated = 0, sourceDuplicates = 0;
