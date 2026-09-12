@@ -4,11 +4,12 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 const headers = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type", "Content-Type": "application/json" };
 const reply = (x: unknown, status = 200) => new Response(JSON.stringify(x), { status, headers });
-const decode = (s: string) => s.replaceAll("<![CDATA[", "").replaceAll("]]>", "").replaceAll("&amp;", "&").replaceAll("&quot;", '"').replaceAll("&apos;", "'").replaceAll("&lt;", "<").replaceAll("&gt;", ">").trim();
+const decode = (s: string) => s.replaceAll("<![CDATA[", "").replaceAll("]]>", "").replace(/&(amp|quot|apos|lt|gt);/g, (_m, n) => ({ amp: "&", quot: '"', apos: "'", lt: "<", gt: ">" }[n] || _m)).trim();
 const field = (b: string, n: string) => { const s = b.indexOf("<" + n), o = b.indexOf(">", s), e = b.indexOf("</" + n + ">", o); return s >= 0 && o >= 0 && e > o ? decode(b.slice(o + 1, e)) : ""; };
-const items = (xml: string) => { const out: string[] = []; for (const tag of ["item", "entry"]) { let p = 0; while (true) { const s = xml.indexOf("<" + tag, p); if (s < 0) break; const o = xml.indexOf(">", s), e = xml.indexOf("</" + tag + ">", o); if (o < 0 || e < 0) break; out.push(xml.slice(s, e + tag.length + 3)); p = e + tag.length + 3; } } return out; };
+const items = (xml: string) => { const out: string[] = []; for (const tag of ["item", "entry"]) { const re = new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}>`, "gi"); let match: RegExpExecArray | null; while ((match = re.exec(xml))) out.push(match[0]); } return out; };
 const STOP = new Set(["في","من","الى","إلى","على","عن","مع","هذا","هذه","هناك","بعد","قبل","وقد","خبر","اخبار","تقرير","مصدر","اليوم","أمس","الآن","بحسب"]);
 const words = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(x => x.length > 2 && !STOP.has(x));
+const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
 const unique = (xs: string[]) => [...new Set(xs)];
 const EVENT_ANCHORS = ["حرب","هجوم","انفجار","زلزال","انتخابات","اتفاق","عقوبات","احتجاج","مفاوضات","تصعيد","هدنه","اغتيال","قتلى","وفيات","نفط","بنك","استثمار"];
 const PLACE_ANCHORS = ["ايران","اسرائيل","لبنان","سوريا","العراق","اليمن","السعوديه","الاردن","غزه","فلسطين","امريكا","روسيا","اوكرانيا","الصين","اوروبا","المانيا","بريطانيا","فرنسا","تركيا","السودان","ليبيا"];
@@ -20,7 +21,7 @@ const classify = (s: string) => { const groups: Record<string, string[]> = { Eco
 const importance = (s: string, published = "") => { const t = s.toLowerCase(); let n = 30; for (const [rx, add] of [[/عاجل|طارئ|فوري|مباشر/,18],[/قتيل|قتلى|وفيات|جرحى|ضحايا|خسائر|تدمير/,16],[/حرب|هجوم|انفجار|قصف|صاروخ|اغتيال|تصعيد|اشتباك/,14],[/رئيس|حكومه|انتخابات|اتفاق|عقوبات|قرار|برلمان/,10],[/نفط|دولار|بنك|اسعار|استثمار|اقتصاد|تجاره/,8]] as const) if (rx.test(t)) n += add; if (/\b\d+(?:[\.,]\d+)?\b/.test(t)) n += 4; const age = Date.now() - new Date(published || Date.now()).getTime(); if (Number.isFinite(age) && age >= 0 && age < 3 * 60 * 60 * 1000) n += 6; return Math.max(1, Math.min(95, n)); };
 const confidence = (trust: number, text: string) => Math.max(0, Math.min(100, trust * 100 + (signature(text).numbers.length ? 3 : 0) + (words(text).length >= 8 ? 2 : 0)));
 const sentiment = (s: string) => s.includes("حرب") || s.includes("هجوم") || s.includes("قتلى") || s.includes("أزمة") || s.includes("انفجار") ? "Negative" : s.includes("اتفاق") || s.includes("فوز") || s.includes("نمو") ? "Positive" : "Neutral";
-const canonicalUrl = (raw: string) => { try { const u = new URL(raw); for (const k of [...u.searchParams.keys()]) if (/^(utm_|fbclid|gclid|ref|source)$/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
+const canonicalUrl = (raw: string) => { try { const u = new URL(decode(raw)); for (const k of [...u.searchParams.keys()]) if (/^(utm_|at_|fbclid|gclid|ref$|source$|maca|ocid|ns_|ito|cmpid|ncid)/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
 const publishedAt = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); if (!v) continue; const d = new Date(v); if (Number.isFinite(d.getTime())) return d.toISOString(); const m = v.match(/(?:،\s*)?(\d{1,2})\s+(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)\s+(\d{4})\s+(\d{1,2}):(\d{2})\s+(ص|م)/); if (m) { const months: Record<string, number> = { يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, مايو: 5, يونيو: 6, يوليو: 7, أغسطس: 8, سبتمبر: 9, أكتوبر: 10, نوفمبر: 11, ديسمبر: 12 }; let hour = Number(m[4]) % 12; if (m[6] === "م") hour += 12; const parsed = new Date(`${m[3]}-${String(months[m[2]]).padStart(2, "0")}-${m[1].padStart(2, "0")}T${String(hour).padStart(2, "0")}:${m[5]}:00+03:00`); if (Number.isFinite(parsed.getTime())) return parsed.toISOString(); } } return new Date().toISOString(); };
 const rawPayload = (sourceKey: string, item: string, title: string, link: string, summary: string) => ({ source_key: sourceKey, title, link, description: summary, published: field(item, "pubDate") || field(item, "published") || field(item, "updated") || field(item, "dc:date") || null, author: field(item, "author") || field(item, "dc:creator") || null, category: field(item, "category") || null, guid: field(item, "guid") || null });
 
@@ -47,6 +48,9 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
+  const runLock = await db.from("ingest_runs").select("id,started_at").eq("status", "running").gt("started_at", new Date(Date.now() - 4 * 60 * 1000).toISOString()).limit(1);
+  if ((runLock.data || []).length) return reply({ ok: true, skipped: "already_running" });
+  await db.from("ingest_runs").update({ status: "failed", finished_at: new Date().toISOString(), notes: JSON.stringify({ reason: "stale_running_job" }) }).eq("status", "running").lt("started_at", new Date(Date.now() - 4 * 60 * 1000).toISOString());
   const run = await db.from("ingest_runs").insert({ status: "running" }).select("id").single();
   let seen = 0, written = 0, duplicates = 0, clusterUpdates = 0;
   const errors: string[] = [];
@@ -71,13 +75,13 @@ Deno.serve(async req => {
       for (const item of sourceItems) {
         const title = field(item, "title");
         const link = canonicalUrl(field(item, "link") || field(item, "guid"));
-        if (!title || !link) continue;
+        if (!title || !link || !isArabic(title)) continue;
         seen++;
         sourceSeen++;
         const existingRow = known.get(link);
         if (existingRow) {
           const incomingSummary = field(item, "description") || field(item, "summary") || title;
-          const normalized = (value: string) => value.replace(/\\s+/g, " ").trim();
+          const normalized = (value: string) => value.replace(/\s+/g, " ").trim();
           const changed = normalized(title) !== normalized(existingRow.headline || "") ||
             normalized(incomingSummary) !== normalized(existingRow.summary || "");
           if (changed && existingRow.id) {
@@ -106,7 +110,7 @@ Deno.serve(async req => {
         const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
         if (match && match.score >= 0.66 && match.x.cluster_id) {
           const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
-          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.add(link); continue; }
+          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: publishedAt(item) }); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
         }
         const row = {
