@@ -190,6 +190,7 @@ const fetchLiveFallback = async (source: any) => {
           : findLiveArticleUrl(html, headline))
         || `${fallbackUrl}?mirsad_rapid=${stableKey(headline + "|" + dateValue)}`,
       );
+      if (!directUrl || !/^https?:\/\//i.test(directUrl)) continue;
       rows.push({
         source_key: source.source_key,
         source_name: source.name,
@@ -230,39 +231,45 @@ Deno.serve(async (req) => {
     .eq("is_active", true)
     .eq("source_kind", "rss")
     .not("feed_url", "is", null);
-
   if (sources.error) return reply({ error: sources.error.message }, 500);
 
+  const feedStates = await db.from("source_feed_state").select("source_key,etag,last_modified,last_feed_hash");
+  const stateMap = new Map((feedStates.data || []).map((x: any) => [x.source_key, x]));
+  const sourceNames = new Map((sources.data || []).map((x: any) => [x.source_key, x.name]));
   const startedAt = new Date().toISOString();
   const errors: string[] = [];
   let totalSeen = 0;
   let totalInserted = 0;
   const sourceStats: Record<string, unknown> = {};
   const seenUrls = new Set<string>();
-  const seenHeadlines = new Set<string>();
 
   const fetched = await Promise.allSettled(
     (sources.data || []).map(async (source) => {
       const started = Date.now();
       let lastError = "";
       let status: number | null = null;
+      const state = stateMap.get(source.source_key);
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          const response = await fetch(source.feed_url, {
-            headers: { "user-agent": "MirsadRapid/2.1" },
-            signal: AbortSignal.timeout(9000),
-          });
+          const requestHeaders: Record<string,string> = {
+            "user-agent": "MirsadRapid/5.0",
+            "accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1"
+          };
+          if (state?.etag) requestHeaders["if-none-match"] = state.etag;
+          if (state?.last_modified) requestHeaders["if-modified-since"] = state.last_modified;
+          const response = await fetch(source.feed_url, { headers: requestHeaders, signal: AbortSignal.timeout(10000) });
           status = response.status;
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (status === 304) return { source, xml: "", liveRows: [], status, duration: Date.now() - started, error: "", unchanged: true, etag: state?.etag || null, lastModified: state?.last_modified || null };
+          if (!response.ok) throw new Error(`HTTP ${status}`);
           const xml = await response.text();
           const liveRows = LIVE_FALLBACK_URLS[source.source_key] ? await fetchLiveFallback(source) : [];
-          return { source, xml, liveRows, status, duration: Date.now() - started, error: "" };
+          return { source, xml, liveRows, status, duration: Date.now() - started, error: "", unchanged: false, etag: response.headers.get("etag"), lastModified: response.headers.get("last-modified") };
         } catch (error) {
           lastError = String(error);
           if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
         }
       }
-      return { source, xml: "", liveRows: [], status, duration: Date.now() - started, error: lastError || "feed_fetch_failed" };
+      return { source, xml: "", liveRows: [], status, duration: Date.now() - started, error: lastError || "feed_fetch_failed", unchanged: false, etag: null, lastModified: null };
     }),
   );
 
@@ -270,7 +277,6 @@ Deno.serve(async (req) => {
     const result = fetched[i];
     const source = sources.data?.[i];
     if (!source) continue;
-
     let sourceSeen = 0;
     let sourceInserted = 0;
     let sourceDuplicates = 0;
@@ -286,113 +292,66 @@ Deno.serve(async (req) => {
     if (result.value.error) {
       errors.push(`${source.source_key}: ${result.value.error}`);
       await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: result.value.error });
-      await db.from("source_health").update({
-        last_attempt_at: new Date().toISOString(),
-        last_http_status: result.value.status,
-        last_duration_ms: result.value.duration,
-        last_items_seen: 0,
-        last_items_written: 0,
-        last_items_updated: 0,
-        last_duplicates: 0,
-      }).eq("source_key", source.source_key);
+      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: result.value.status, last_duration_ms: result.value.duration }).eq("source_key", source.source_key);
       continue;
     }
 
     try {
-      const cutoff = Date.now() - RECENT_MS;
-      const parsedItems = items(result.value.xml).map((item, index) => {
-        const ms = publishedMs(item) ?? (index < 5 ? Date.now() : null);
-        return { item, publishedMs: ms, index };
-      }).filter((row) => row.publishedMs && row.publishedMs >= cutoff)
-        .sort((a, b) => (b.publishedMs || 0) - (a.publishedMs || 0))
-        .slice(0, 20);
+      if (result.value.unchanged) {
+        await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: result.value.etag, last_modified: result.value.lastModified, last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
+        await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
+        sourceStats[source.source_key] = { status: 304, duration_ms: result.value.duration, items_seen: 0, inserted: 0, duplicates: 0, mode: "not_modified" };
+        continue;
+      }
 
-      const rows: any[] = [];
-      for (const row of parsedItems) {
-        const headline = cleanRichText(field(row.item, "title"));
-        const url = itemUrl(row.item);
+      const cutoff = Date.now() - RECENT_MS;
+      const observations: any[] = [];
+      const parsedItems = items(result.value.xml).slice(0, 100);
+      for (const item of parsedItems) {
+        const headline = cleanRichText(field(item, "title"));
+        const url = itemUrl(item);
+        const ms = publishedMs(item);
         if (!headline || !isArabic(headline) || !url || !/^https?:\/\//i.test(url)) continue;
+        if (ms && ms < cutoff) continue;
         sourceSeen += 1;
         totalSeen += 1;
-        newestMs = Math.max(newestMs, row.publishedMs || 0);
-        const key = headlineKey(headline);
-        if (seenUrls.has(url) || seenHeadlines.has(`${source.source_key}:${key}`)) {
-          sourceDuplicates += 1;
-          continue;
-        }
+        newestMs = Math.max(newestMs, ms || 0);
+        const key = itemKey(item, url);
+        if (seenUrls.has(url)) { sourceDuplicates += 1; continue; }
         seenUrls.add(url);
-        seenHeadlines.add(`${source.source_key}:${key}`);
-        rows.push({
+        observations.push({
           source_key: source.source_key,
-          source_name: source.name,
+          item_key: key,
           source_url: url,
+          guid: field(item, "guid") || "",
           headline,
-          summary: cleanRichText(field(row.item, "description") || field(row.item, "summary") || headline),
-          published_at: new Date(row.publishedMs || Date.now()).toISOString(),
-          importance_score: importance(headline),
+          summary: cleanRichText(field(item, "description") || field(item, "summary") || headline),
+          published_at: ms ? new Date(ms).toISOString() : null
         });
       }
 
       for (const liveRow of result.value.liveRows || []) {
         const url = canonical(liveRow.source_url);
-        const key = headlineKey(liveRow.headline || "");
         const ms = normalizePublishedMs(new Date(liveRow.published_at).getTime());
-        if (!url || !key || !ms || ms < cutoff) continue;
-        newestMs = Math.max(newestMs, ms);
-        if (seenUrls.has(url) || seenHeadlines.has(`${source.source_key}:${key}`)) {
-          sourceDuplicates += 1;
-          continue;
-        }
+        if (!url || !ms || ms < cutoff) continue;
+        if (seenUrls.has(url)) continue;
         seenUrls.add(url);
-        seenHeadlines.add(`${source.source_key}:${key}`);
         sourceSeen += 1;
         totalSeen += 1;
-        rows.push({ ...liveRow, source_url: url, published_at: new Date(ms).toISOString() });
+        newestMs = Math.max(newestMs, ms);
+        observations.push({ source_key: source.source_key, item_key: url, source_url: url, guid: "", headline: liveRow.headline, summary: liveRow.summary, published_at: new Date(ms).toISOString() });
       }
 
-      if (rows.length) {
-        const urls = rows.map((row) => row.source_url);
-        const [alreadyInArticles, alreadyInRapid] = await Promise.all([
-          urlsInTable("news_articles", urls),
-          urlsInTable("rapid_news", urls),
-        ]);
-        const isLiveUrl = (url: string) => /\/live\/|mirsad_rapid=|\/news\/breaking/i.test(url);
-        const toWrite = rows.filter((row) => {
-          if (alreadyInArticles.has(row.source_url)) return false;
-          if (alreadyInRapid.has(row.source_url) && !isLiveUrl(row.source_url)) return false;
-          return true;
-        });
-        sourceDuplicates += rows.length - toWrite.length;
-        if (toWrite.length) {
-          const inserted = await db.from("rapid_news")
-            .upsert(toWrite, { onConflict: "source_url" })
-            .select("id");
-          if (inserted.error) throw new Error(inserted.error.message);
-          sourceInserted = inserted.data?.length || 0;
-          totalInserted += sourceInserted;
-        }
+      if (observations.length) {
+        const obs = await db.from("source_item_ledger").insert(observations);
+        if (obs.error && obs.error.code !== "23505") throw new Error(obs.error.message);
       }
 
+      await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: result.value.etag, last_modified: result.value.lastModified, last_feed_hash: feedHash(result.value.xml), last_checked_at: new Date().toISOString(), last_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
+
+      sourceStats[source.source_key] = { status: result.value.status, duration_ms: result.value.duration, items_seen: sourceSeen, observed: observations.length, inserted: 0, duplicates: sourceDuplicates, live_rows: (result.value.liveRows || []).length, mode: "observe_then_wait" };
       await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
-      await db.from("source_health").update({
-        last_attempt_at: new Date().toISOString(),
-        last_http_status: result.value.status,
-        last_duration_ms: result.value.duration,
-        last_item_at: newestMs ? new Date(newestMs).toISOString() : null,
-        last_items_seen: sourceSeen,
-        last_items_written: sourceInserted,
-        last_items_updated: 0,
-        last_duplicates: sourceDuplicates,
-      }).eq("source_key", source.source_key);
-
-      sourceStats[source.source_key] = {
-        status: result.value.status,
-        duration_ms: result.value.duration,
-        items_seen: sourceSeen,
-        inserted: sourceInserted,
-        duplicates: sourceDuplicates,
-        live_rows: (result.value.liveRows || []).length,
-      };
+      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: result.value.status, last_duration_ms: result.value.duration, last_item_at: newestMs ? new Date(newestMs).toISOString() : null, last_items_seen: sourceSeen, last_items_written: 0, last_items_updated: 0, last_duplicates: sourceDuplicates }).eq("source_key", source.source_key);
     } catch (error) {
       const message = String(error).slice(0, 500);
       errors.push(`${source.source_key}: ${message}`);
@@ -400,17 +359,29 @@ Deno.serve(async (req) => {
     }
   }
 
-  const trim = await db.rpc("mirsad_trim_rapid_news_to_400");
-  if (trim.error) errors.push(`trim: ${trim.error.message}`);
+  const sync = await db.rpc("mirsad_sync_ledger_main_status");
+  if (sync.error) errors.push("ledger_sync: " + sync.error.message);
 
-  return reply({
-    ok: true,
-    started_at: startedAt,
-    finished_at: new Date().toISOString(),
-    sources: (sources.data || []).length,
-    items_seen: totalSeen,
-    inserted: totalInserted,
-    errors: errors.slice(0, 20),
-    source_stats: sourceStats,
-  });
+  const due = await db.from("source_item_ledger")
+    .select("source_key,item_key,source_url,headline,summary,published_at,first_seen_at,status")
+    .eq("status", "observed")
+    .lte("first_seen_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
+    .gte("first_seen_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+    .or(`published_at.is.null,published_at.gte.${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}`)
+    .limit(400);
+  if (due.error) errors.push("due_query: " + due.error.message);
+
+  const dueRows = (due.data || []).filter((row: any) => !seenUrls.has(canonical(row.source_url)));
+  if (dueRows.length) {
+    const inserted = await db.from("rapid_news").upsert(dueRows.map((row: any) => ({ source_key: row.source_key, source_name: sourceNames.get(row.source_key) || row.source_key, source_url: canonical(row.source_url), headline: cleanRichText(row.headline), summary: cleanRichText(row.summary), published_at: row.published_at, importance_score: importance(row.headline) })), { onConflict: "source_url", ignoreDuplicates: true }).select("id");
+    if (inserted.error) errors.push("rapid_insert: " + inserted.error.message);
+    else totalInserted += inserted.data?.length || 0;
+    const capturedKeys = dueRows.map((row: any) => row.item_key);
+    if (capturedKeys.length) await db.from("source_item_ledger").update({ status: "captured", captured_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in("item_key", capturedKeys);
+  }
+
+  const trim = await db.rpc("mirsad_trim_rapid_news_to_400");
+  if (trim.error) errors.push("trim: " + trim.error.message);
+
+  return reply({ ok: true, started_at: startedAt, finished_at: new Date().toISOString(), sources: (sources.data || []).length, items_seen: totalSeen, inserted: totalInserted, due_candidates: dueRows.length, errors: errors.slice(0, 20), source_stats: sourceStats });
 });
