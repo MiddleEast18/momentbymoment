@@ -52,8 +52,8 @@ Deno.serve(async req => {
   const errors: string[] = [];
   const sources = await db.from("news_sources").select("source_key,name,feed_url,trust_weight,default_category").eq("is_active", true).eq("source_kind", "rss").not("feed_url", "is", null).limit(20);
   if (sources.error) return reply({ error: sources.error.message }, 500);
-  const existing = await db.from("news_articles").select("source_url,headline,cluster_id,category").eq("is_pending_verification", false).order("updated_at", { ascending: false }).limit(400);
-  const known = new Set((existing.data || []).map((x: any) => canonicalUrl(x.source_url)));
+  const existing = await db.from("news_articles").select("id,source_url,headline,summary,cluster_id,category,published_at").eq("is_pending_verification", false).order("updated_at", { ascending: false }).limit(400);
+  const known = new Map((existing.data || []).map((x: any) => [canonicalUrl(x.source_url), x]));
 
   const fetchedSources = await Promise.all((sources.data || []).map(fetchFeed));
   for (const fetched of fetchedSources) {
@@ -74,7 +74,32 @@ Deno.serve(async req => {
         if (!title || !link) continue;
         seen++;
         sourceSeen++;
-        if (known.has(link)) { duplicates++; sourceDuplicates++; continue; }
+        const existingRow = known.get(link);
+        if (existingRow) {
+          const incomingSummary = field(item, "description") || field(item, "summary") || title;
+          const normalized = (value: string) => value.replace(/\\s+/g, " ").trim();
+          const changed = normalized(title) !== normalized(existingRow.headline || "") ||
+            normalized(incomingSummary) !== normalized(existingRow.summary || "");
+          if (changed && existingRow.id) {
+            const updated = await db.rpc("mirsad_apply_source_update", {
+              p_article_id: existingRow.id,
+              p_headline: title,
+              p_summary: incomingSummary,
+              p_published_at: publishedAt(item),
+            });
+            if (!updated.error) {
+              existingRow.headline = title;
+              existingRow.summary = incomingSummary;
+              existingRow.published_at = publishedAt(item);
+              sourceUpdated++;
+              continue;
+            }
+            errors.push(source.source_key + ": source update " + updated.error.message);
+          }
+          duplicates++;
+          sourceDuplicates++;
+          continue;
+        }
         const summary = field(item, "description") || field(item, "summary") || title;
         const all = `${title} ${summary}`;
         const category = source.default_category || classify(all);
@@ -105,7 +130,7 @@ Deno.serve(async req => {
           published_at: publishedAt(item),
         };
         const result = await db.from("news_articles").insert(row);
-        if (!result.error) { written++; sourceWritten++; known.add(link); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);
+        if (!result.error) { written++; sourceWritten++; known.set(link, { id: null, source_url: link, headline: title, summary, cluster_id: row.cluster_id, category, published_at: row.published_at }); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);
       }
       await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
       await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: fetched.status, last_duration_ms: fetched.duration, last_item_at: sourceItems.map((item: string) => publishedAt(item)).sort().at(-1) || null, last_items_seen: sourceSeen, last_items_written: sourceWritten, last_items_updated: sourceUpdated, last_duplicates: sourceDuplicates, consecutive_empty_runs: sourceSeen === 0 ? 1 : 0 }).eq("source_key", source.source_key);
