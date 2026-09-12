@@ -34,6 +34,9 @@
     showDeductionToast(result, label);
     return result;
   };
+  window.mirsadNotifyDeduction = (label = 'فتحة واحدة', amount) => {
+    showDeductionToast({ charged: true }, label || (Number(amount) === 1 ? 'فتحة واحدة' : `${amount} فتحات`));
+  };
   window.mirsadViewAccess = {
     async openRapid() {
       const { data, error } = await sb.rpc('open_rapid_news');
