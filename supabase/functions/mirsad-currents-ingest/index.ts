@@ -136,11 +136,16 @@ Deno.serve(async (req) => {
     const failureScore = Math.min(80, Number(h.consecutive_failures || 0) * 25);
     const emptyScore = Math.min(40, Number(h.consecutive_empty_runs || 0) * 10);
     const staleScore = Math.min(70, ageHours * 14);
-    const recentFocusHours = f.last_focused_at
+    const focusAgeHours = f.last_focused_at
       ? Math.max(0, (now - new Date(f.last_focused_at).getTime()) / 3600000)
       : 999;
-    const focusPenalty = recentFocusHours < 2 ? 40 : recentFocusHours < 8 ? 15 : 0;
-    const requestPriority = staleScore + failureScore + emptyScore + focusPenalty;
+    // Prefer sources that have been quiet longer, have recent failures/empty runs,
+    // and have not received a Currents probe recently. Never let a source win
+    // merely because it was just probed.
+    const focusFairness = f.last_focused_at
+      ? Math.min(70, focusAgeHours * 8)
+      : 70;
+    const requestPriority = staleScore + failureScore + emptyScore + focusFairness;
     return { source, health: h, focus: f, score: requestPriority };
   }).sort((a: any,b: any) => b.score-a.score);
 
