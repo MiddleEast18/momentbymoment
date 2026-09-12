@@ -279,6 +279,7 @@
       throw new Error(message);
     }
     window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining: Number(result?.remaining_unlocks || 0), unlimited: Boolean(result?.unlimited) } }));
+    if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('الخبر', Number(result?.charged_amount || 1));
     return result;
   }
 
