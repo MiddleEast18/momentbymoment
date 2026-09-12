@@ -347,7 +347,7 @@ Deno.serve(async (req) => {
         const url = /^https?:\/\//i.test(field(item, "link"))
           ? canonical(field(item, "link"))
           : itemUrl(item);
-        const ms = published(item);
+        const ms = (() => { const value = publishedMs(item); return value ? new Date(value).toISOString() : null; })();
         if (!headline || !isArabic(headline) || !url) continue;
         if (ms) {
           const age = Date.now() - new Date(ms).getTime();
