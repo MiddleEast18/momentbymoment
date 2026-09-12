@@ -15,27 +15,211 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
-  const sources = await db.from("news_sources").select("source_key,name,feed_url").eq("is_active", true).eq("source_kind", "rss").not("feed_url", "is", null).limit(20);
+
+  const sources = await db.from("news_sources")
+    .select("source_key,name,feed_url")
+    .eq("is_active", true)
+    .eq("source_kind", "rss")
+    .not("feed_url", "is", null);
+
   if (sources.error) return reply({ error: sources.error.message }, 500);
-  const existingRapid = await db.from("rapid_news").select("source_url").gte("received_at", new Date(Date.now() - 7 * 86400000).toISOString()).limit(2000);
-  const normal = await db.from("news_articles").select("source_url").eq("is_pending_verification", false).limit(400);
-  if (existingRapid.error || normal.error) return reply({ error: existingRapid.error?.message || normal.error?.message }, 500);
-  const seen = new Set([...(existingRapid.data || []).map((x) => canonical(x.source_url)), ...(normal.data || []).map((x) => canonical(x.source_url))]);
-  const inserted: string[] = [], errors: string[] = [];
-  for (const source of sources.data || []) {
+
+  const [existingRapid, normal] = await Promise.all([
+    db.from("rapid_news")
+      .select("source_url")
+      .gte("received_at", new Date(Date.now() - 7 * 86400000).toISOString())
+      .limit(2000),
+    db.from("news_articles")
+      .select("source_url")
+      .eq("is_pending_verification", false)
+      .limit(400),
+  ]);
+
+  if (existingRapid.error || normal.error) {
+    return reply({ error: existingRapid.error?.message || normal.error?.message }, 500);
+  }
+
+  const seen = new Set([
+    ...(existingRapid.data || []).map((x) => canonical(x.source_url)),
+    ...(normal.data || []).map((x) => canonical(x.source_url)),
+  ]);
+
+  const startedAt = new Date().toISOString();
+  const errors: string[] = [];
+  let totalSeen = 0;
+  let totalInserted = 0;
+  const sourceStats: Record<string, unknown> = {};
+
+  // Every active source is fetched independently and concurrently.
+  const fetched = await Promise.allSettled(
+    (sources.data || []).map(async (source) => {
+      const started = Date.now();
+      let lastError = "";
+      let status: number | null = null;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch(source.feed_url, {
+            headers: { "user-agent": "MirsadRapid/2.0" },
+            signal: AbortSignal.timeout(9000),
+          });
+          status = response.status;
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return {
+            source,
+            xml: await response.text(),
+            status,
+            duration: Date.now() - started,
+            error: "",
+          };
+        } catch (error) {
+          lastError = String(error);
+          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+
+      return {
+        source,
+        xml: "",
+        status,
+        duration: Date.now() - started,
+        error: lastError || "feed_fetch_failed",
+      };
+    }),
+  );
+
+  for (let i = 0; i < fetched.length; i += 1) {
+    const result = fetched[i];
+    const source = sources.data?.[i];
+    if (!source) continue;
+
+    let sourceSeen = 0;
+    let sourceInserted = 0;
+    let sourceDuplicates = 0;
+
+    if (result.status === "rejected") {
+      const error = String(result.reason);
+      errors.push(`${source.source_key}: ${error}`);
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key,
+        p_ok: false,
+        p_error: error,
+      });
+      continue;
+    }
+
+    if (result.value.error) {
+      errors.push(`${source.source_key}: ${result.value.error}`);
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key,
+        p_ok: false,
+        p_error: result.value.error,
+      });
+      await db.from("source_health").update({
+        last_attempt_at: new Date().toISOString(),
+        last_http_status: result.value.status,
+        last_duration_ms: result.value.duration,
+        last_items_seen: 0,
+        last_items_written: 0,
+        last_items_updated: 0,
+        last_duplicates: 0,
+      }).eq("source_key", source.source_key);
+      continue;
+    }
+
     try {
-      const response = await fetch(source.feed_url, { headers: { "user-agent": "MirsadRapid/1.3" }, signal: AbortSignal.timeout(9000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const xml = await response.text();
-      for (const item of items(xml).slice(0, 30)) {
+      // Read the whole available feed. A safety cap prevents pathological feeds
+      // from exhausting an execution while preserving far more than the old 30-item window.
+      const sourceItems = items(result.value.xml).slice(0, 200);
+      const rows = [];
+
+      for (const item of sourceItems) {
         const headline = field(item, "title");
         const url = canonical(field(item, "link") || field(item, "guid"));
-        if (!headline || !isArabic(headline) || !url || seen.has(url)) continue;
-        const result = await db.from("rapid_news").insert({ source_key: source.source_key, source_name: source.name, source_url: url, headline: cleanRichText(headline), summary: cleanRichText(field(item, "description") || field(item, "summary") || headline), published_at: published(item), importance_score: importance(headline) }).select("id").single();
-        if (!result.error || result.error.code === "23505") { seen.add(url); if (!result.error) inserted.push(result.data.id); }
-        else errors.push(`${source.source_key}: ${result.error.message}`);
+        if (!headline || !isArabic(headline) || !url) continue;
+
+        sourceSeen += 1;
+        totalSeen += 1;
+
+        if (seen.has(url)) {
+          sourceDuplicates += 1;
+          continue;
+        }
+
+        const row = {
+          source_key: source.source_key,
+          source_name: source.name,
+          source_url: url,
+          headline: cleanRichText(headline),
+          summary: cleanRichText(field(item, "description") || field(item, "summary") || headline),
+          published_at: published(item),
+          importance_score: importance(headline),
+        };
+
+        rows.push(row);
+        // Reserve immediately so the same URL cannot be queued twice during this run.
+        seen.add(url);
       }
-    } catch (error) { errors.push(`${source.source_key}: ${String(error).slice(0, 500)}`); }
+
+      if (rows.length) {
+        const resultInsert = await db.from("rapid_news").insert(rows).select("id");
+        if (resultInsert.error) {
+          // A concurrent run can legitimately race on the unique URL.
+          if (resultInsert.error.code !== "23505") {
+            throw new Error(resultInsert.error.message);
+          }
+        } else {
+          sourceInserted = resultInsert.data?.length || rows.length;
+          totalInserted += sourceInserted;
+        }
+      }
+
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key,
+        p_ok: true,
+        p_error: null,
+      });
+      await db.from("source_health").update({
+        last_attempt_at: new Date().toISOString(),
+        last_http_status: result.value.status,
+        last_duration_ms: result.value.duration,
+        last_items_seen: sourceSeen,
+        last_items_written: sourceInserted,
+        last_items_updated: 0,
+        last_duplicates: sourceDuplicates,
+      }).eq("source_key", source.source_key);
+
+      sourceStats[source.source_key] = {
+        status: result.value.status,
+        duration_ms: result.value.duration,
+        items_seen: sourceSeen,
+        inserted: sourceInserted,
+        duplicates: sourceDuplicates,
+      };
+    } catch (error) {
+      const message = String(error).slice(0, 500);
+      errors.push(`${source.source_key}: ${message}`);
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key,
+        p_ok: false,
+        p_error: message,
+      });
+    }
   }
-  return reply({ ok: true, inserted: inserted.length, errors });
+
+  // Keep the independent layer bounded at 400 rows.
+  await db.from("rapid_news").delete()
+    .not("id", "in", `(${"select id from public.rapid_news order by received_at desc limit 400"})`);
+
+  const finishedAt = new Date().toISOString();
+  return reply({
+    ok: true,
+    started_at: startedAt,
+    finished_at: finishedAt,
+    sources: (sources.data || []).length,
+    items_seen: totalSeen,
+    inserted: totalInserted,
+    errors: errors.slice(0, 20),
+    source_stats: sourceStats,
+  });
 });
