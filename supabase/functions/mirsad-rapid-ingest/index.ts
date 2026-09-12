@@ -105,6 +105,8 @@ const importance = (s: string) => Math.min(
     + (/(رئيس|حكومة|انتخابات|اتفاق|تصعيد|إيران|إسرائيل|أمريكا)/.test(s) ? 10 : 0),
 );
 
+const itemKey = (item: string, url: string) => field(item, "guid") || url;
+const feedHash = (text: string) => { let h = 2166136261; for (let i=0;i<text.length;i++) { h ^= text.charCodeAt(i); h = Math.imul(h,16777619); } return (h>>>0).toString(16); };
 const cleanRichText = (value: string) => decodeEntities(String(value || "")
   .replace(/<br\s*\/?>/gi, "\n")
   .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
@@ -234,91 +236,127 @@ Deno.serve(async (req) => {
   if (sources.error) return reply({ error: sources.error.message }, 500);
 
   const feedStates = await db.from("source_feed_state").select("source_key,etag,last_modified,last_feed_hash");
-  const stateMap = new Map((feedStates.data || []).map((x: any) => [x.source_key, x]));
-  const sourceNames = new Map((sources.data || []).map((x: any) => [x.source_key, x.name]));
+  const stateMap = new Map((feedStates.data || []).map((row: any) => [row.source_key, row]));
+  const sourceNames = new Map((sources.data || []).map((row: any) => [row.source_key, row.name]));
+
   const startedAt = new Date().toISOString();
   const errors: string[] = [];
-  let totalSeen = 0;
-  let totalInserted = 0;
-  const sourceStats: Record<string, unknown> = {};
-  const seenUrls = new Set<string>();
+  let itemsSeen = 0;
+  let captured = 0;
+  const stats: Record<string, any> = {};
 
-  const fetched = await Promise.allSettled(
-    (sources.data || []).map(async (source) => {
-      const started = Date.now();
-      let lastError = "";
-      let status: number | null = null;
-      const state = stateMap.get(source.source_key);
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          const requestHeaders: Record<string,string> = {
-            "user-agent": "MirsadRapid/5.0",
-            "accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1"
+  // Phase 1: observe every source independently and concurrently.
+  const fetched = await Promise.allSettled((sources.data || []).map(async (source) => {
+    const state = stateMap.get(source.source_key);
+    const started = Date.now();
+    let status: number | null = null;
+    let lastError = "";
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const headers: Record<string, string> = {
+          "user-agent": "MirsadRapid/5.0",
+          "accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1",
+        };
+        if (state?.etag) headers["if-none-match"] = state.etag;
+        if (state?.last_modified) headers["if-modified-since"] = state.last_modified;
+
+        const response = await fetch(source.feed_url, {
+          headers,
+          signal: AbortSignal.timeout(10000),
+        });
+        status = response.status;
+
+        if (status === 304) {
+          return {
+            source, xml: "", liveRows: [], status,
+            duration: Date.now() - started, error: "", unchanged: true,
+            etag: state?.etag || null, lastModified: state?.last_modified || null,
           };
-          if (state?.etag) requestHeaders["if-none-match"] = state.etag;
-          if (state?.last_modified) requestHeaders["if-modified-since"] = state.last_modified;
-          const response = await fetch(source.feed_url, { headers: requestHeaders, signal: AbortSignal.timeout(10000) });
-          status = response.status;
-          if (status === 304) return { source, xml: "", liveRows: [], status, duration: Date.now() - started, error: "", unchanged: true, etag: state?.etag || null, lastModified: state?.last_modified || null };
-          if (!response.ok) throw new Error(`HTTP ${status}`);
-          const xml = await response.text();
-          const liveRows = LIVE_FALLBACK_URLS[source.source_key] ? await fetchLiveFallback(source) : [];
-          return { source, xml, liveRows, status, duration: Date.now() - started, error: "", unchanged: false, etag: response.headers.get("etag"), lastModified: response.headers.get("last-modified") };
-        } catch (error) {
-          lastError = String(error);
-          if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
         }
+
+        if (!response.ok) throw new Error(`HTTP ${status}`);
+        const xml = await response.text();
+        const liveRows = LIVE_FALLBACK_URLS[source.source_key]
+          ? await fetchLiveFallback(source)
+          : [];
+
+        return {
+          source, xml, liveRows, status,
+          duration: Date.now() - started, error: "", unchanged: false,
+          etag: response.headers.get("etag"),
+          lastModified: response.headers.get("last-modified"),
+        };
+      } catch (error) {
+        lastError = String(error);
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
       }
-      return { source, xml: "", liveRows: [], status, duration: Date.now() - started, error: lastError || "feed_fetch_failed", unchanged: false, etag: null, lastModified: null };
-    }),
-  );
+    }
+
+    return {
+      source, xml: "", liveRows: [], status,
+      duration: Date.now() - started,
+      error: lastError || "feed_fetch_failed",
+      unchanged: false, etag: null, lastModified: null,
+    };
+  }));
 
   for (let i = 0; i < fetched.length; i += 1) {
     const result = fetched[i];
     const source = sources.data?.[i];
-    if (!source) continue;
-    let sourceSeen = 0;
-    let sourceInserted = 0;
-    let sourceDuplicates = 0;
-    let newestMs = 0;
-
-    if (result.status === "rejected") {
-      const error = String(result.reason);
-      errors.push(`${source.source_key}: ${error}`);
-      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: error });
-      continue;
-    }
+    if (!source || result.status === "rejected") continue;
 
     if (result.value.error) {
-      errors.push(`${source.source_key}: ${result.value.error}`);
-      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: result.value.error });
-      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: result.value.status, last_duration_ms: result.value.duration }).eq("source_key", source.source_key);
+      const message = `${source.source_key}: ${result.value.error}`;
+      errors.push(message);
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key, p_ok: false, p_error: result.value.error,
+      });
       continue;
     }
 
     try {
+      const nowIso = new Date().toISOString();
+
       if (result.value.unchanged) {
-        await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: result.value.etag, last_modified: result.value.lastModified, last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
-        await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
-        sourceStats[source.source_key] = { status: 304, duration_ms: result.value.duration, items_seen: 0, inserted: 0, duplicates: 0, mode: "not_modified" };
+        await db.from("source_feed_state").upsert({
+          source_key: source.source_key,
+          etag: result.value.etag,
+          last_modified: result.value.lastModified,
+          last_checked_at: nowIso,
+          updated_at: nowIso,
+        }, { onConflict: "source_key" });
+
+        stats[source.source_key] = {
+          status: 304,
+          duration_ms: result.value.duration,
+          items_seen: 0,
+          captured: 0,
+          mode: "unchanged",
+        };
         continue;
       }
 
       const cutoff = Date.now() - RECENT_MS;
       const observations: any[] = [];
-      const parsedItems = items(result.value.xml).slice(0, 100);
-      for (const item of parsedItems) {
+      const localKeys = new Set<string>();
+      const parsed = items(result.value.xml).slice(0, 100);
+
+      for (const item of parsed) {
         const headline = cleanRichText(field(item, "title"));
-        const url = itemUrl(item);
-        const ms = publishedMs(item);
-        if (!headline || !isArabic(headline) || !url || !/^https?:\/\//i.test(url)) continue;
-        if (ms && ms < cutoff) continue;
-        sourceSeen += 1;
-        totalSeen += 1;
-        newestMs = Math.max(newestMs, ms || 0);
+        const url = /^https?:\/\//i.test(field(item, "link"))
+          ? canonical(field(item, "link"))
+          : itemUrl(item);
+        const ms = published(item);
+        if (!headline || !isArabic(headline) || !url) continue;
+        if (ms) {
+          const age = Date.now() - new Date(ms).getTime();
+          if (age > RECENT_MS) continue;
+        }
+
         const key = itemKey(item, url);
-        if (seenUrls.has(url)) { sourceDuplicates += 1; continue; }
-        seenUrls.add(url);
+        if (localKeys.has(key)) continue;
+        localKeys.add(key);
         observations.push({
           source_key: source.source_key,
           item_key: key,
@@ -326,62 +364,147 @@ Deno.serve(async (req) => {
           guid: field(item, "guid") || "",
           headline,
           summary: cleanRichText(field(item, "description") || field(item, "summary") || headline),
-          published_at: ms ? new Date(ms).toISOString() : null
+          published_at: ms,
         });
       }
 
-      for (const liveRow of result.value.liveRows || []) {
-        const url = canonical(liveRow.source_url);
-        const ms = normalizePublishedMs(new Date(liveRow.published_at).getTime());
-        if (!url || !ms || ms < cutoff) continue;
-        if (seenUrls.has(url)) continue;
-        seenUrls.add(url);
-        sourceSeen += 1;
-        totalSeen += 1;
-        newestMs = Math.max(newestMs, ms);
-        observations.push({ source_key: source.source_key, item_key: url, source_url: url, guid: "", headline: liveRow.headline, summary: liveRow.summary, published_at: new Date(ms).toISOString() });
+      for (const live of result.value.liveRows || []) {
+        const url = canonical(live.source_url);
+        const ms = live.published_at;
+        if (!url || !isArabic(live.headline || "")) continue;
+        if (ms && Date.now() - new Date(ms).getTime() > RECENT_MS) continue;
+        const key = live.source_url;
+        if (localKeys.has(key)) continue;
+        localKeys.add(key);
+        observations.push({
+          source_key: source.source_key,
+          item_key: key,
+          source_url: url,
+          guid: "",
+          headline: cleanRichText(live.headline),
+          summary: cleanRichText(live.summary || live.headline),
+          published_at: ms || null,
+        });
       }
 
+      itemsSeen += observations.length;
+
+      // The ledger is the source of truth: observing an item never makes it captured.
       if (observations.length) {
-        const obs = await db.from("source_item_ledger").insert(observations);
-        if (obs.error && obs.error.code !== "23505") throw new Error(obs.error.message);
+        const obs = await db.from("source_item_ledger").upsert(observations, { onConflict: "source_key,item_key", ignoreDuplicates: false });
+        if (obs.error) throw new Error(obs.error.message);
       }
 
-      await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: result.value.etag, last_modified: result.value.lastModified, last_feed_hash: feedHash(result.value.xml), last_checked_at: new Date().toISOString(), last_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
+      await db.from("source_feed_state").upsert({
+        source_key: source.source_key,
+        etag: result.value.etag,
+        last_modified: result.value.lastModified,
+        last_feed_hash: feedHash(result.value.xml),
+        last_checked_at: nowIso,
+        last_changed_at: nowIso,
+        updated_at: nowIso,
+      }, { onConflict: "source_key" });
 
-      sourceStats[source.source_key] = { status: result.value.status, duration_ms: result.value.duration, items_seen: sourceSeen, observed: observations.length, inserted: 0, duplicates: sourceDuplicates, live_rows: (result.value.liveRows || []).length, mode: "observe_then_wait" };
-      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
-      await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: result.value.status, last_duration_ms: result.value.duration, last_item_at: newestMs ? new Date(newestMs).toISOString() : null, last_items_seen: sourceSeen, last_items_written: 0, last_items_updated: 0, last_duplicates: sourceDuplicates }).eq("source_key", source.source_key);
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key, p_ok: true, p_error: null,
+      });
+      await db.from("source_health").update({
+        last_attempt_at: nowIso,
+        last_http_status: result.value.status,
+        last_duration_ms: result.value.duration,
+        last_items_seen: observations.length,
+        last_items_written: 0,
+        last_items_updated: 0,
+        last_duplicates: 0,
+      }).eq("source_key", source.source_key);
+
+      stats[source.source_key] = {
+        status: result.value.status,
+        duration_ms: result.value.duration,
+        items_seen: observations.length,
+        captured: 0,
+        live_rows: (result.value.liveRows || []).length,
+        mode: "observe_only",
+      };
     } catch (error) {
       const message = String(error).slice(0, 500);
       errors.push(`${source.source_key}: ${message}`);
-      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: false, p_error: message });
+      await db.rpc("record_source_health", {
+        p_source_key: source.source_key, p_ok: false, p_error: message,
+      });
     }
   }
 
+  // Reconcile what already made it into the main store before any capture decision.
   const sync = await db.rpc("mirsad_sync_ledger_main_status");
   if (sync.error) errors.push("ledger_sync: " + sync.error.message);
 
+  // Only items first observed at least one hour ago and still absent from the main store
+  // are eligible for the captured-news safety net.
+  const cutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const maxAgeIso = new Date(Date.now() - RECENT_MS).toISOString();
   const due = await db.from("source_item_ledger")
-    .select("source_key,item_key,source_url,headline,summary,published_at,first_seen_at,status")
+    .select("source_key,source_url,headline,summary,published_at,first_seen_at,item_key")
     .eq("status", "observed")
-    .lte("first_seen_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
-    .gte("first_seen_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-    .or(`published_at.is.null,published_at.gte.${new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()}`)
+    .lte("first_seen_at", cutoffIso)
+    .gte("first_seen_at", maxAgeIso)
     .limit(400);
-  if (due.error) errors.push("due_query: " + due.error.message);
 
-  const dueRows = (due.data || []).filter((row: any) => !seenUrls.has(canonical(row.source_url)));
-  if (dueRows.length) {
-    const inserted = await db.from("rapid_news").upsert(dueRows.map((row: any) => ({ source_key: row.source_key, source_name: sourceNames.get(row.source_key) || row.source_key, source_url: canonical(row.source_url), headline: cleanRichText(row.headline), summary: cleanRichText(row.summary), published_at: row.published_at, importance_score: importance(row.headline) })), { onConflict: "source_url", ignoreDuplicates: true }).select("id");
-    if (inserted.error) errors.push("rapid_insert: " + inserted.error.message);
-    else totalInserted += inserted.data?.length || 0;
-    const capturedKeys = dueRows.map((row: any) => row.item_key);
-    if (capturedKeys.length) await db.from("source_item_ledger").update({ status: "captured", captured_at: new Date().toISOString(), updated_at: new Date().toISOString() }).in("item_key", capturedKeys);
+  if (due.error) {
+    errors.push("due_query: " + due.error.message);
+  } else if (due.data?.length) {
+    const urls = due.data.map((row: any) => canonical(row.source_url));
+    const existing = await db.from("news_articles")
+      .select("source_url")
+      .in("source_url", urls)
+      .eq("is_pending_verification", false);
+    if (existing.error) {
+      errors.push("main_check: " + existing.error.message);
+    } else {
+      const mainUrls = new Set((existing.data || []).map((row: any) => canonical(row.source_url)));
+      const rows = due.data.filter((row: any) => !mainUrls.has(canonical(row.source_url)));
+
+      if (rows.length) {
+        const inserted = await db.from("rapid_news").upsert(
+          rows.map((row: any) => ({
+            source_key: row.source_key,
+            source_name: sourceNames.get(row.source_key) || row.source_key,
+            source_url: canonical(row.source_url),
+            headline: cleanRichText(row.headline),
+            summary: cleanRichText(row.summary),
+            published_at: row.published_at,
+            importance_score: importance(row.headline),
+          })),
+          { onConflict: "source_url", ignoreDuplicates: true },
+        ).select("id");
+
+        if (inserted.error) {
+          errors.push("rapid_insert: " + inserted.error.message);
+        } else {
+          captured = inserted.data?.length || 0;
+          for (const row of rows) {
+            await db.from("source_item_ledger").update({
+              status: "captured",
+              captured_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }).eq("source_key", row.source_key).eq("item_key", row.item_key);
+          }
+        }
+      }
+    }
   }
 
   const trim = await db.rpc("mirsad_trim_rapid_news_to_400");
   if (trim.error) errors.push("trim: " + trim.error.message);
 
-  return reply({ ok: true, started_at: startedAt, finished_at: new Date().toISOString(), sources: (sources.data || []).length, items_seen: totalSeen, inserted: totalInserted, due_candidates: dueRows.length, errors: errors.slice(0, 20), source_stats: sourceStats });
+  return reply({
+    ok: errors.length === 0,
+    started_at: startedAt,
+    finished_at: new Date().toISOString(),
+    sources: sources.data?.length || 0,
+    items_seen: itemsSeen,
+    captured,
+    errors: errors.slice(0, 20),
+    source_stats: stats,
+  });
 });
