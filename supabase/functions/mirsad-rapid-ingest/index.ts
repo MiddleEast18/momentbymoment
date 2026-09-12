@@ -11,6 +11,82 @@ const published = (item: string) => { for (const tag of ["pubDate", "published",
 const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
 const importance = (s: string) => Math.min(100, 35 + (/(عاجل|عاجلة|هجوم|حرب|انفجار|زلزال|قتلى|وفيات|اغتيال)/.test(s) ? 25 : 0) + (/(رئيس|حكومة|انتخابات|اتفاق|تصعيد|إيران|إسرائيل|أمريكا)/.test(s) ? 10 : 0));
 const cleanRichText = (value: string) => String(value || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h[1-6])>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+const LIVE_FALLBACK_URLS: Record<string, string> = {
+  aljazeera: "https://www.aljazeera.net/news/breaking",
+};
+
+const stableKey = (value: string) => {
+  const normalized = value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+  let hash = 2166136261;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash ^= normalized.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+};
+
+const extractJsonLdObjects = (html: string) => {
+  const out: any[] = [];
+  const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\\s\\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html))) {
+    try {
+      const value = JSON.parse(match[1]);
+      out.push(value);
+    } catch {
+      // Ignore malformed/unrelated JSON-LD blocks.
+    }
+  }
+  return out;
+};
+
+const findLiveArticleUrl = (html: string, headline: string) => {
+  const index = html.indexOf(headline);
+  if (index < 0) return "";
+  const windowStart = Math.max(0, index - 3000);
+  const window = html.slice(windowStart, Math.min(html.length, index + 1200));
+  const links = [...window.matchAll(/href=["'](https?:\\/\\/www\\.aljazeera\\.net\\/[^"']+)["']/gi)]
+    .map((m) => m[1]);
+  return links.reverse().find((url) => /aljazeera\\.net\\/(news|politics|sport|ebusiness)\\//i.test(url)) || "";
+};
+
+const fetchLiveFallback = async (source: any) => {
+  const fallbackUrl = LIVE_FALLBACK_URLS[source.source_key];
+  if (!fallbackUrl) return [];
+  try {
+    const response = await fetch(fallbackUrl, {
+      headers: { "user-agent": "MirsadRapidLive/1.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return [];
+    const html = await response.text();
+    const rows: any[] = [];
+    for (const obj of extractJsonLdObjects(html)) {
+      const posts = Array.isArray(obj?.blogPost) ? obj.blogPost : [];
+      for (const post of posts) {
+        const headline = String(post?.headline || "").trim();
+        const dateValue = String(post?.dateModified || post?.datePublished || "").trim();
+        const publishedMs = new Date(dateValue).getTime();
+        if (!headline || !isArabic(headline) || !Number.isFinite(publishedMs)) continue;
+        const directUrl = findLiveArticleUrl(html, headline);
+        const url = canonical(directUrl || fallbackUrl + "?mirsad_rapid=" + stableKey(headline + "|" + dateValue));
+        rows.push({
+          source_key: source.source_key,
+          source_name: source.name,
+          source_url: url,
+          headline: cleanRichText(headline),
+          summary: cleanRichText(headline),
+          published_at: new Date(publishedMs).toISOString(),
+          importance_score: importance(headline) + (/عاجل|مباشر|فوري/.test(headline) ? 15 : 0),
+        });
+      }
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+};
+
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
 
 Deno.serve(async (req) => {
@@ -65,9 +141,12 @@ Deno.serve(async (req) => {
           });
           status = response.status;
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const xml = await response.text();
+          const liveRows = source.source_key === "aljazeera" ? await fetchLiveFallback(source) : [];
           return {
             source,
-            xml: await response.text(),
+            xml,
+            liveRows,
             status,
             duration: Date.now() - started,
             error: "",
@@ -137,7 +216,9 @@ Deno.serve(async (req) => {
         .sort((a, b) => b.publishedMs - a.publishedMs)
         .slice(0, 40)
         .map(({ item }) => item);
-      const rows = [];
+      const rows = Array.isArray(result.value.liveRows)
+        ? result.value.liveRows.filter((row) => !seen.has(canonical(row.source_url)))
+        : [];
 
       for (const item of sourceItems) {
         const headline = field(item, "title");
@@ -165,6 +246,10 @@ Deno.serve(async (req) => {
         rows.push(row);
         // Reserve immediately so the same URL cannot be queued twice during this run.
         seen.add(url);
+      }
+
+      for (const liveRow of rows) {
+        if (liveRow.source_url) seen.add(canonical(liveRow.source_url));
       }
 
       if (rows.length) {
