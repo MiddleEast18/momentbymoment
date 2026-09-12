@@ -45,9 +45,9 @@ const findLiveArticleUrl = (html: string, headline: string) => {
   if (index < 0) return "";
   const windowStart = Math.max(0, index - 3000);
   const window = html.slice(windowStart, Math.min(html.length, index + 1200));
-  const links = [...window.matchAll(/href=["'](https?:\\/\\/www\\.aljazeera\\.net\\/[^"']+)["']/gi)]
+  const links = [...window.matchAll(/href=["'](https?:\/\/www\.aljazeera\.net\/[^"']+)["']/gi)]
     .map((m) => m[1]);
-  return links.reverse().find((url) => /aljazeera\\.net\\/(news|politics|sport|ebusiness)\\//i.test(url)) || "";
+  return links.reverse().find((url) => /aljazeera\.net\/(news|politics|sport|ebusiness)\//i.test(url)) || "";
 };
 
 const fetchLiveFallback = async (source: any) => {
