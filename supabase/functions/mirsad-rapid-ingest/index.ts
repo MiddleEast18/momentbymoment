@@ -128,9 +128,15 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Read the whole available feed. A safety cap prevents pathological feeds
-      // from exhausting an execution while preserving far more than the old 30-item window.
-      const sourceItems = items(result.value.xml).slice(0, 200);
+      // Process each source independently. Keep the fast layer focused on genuinely recent
+      // items so an old/stale RSS feed cannot flood the 400-row buffer and crowd out other sources.
+      const recentCutoff = Date.now() - 48 * 60 * 60 * 1000;
+      const sourceItems = items(result.value.xml)
+        .map((item) => ({ item, publishedMs: new Date(published(item) || 0).getTime() }))
+        .filter(({ publishedMs }) => Number.isFinite(publishedMs) && publishedMs >= recentCutoff)
+        .sort((a, b) => b.publishedMs - a.publishedMs)
+        .slice(0, 40)
+        .map(({ item }) => item);
       const rows = [];
 
       for (const item of sourceItems) {
