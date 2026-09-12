@@ -118,7 +118,8 @@ Deno.serve(async (req) => {
     db.from("news_sources")
       .select("source_key,name,feed_url,domain")
       .eq("is_active", true)
-      .eq("source_kind", "rss"),
+      .eq("source_kind", "rss")
+      .neq("source_key", "youm7"),
     db.from("source_health")
       .select("source_key,last_item_at,last_attempt_at,last_success_at,last_http_status,last_items_seen,last_items_written,consecutive_failures,consecutive_empty_runs"),
     db.from("currents_focus_state")
@@ -145,7 +146,8 @@ Deno.serve(async (req) => {
     const focusFairness = f.last_focused_at
       ? Math.min(70, focusAgeHours * 8)
       : 70;
-    const requestPriority = staleScore + failureScore + emptyScore + focusFairness;
+    const sourcePreference = source.source_key === "aljazeera" ? 25 : 0;
+    const requestPriority = staleScore + failureScore + emptyScore + focusFairness + sourcePreference;
     return { source, health: h, focus: f, score: requestPriority };
   }).sort((a: any,b: any) => b.score-a.score);
 
