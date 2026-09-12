@@ -34,7 +34,14 @@
     return n;
   }
   async function load(){
-    status.hidden=false;status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
+    status.hidden=false;status.textContent='جارٍ التحقق من فتحات الأخبار…';
+    if(!window.mirsadViewAccess){ status.textContent='تعذر التحقق من فتحات الأخبار.'; return; }
+    const access=await window.mirsadViewAccess.consume('24h');
+    if(!access.allowed){
+      status.textContent=access.error?.message==='not_authenticated'?'سجّل الدخول لاستخدام أخبار 24 ساعة.':'لا توجد فتحات كافية لفتح أخبار 24 ساعة.';
+      return;
+    }
+    status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
     const now=new Date();const cutoff=new Date(now.getTime()-24*60*60*1000).toISOString();
     const {data,error}=await sb.from('news_24h_articles').select('id,source_name,source_url,headline,summary,category,importance_score,update_count,confidence_score,published_at').gte('published_at',cutoff).lte('published_at',now.toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false});
     if(error){console.error(error);status.textContent='تعذر تحميل أخبار آخر 24 ساعة.';return}
