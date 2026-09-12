@@ -73,7 +73,11 @@
     moreButton.disabled = false;
     allButton.disabled = false;
     if (!result.allowed) { status.textContent = result.error?.message === 'not_authenticated' ? 'سجّل الدخول لاستخدام الفتحات' : 'لا توجد فتحات كافية'; return false; }
-    status.textContent = result.charged ? `تم خصم ${kind === 'more' ? 5 : 100} فتحات` : 'الاستخدام مجاني في هذه الدورة';
+    const threshold = Number(result.threshold || (kind === 'more' ? 10 : 100));
+    const newCount = Number(result.new_count || 0);
+    status.textContent = result.charged
+      ? `تم خصم ${kind === 'more' ? 5 : 100} فتحات`
+      : `الاستخدام مجاني — ${newCount}/${threshold} أخبار جديدة`;
     return true;
   }
 
