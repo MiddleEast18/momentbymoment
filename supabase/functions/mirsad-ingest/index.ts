@@ -81,12 +81,7 @@ Deno.serve(async req => {
     try {
       if (fetched.unchanged) {
         await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: fetched.etag, last_modified: fetched.lastModified, last_checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
-        if (observations.length) {
-        const obs = await db.from("source_item_ledger").insert(observations);
-        if (obs.error && obs.error.code !== "23505") errors.push(`${source.source_key}: ledger ${obs.error.message}`);
-      }
-      await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: fetched.etag, last_modified: fetched.lastModified, last_feed_hash: feedHash(xml), last_checked_at: new Date().toISOString(), last_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
-      await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
+        await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
         await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: fetched.status, last_duration_ms: fetched.duration, last_items_seen: 0, last_items_written: 0, last_items_updated: 0, last_duplicates: 0 }).eq("source_key", source.source_key);
         continue;
       }
@@ -158,6 +153,11 @@ Deno.serve(async req => {
         const result = await db.from("news_articles").insert(row);
         if (!result.error) { written++; sourceWritten++; known.set(link, { id: null, source_url: link, headline: title, summary, cluster_id: row.cluster_id, category, published_at: row.published_at }); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);
       }
+      if (observations.length) {
+        const obs = await db.from("source_item_ledger").insert(observations);
+        if (obs.error && obs.error.code !== "23505") errors.push(source.source_key + ": ledger " + obs.error.message);
+      }
+      await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: fetched.etag, last_modified: fetched.lastModified, last_feed_hash: feedHash(xml), last_checked_at: new Date().toISOString(), last_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
       await db.rpc("record_source_health", { p_source_key: source.source_key, p_ok: true, p_error: null });
       await db.from("source_health").update({ last_attempt_at: new Date().toISOString(), last_http_status: fetched.status, last_duration_ms: fetched.duration, last_item_at: sourceItems.map((item: string) => publishedAt(item)).sort().at(-1) || null, last_items_seen: sourceSeen, last_items_written: sourceWritten, last_items_updated: sourceUpdated, last_duplicates: sourceDuplicates, consecutive_empty_runs: sourceSeen === 0 ? 1 : 0 }).eq("source_key", source.source_key);
     } catch (error) {
