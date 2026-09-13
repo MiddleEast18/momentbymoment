@@ -28,6 +28,9 @@
 .mirsad-analysis__header h3 { margin:0; color:var(--text); font-family:var(--font-display); font-size:17px; font-weight:600; }
 .mirsad-analysis__confidence { flex:0 0 auto; padding:5px 9px; border:1px solid var(--panel-border-strong); border-radius:999px; color:var(--text-dim); background:rgba(255,255,255,.025); font:11px/1 var(--font-mono); }
 .mirsad-analysis__claim { margin:0 0 14px; color:var(--text); font-size:14px; line-height:1.9; }
+.mirsad-analysis__loading { display:flex; align-items:center; gap:9px; color:var(--text-dim); }
+.mirsad-analysis__spinner { width:14px; height:14px; flex:0 0 auto; border:2px solid rgba(201,162,39,.22); border-top-color:var(--gold); border-radius:50%; animation:mirsad-spin .9s linear infinite; }
+@keyframes mirsad-spin { to { transform:rotate(360deg); } }
 .mirsad-analysis__points { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
 .mirsad-analysis__point { min-width:0; padding:10px 11px; border:1px solid var(--panel-border); border-radius:9px; background:rgba(255,255,255,.018); }
 .mirsad-analysis__point strong { display:block; margin-bottom:4px; color:var(--text-faint); font:600 10.5px/1.4 var(--font-mono); }

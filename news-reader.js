@@ -90,6 +90,7 @@
           <p class="mirsad-analysis__claim">${escapeHtml(state.mirsad.analytical_reading)}</p>
         </section>`;
     }
+    const analysisPending = state.mirsadLoading || ['queued', 'processing', 'pending'].includes(state.mirsad?.status);
     return `
       <section class="mirsad-analysis" aria-labelledby="mirsadAnalysisTitle">
         <div class="mirsad-analysis__header">
@@ -98,7 +99,9 @@
             <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
           </div>
         </div>
-        <p class="mirsad-analysis__claim">${state.mirsadLoading ? 'جارٍ تجهيز القراءة التحليلية…' : 'لا تتوفر قراءة تحليلية لهذا الخبر حاليًا.'}</p>
+        ${analysisPending
+          ? '<p class="mirsad-analysis__claim mirsad-analysis__loading" role="status" aria-live="polite"><span class="mirsad-analysis__spinner" aria-hidden="true"></span><span>جارٍ إعداد القراءة التحليلية…</span></p>'
+          : '<p class="mirsad-analysis__claim">لا تتوفر قراءة تحليلية لهذا الخبر حاليًا.</p>'}
       </section>`;
   }
 
@@ -184,6 +187,7 @@
 
       const raw = article.raw_payload && typeof article.raw_payload === 'object' ? article.raw_payload : {};
       const longText = String(raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? article.summary ?? '').trim();
+      let submissionStatus = 'processing';
 
       if (longText) {
         const submit = await fetch(MIRSAD_API, {
@@ -204,9 +208,10 @@
         });
         const queued = await submit.json().catch(() => ({}));
         if (!submit.ok) throw new Error(queued?.error || 'تعذر إرسال الخبر إلى مِرصاد');
+        submissionStatus = queued?.status || submissionStatus;
       }
 
-      state.mirsad = { status:'processing', analytical_reading:null };
+      state.mirsad = { status: submissionStatus, analytical_reading:null };
       state.mirsadLoading = false;
       renderArticle();
 
