@@ -14,7 +14,6 @@
   function card(a){
     const n=template.content.firstElementChild.cloneNode(true);
     n.dataset.id=a.id;
-    n.querySelector('.card__score').textContent=String(a.importance_score??'');
     n.querySelector('.card__category').textContent=CATEGORY_LABELS[a.category]||a.category||'عام';
     n.querySelector('.card__dot').style.background=CATEGORY_COLORS[a.category]||'#888';
     n.querySelector('.card__source').textContent=a.source_name||'مصدر';
