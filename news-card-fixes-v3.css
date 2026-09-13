@@ -35,8 +35,8 @@
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgba(20, 27, 36, 0) 0%,
-    var(--panel) 18%,
+    transparent 0%,
+    var(--panel) 12%,
     var(--panel) 100%
   );
 }
