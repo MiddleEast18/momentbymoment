@@ -5,9 +5,10 @@
   const SUPABASE_KEY = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
   const API = `${SUPABASE_URL}/rest/v1/news_articles`;
   const REVISIONS_API = `${SUPABASE_URL}/rest/v1/news_article_revisions`;
+  const MIRSAD_API = `${SUPABASE_URL}/functions/v1/mirsad-analysis-api`;
   const CATEGORY_LABELS = { Politics:'سياسة', Economy:'اقتصاد', Tech:'تقنية', Society:'مجتمع', Sports:'رياضة' };
   const CATEGORY_COLORS = { Politics:'#8b7bc7', Economy:'#c9a227', Tech:'#4f9dde', Society:'#b8794a', Sports:'#4fa8a0' };
-  const state = { open:false, article:null, related:[], revisions:[], selectedRevision:0, returnFocus:null };
+  const state = { open:false, article:null, related:[], revisions:[], selectedRevision:0, returnFocus:null, mirsad:null, mirsadLoading:false };
 
   const text = (value) => String(value ?? '').trim();
   const stripHtml = (value) => {
@@ -75,59 +76,39 @@
     sourceBtn.hidden = true;
   }
 
-  function getClaimDigest(article) {
-    if (!article?.claim_digest) return '';
-    if (typeof article.claim_digest === 'string') return stripHtml(article.claim_digest);
-    if (typeof article.claim_digest === 'object') {
-      return stripHtml(article.claim_digest.main_claim || article.claim_digest.summary || article.claim_digest.claim || '');
-    }
-    return '';
+  function activeDisplay(article, revisions) {
+    if (!revisions.length) return { ...article, __isRevision:false, __revisionNumber:0, __capturedAt:article.updated_at || article.created_at };
+    const revision = revisions[Math.min(state.selectedRevision, revisions.length - 1)];
+    return { ...article, headline:revision.headline, summary:revision.summary, source_name:revision.source_name || article.source_name, source_url:revision.source_url || article.source_url, published_at:revision.published_at || article.published_at, __isRevision:true, __revisionNumber:revision.revision_number, __revisionType:revision.revision_type, __capturedAt:revision.captured_at };
   }
 
-  function buildMirsadReading(article) {
-    const claim = getClaimDigest(article);
-    const sourceCount = Math.max(1, Number(article.source_count) || 1);
-    const updates = Math.max(0, Number(article.update_count) || 0);
-    const importance = Math.round(Number(article.importance_score) || 0);
-    const confidence = Math.round(Number(article.confidence_score) || 0);
-
-    let significance = 'خبر للمتابعة ضمن المستجدات الجارية.';
-    if (importance >= 80) significance = 'تطور مرتفع الأهمية ويستحق المتابعة المباشرة.';
-    else if (importance >= 60) significance = 'تطور مهم وقد يستدعي متابعة تحديثاته.';
-    else if (importance >= 40) significance = 'تطور متوسط الأهمية ضمن سياق الأخبار الجارية.';
-
-    const evidence = sourceCount > 1
-      ? `يدعمه أكثر من مصدر (${sourceCount})، ما يرفع قابلية المقارنة بين الروايات.`
-      : 'يستند حاليًا إلى مصدر واحد، لذلك يُنصح بالرجوع إلى المصدر الأصلي لأي تفاصيل إضافية.';
-
-    const freshness = updates > 0
-      ? `شهد ${updates} ${updates === 1 ? 'تحديثًا' : 'تحديثات'} منذ نشره.`
-      : 'لم يُسجَّل تحديث إضافي حتى آخر مزامنة.';
-
-    return { claim: claim || 'لا تتوفر خلاصة تحليلية مستقلة لهذا الخبر حاليًا.', significance, evidence, freshness, confidence };
+  function mirsadBlock() {
+    if (state.mirsad?.status === 'completed' && state.mirsad.analytical_reading) {
+      return `
+        <section class="mirsad-analysis" aria-labelledby="mirsadAnalysisTitle">
+          <div class="mirsad-analysis__header">
+            <div>
+              <span class="mirsad-analysis__eyebrow">إضافة مِرصاد</span>
+              <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
+            </div>
+          </div>
+          <p class="mirsad-analysis__claim">${escapeHtml(state.mirsad.analytical_reading)}</p>
+        </section>`;
+    }
+    return `
+      <section class="mirsad-analysis" aria-labelledby="mirsadAnalysisTitle">
+        <div class="mirsad-analysis__header">
+          <div>
+            <span class="mirsad-analysis__eyebrow">إضافة مِرصاد</span>
+            <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
+          </div>
+        </div>
+        <p class="mirsad-analysis__claim">${state.mirsadLoading ? 'جارٍ تجهيز القراءة التحليلية…' : 'لا تتوفر قراءة تحليلية لهذا الخبر حاليًا.'}</p>
+      </section>`;
   }
 
   function revisionLabel(revision) {
-    return revision.revision_type === 'original' && revision.revision_number === 1
-      ? 'الأصل'
-      : `تحديث ${Math.max(1, Number(revision.revision_number || 1) - 1)}`;
-  }
-
-  function activeDisplay(article, revisions) {
-    if (!revisions.length) return { ...article, __isRevision: false, __revisionNumber: 0, __capturedAt: article.updated_at || article.created_at };
-    const revision = revisions[Math.min(state.selectedRevision, revisions.length - 1)];
-    return {
-      ...article,
-      headline: revision.headline,
-      summary: revision.summary,
-      source_name: revision.source_name || article.source_name,
-      source_url: revision.source_url || article.source_url,
-      published_at: revision.published_at || article.published_at,
-      __isRevision: true,
-      __revisionNumber: revision.revision_number,
-      __revisionType: revision.revision_type,
-      __capturedAt: revision.captured_at,
-    };
+    return revision.revision_type === 'original' && revision.revision_number === 1 ? 'الأصل' : `تحديث ${Math.max(1, Number(revision.revision_number || 1) - 1)}`;
   }
 
   function articleMarkup(article, related, revisions) {
@@ -137,33 +118,20 @@
     const title = text(display.headline || display.title) || 'خبر دون عنوان';
     const summary = stripHtml(display.summary);
     const source = text(display.source_name) || 'مصدر';
-    const confidence = Math.round(Number(article.confidence_score) || 0);
-    const importance = Math.round(Number(article.importance_score) || 0);
-    const updates = Math.max(0, Number(article.update_count) || 0);
-    const sources = Math.max(1, Number(article.source_count) || 1);
-    const reading = buildMirsadReading(article);
-    const currentRevision = revisions.length ? revisions[Math.min(state.selectedRevision, revisions.length - 1)] : null;
 
     const revisionMarkup = revisions.length > 1 ? `
       <section class="mirsad-reader__section mirsad-revisions" aria-labelledby="mirsadRevisionsTitle">
         <div class="mirsad-revisions__header">
-          <div>
-            <span class="mirsad-analysis__eyebrow">سجل الخبر</span>
-            <h3 id="mirsadRevisionsTitle">الأصل والتحديثات</h3>
-          </div>
+          <div><span class="mirsad-analysis__eyebrow">سجل الخبر</span><h3 id="mirsadRevisionsTitle">الأصل والتحديثات</h3></div>
           <span class="mirsad-revisions__count">${revisions.length - 1} تحديث</span>
         </div>
         <div class="mirsad-revisions__tabs" role="tablist" aria-label="نسخ الخبر">
           ${revisions.map((revision, index) => `
             <button type="button" class="mirsad-revision-tab${index === state.selectedRevision ? ' is-active' : ''}" data-revision-index="${index}" role="tab" aria-selected="${index === state.selectedRevision}">
-              <span>${escapeHtml(revisionLabel(revision))}</span>
-              <small>${escapeHtml(relative(revision.captured_at))}</small>
+              <span>${escapeHtml(revisionLabel(revision))}</span><small>${escapeHtml(relative(revision.captured_at))}</small>
             </button>`).join('')}
         </div>
-        <div class="mirsad-revisions__active">
-          <span>${escapeHtml(currentRevision ? revisionLabel(currentRevision) : 'النسخة الحالية')}</span>
-          <time datetime="${escapeHtml(currentRevision?.captured_at || '')}">${escapeHtml(formatTime(currentRevision?.captured_at || display.__capturedAt))}</time>
-        </div>
+        <div class="mirsad-revisions__active"><span>${escapeHtml(revisions[state.selectedRevision] ? revisionLabel(revisions[state.selectedRevision]) : 'النسخة الحالية')}</span><time datetime="${escapeHtml(revisions[state.selectedRevision]?.captured_at || '')}">${escapeHtml(formatTime(revisions[state.selectedRevision]?.captured_at || display.__capturedAt))}</time></div>
       </section>` : '';
 
     const relatedMarkup = related.length ? `
@@ -188,48 +156,93 @@
 
       ${revisionMarkup}
 
-      <section class="mirsad-analysis" aria-labelledby="mirsadAnalysisTitle">
-        <div class="mirsad-analysis__header">
-          <div>
-            <span class="mirsad-analysis__eyebrow">إضافة مِرصاد</span>
-            <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
-          </div>
-          <span class="mirsad-analysis__confidence">ثقة ${reading.confidence}%</span>
-        </div>
-        <p class="mirsad-analysis__claim">${escapeHtml(reading.claim)}</p>
-        <div class="mirsad-analysis__points">
-          <div class="mirsad-analysis__point"><strong>الأهمية</strong><span>${escapeHtml(reading.significance)}</span></div>
-          <div class="mirsad-analysis__point"><strong>المصادر</strong><span>${escapeHtml(reading.evidence)}</span></div>
-          <div class="mirsad-analysis__point"><strong>التحديث</strong><span>${escapeHtml(reading.freshness)}</span></div>
-        </div>
-      </section>
+      ${mirsadBlock()}
 
-      <div class="mirsad-reader__stats mirsad-reader__stats--compact">
-        <div class="mirsad-reader__stat"><span>الأهمية</span><strong>${importance}</strong></div>
-        <div class="mirsad-reader__stat"><span>الثقة</span><strong>${confidence}%</strong></div>
-        <div class="mirsad-reader__stat"><span>المصادر</span><strong>${sources}</strong></div>
-        <div class="mirsad-reader__stat"><span>التحديثات</span><strong>${updates}</strong></div>
-        <div class="mirsad-reader__stat"><span>النشر</span><strong>${escapeHtml(formatTime(article.published_at))}</strong></div>
-        <div class="mirsad-reader__stat"><span>آخر مزامنة</span><strong>${escapeHtml(formatTime(article.updated_at || article.created_at))}</strong></div>
-      </div>
       ${relatedMarkup}`;
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-      cache: 'no-store',
-    });
+    const response = await fetch(url, { headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}` }, cache:'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
 
+  async function loadMirsadAnalysis(article) {
+    if (!article?.id) return;
+    state.mirsad = null;
+    state.mirsadLoading = true;
+    renderArticle();
+
+    try {
+      const response = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(article.id)}`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data?.status === 'completed' && data?.analytical_reading) {
+        state.mirsad = data;
+        state.mirsadLoading = false;
+        renderArticle();
+        return;
+      }
+
+      // Submit the full text through the server-side bridge, without exposing the Mirsad secret.
+      const raw = article.raw_payload && typeof article.raw_payload === 'object' ? article.raw_payload : {};
+      const longText = String(raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? article.summary ?? '').trim();
+
+      if (longText) {
+        const submit = await fetch(MIRSAD_API, {
+          method: 'POST',
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json' },
+          body: JSON.stringify({
+            article: {
+              external_id: article.id,
+              headline: article.headline,
+              content: longText,
+              source_name: article.source_name,
+              source_url: article.source_url,
+              category: article.category,
+              published_at: article.published_at
+            }
+          })
+        });
+        const queued = await submit.json().catch(() => ({}));
+        if (!submit.ok) throw new Error(queued?.error || 'تعذر إرسال الخبر إلى مِرصاد');
+      }
+
+      state.mirsad = { status:'processing', analytical_reading:null };
+      state.mirsadLoading = false;
+      renderArticle();
+
+      // Poll briefly so a newly queued article can appear without making the main page wait.
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 1800));
+        const poll = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(article.id)}`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
+          cache: 'no-store',
+        });
+        const result = await poll.json().catch(() => ({}));
+        if (poll.ok && result?.status === 'completed' && result?.analytical_reading) {
+          state.mirsad = result;
+          renderArticle();
+          return;
+        }
+      }
+    } catch (error) {
+      console.warn('[mirsad reader] analysis unavailable', error);
+      state.mirsad = { status:'unavailable', analytical_reading:null };
+      state.mirsadLoading = false;
+      renderArticle();
+    }
+  }
+
   async function loadArticle(id) {
     const params = new URLSearchParams({
-      select: 'id,source_name,source_url,agency_urls,headline,summary,category,importance_score,sentiment,update_count,source_count,confidence_score,published_at,created_at,updated_at,cluster_id,is_pending_verification,claim_digest',
-      id: `eq.${id}`,
-      is_pending_verification: 'eq.false',
-      limit: '1',
+      select:'id,source_name,source_url,agency_urls,headline,summary,category,importance_score,sentiment,update_count,source_count,confidence_score,published_at,created_at,updated_at,cluster_id,is_pending_verification,claim_digest,raw_payload',
+      id:`eq.${id}`,
+      is_pending_verification:'eq.false',
+      limit:'1',
     });
     const rows = await fetchJson(`${API}?${params.toString()}`);
     if (!rows.length) throw new Error('article_not_found');
@@ -240,18 +253,8 @@
       const rel = new URLSearchParams({ select:'id,source_name,headline,published_at,updated_at', cluster_id:`eq.${article.cluster_id}`, is_pending_verification:'eq.false', id:`neq.${article.id}`, order:'published_at.desc.nullslast,updated_at.desc.nullslast', limit:'8' });
       related = await fetchJson(`${API}?${rel.toString()}`);
     }
-    const revParams = new URLSearchParams({
-      select: 'id,article_id,revision_number,revision_type,source_name,source_url,headline,summary,published_at,captured_at,created_at',
-      article_id: `eq.${article.id}`,
-      order: 'revision_number.desc',
-      limit: '20',
-    });
-    try {
-      revisions = await fetchJson(`${REVISIONS_API}?${revParams.toString()}`);
-    } catch (error) {
-      console.warn('[mirsad reader] revisions unavailable', error);
-      revisions = [];
-    }
+    const revParams = new URLSearchParams({ select:'id,article_id,revision_number,revision_type,source_name,source_url,headline,summary,published_at,captured_at,created_at', article_id:`eq.${article.id}`, order:'revision_number.desc', limit:'20' });
+    try { revisions = await fetchJson(`${REVISIONS_API}?${revParams.toString()}`); } catch { revisions = []; }
     return { article, related, revisions };
   }
 
@@ -268,17 +271,14 @@
   async function authorizeArticleOpen(id) {
     const client = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
     if (!client) throw new Error('supabase_unavailable');
-    const { data, error } = await client.rpc('open_article', { p_article_id: id });
+    const { data, error } = await client.rpc('open_article', { p_article_id:id });
     if (error) throw error;
     const result = Array.isArray(data) ? data[0] : data;
     if (!result?.opened) {
       const remaining = Number(result?.remaining_unlocks ?? 0);
-      const message = remaining <= 0
-        ? 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.'
-        : 'تعذر فتح الخبر حاليًا.';
-      throw new Error(message);
+      throw new Error(remaining <= 0 ? 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.' : 'تعذر فتح الخبر حاليًا.');
     }
-    window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining: Number(result?.remaining_unlocks || 0), unlimited: Boolean(result?.unlimited) } }));
+    window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail:{ remaining:Number(result?.remaining_unlocks || 0), unlimited:Boolean(result?.unlimited) } }));
     if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('الخبر', Number(result?.charged_amount || 1));
     return result;
   }
@@ -293,12 +293,14 @@
       state.related = related;
       state.revisions = revisions.sort((a,b) => Number(a.revision_number) - Number(b.revision_number));
       state.selectedRevision = state.revisions.length ? state.revisions.length - 1 : 0;
+      state.mirsad = null;
+      state.mirsadLoading = true;
       renderArticle();
       body.scrollTop = 0;
+      void loadMirsadAnalysis(article);
     } catch (error) {
       console.error('[mirsad reader] load failed', error);
-      const message = error?.message || 'تعذر تحميل تفاصيل الخبر. حاول مرة أخرى.';
-      content.innerHTML = `<div class="mirsad-reader__error">${escapeHtml(message)}</div>`;
+      content.innerHTML = `<div class="mirsad-reader__error">${escapeHtml(error?.message || 'تعذر تحميل تفاصيل الخبر. حاول مرة أخرى.')}</div>`;
       sourceBtn.hidden = true;
     }
   }
@@ -335,6 +337,8 @@
     state.related = [];
     state.revisions = [];
     state.selectedRevision = 0;
+    state.mirsad = null;
+    state.mirsadLoading = false;
     backdrop.hidden = true;
     document.body.classList.remove('mirsad-reader-open');
     if (state.returnFocus && typeof state.returnFocus.focus === 'function') state.returnFocus.focus();
