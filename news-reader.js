@@ -366,27 +366,36 @@
     wireRevisions();
   }
 
+  const articleOpenInFlight = new Map();
+
   async function authorizeArticleOpen(id) {
+    if (articleOpenInFlight.has(id)) return articleOpenInFlight.get(id);
     const client = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
     if (!client) throw new Error('supabase_unavailable');
-    const { data, error } = await client.rpc('open_article', { p_article_id:id });
-    if (error) throw error;
-    const result = Array.isArray(data) ? data[0] : data;
-    if (!result?.opened) {
-      const remaining = Number(result?.remaining_unlocks ?? 0);
-      throw new Error(remaining <= 0 ? 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.' : 'تعذر فتح الخبر حاليًا.');
-    }
-    window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail:{ remaining:Number(result?.remaining_unlocks || 0), unlimited:Boolean(result?.unlimited) } }));
-    if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('الخبر', Number(result?.charged_amount || 1));
-    return result;
+    const request = (async () => {
+      const { data, error } = await client.rpc('open_article', { p_article_id:id });
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result?.opened) {
+        const remaining = Number(result?.remaining_unlocks ?? 0);
+        throw new Error(remaining <= 0 ? 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.' : 'تعذر فتح الخبر حاليًا.');
+      }
+      window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail:{ remaining:Number(result?.remaining_unlocks || 0), unlimited:Boolean(result?.unlimited) } }));
+      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('الخبر', Number(result?.charged_amount || 1));
+      return result;
+    })();
+    articleOpenInFlight.set(id, request);
+    try { return await request; } finally { articleOpenInFlight.delete(id); }
   }
 
   async function showArticle(id) {
     body.scrollTop = 0;
     renderLoading();
     try {
+      // Load first: a failed/invalid article request must never consume a slot.
+      const loaded = await loadArticle(id);
       await authorizeArticleOpen(id);
-      const { article, related, revisions } = await loadArticle(id);
+      const { article, related, revisions } = loaded;
       state.article = article;
       state.related = related;
       state.revisions = revisions.sort((a,b) => new Date(a.captured_at || 0) - new Date(b.captured_at || 0) || Number(a.revision_number) - Number(b.revision_number));
