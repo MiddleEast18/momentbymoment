@@ -10,17 +10,9 @@
   const CATEGORY_COLORS = { Politics:'#8b7bc7', Economy:'#c9a227', Tech:'#4f9dde', Society:'#b8794a', Sports:'#4fa8a0' };
   const state = { open:false, article:null, related:[], revisions:[], selectedRevision:0, returnFocus:null, mirsad:null, mirsadLoading:false };
 
-  const text = (value) => String(value ?? '').trim();
-  const stripHtml = (value) => {
-    const box = document.createElement('div');
-    box.innerHTML = String(value || '');
-    return (box.textContent || box.innerText || '').replace(/\s+\n/g, '\n').replace(/\n\s+/g, '\n').trim();
-  };
-  const escapeHtml = (value) => {
-    const div = document.createElement('div');
-    div.textContent = String(value ?? '');
-    return div.innerHTML;
-  };
+  const text = (value) => MirsadText.normalize(value);
+  const stripHtml = (value) => MirsadText.normalize(value);
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
   const formatTime = (value) => {
     const t = new Date(value || 0).getTime();
     if (!Number.isFinite(t) || t <= 0) return 'وقت غير محدد';
@@ -87,7 +79,7 @@
               <h3 id="mirsadAnalysisTitle">القراءة التحليلية</h3>
             </div>
           </div>
-          <p class="mirsad-analysis__claim">${escapeHtml(state.mirsad.analytical_reading)}</p>
+          <p class="mirsad-analysis__claim">${escapeHtml(MirsadText.normalize(state.mirsad.analytical_reading))}</p>
         </section>`;
     }
     const analysisPending = state.mirsadLoading || ['queued', 'processing', 'pending'].includes(state.mirsad?.status);
@@ -138,8 +130,8 @@
         <div class="mirsad-reader__related">
           ${related.map((item) => `
             <button type="button" class="mirsad-related-item" data-related-id="${escapeHtml(item.id)}">
-              ${escapeHtml(text(item.headline) || 'خبر مرتبط')}
-              <small>${escapeHtml(text(item.source_name) || 'مصدر')} · ${escapeHtml(relative(item.published_at))}</small>
+              ${escapeHtml(MirsadText.normalize(item.headline) || 'خبر مرتبط')}
+              <small>${escapeHtml(MirsadText.normalize(item.source_name) || 'مصدر')} · ${escapeHtml(relative(item.published_at))}</small>
             </button>`).join('')}
         </div>
       </section>` : '';

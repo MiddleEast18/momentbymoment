@@ -11,7 +11,7 @@
   if (!rail || !list || !badge || !toggle || !more || !all || !window.supabase?.createClient) return;
   const sb = window.supabase.createClient(CONFIG.url, CONFIG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const cleanRichText = (value) => { const source = String(value || ''); const doc = new DOMParser().parseFromString(`<div>${source}</div>`, 'text/html'); doc.querySelectorAll('br').forEach((node) => node.replaceWith('\n')); doc.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6').forEach((node) => node.append('\n')); return (doc.body.textContent || '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(); };
+  const cleanRichText = (value) => MirsadText.normalize(value);
   const relative = (value) => { const time = new Date(value || 0).getTime(); if (!Number.isFinite(time)) return ''; const mins = Math.round((time - Date.now()) / 60000); const formatter = new Intl.RelativeTimeFormat('ar', { numeric: 'auto' }); return Math.abs(mins) < 60 ? formatter.format(mins, 'minute') : formatter.format(Math.round(mins / 60), 'hour'); };
   let opened = false;
   let currentUser = false;
@@ -36,35 +36,5 @@
   sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });
   window.addEventListener('pagehide', () => { if (timer) clearInterval(timer); if (channel) sb.removeChannel(channel); });
   
-  // Decode HTML entities that arrived as literal text in syndicated headlines/summaries.
-  // This is display-only; stored data and ingestion remain unchanged.
-  const displaySelectors = '.card__headline, .card__summary, .card__evidence, .card__source, .ticker-strip__item';
-  const decodeDisplayText = (value) => {
-    const source = String(value ?? '');
-    if (!source.includes('&')) return source;
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = source;
-    return textarea.value;
-  };
-  const fixDisplayEntities = (root = document) => {
-    if (root instanceof Element && root.matches(displaySelectors)) {
-      const current = root.textContent;
-      const decoded = decodeDisplayText(current);
-      if (decoded !== current) root.textContent = decoded;
-    }
-    root.querySelectorAll?.(displaySelectors).forEach((element) => {
-      const current = element.textContent;
-      const decoded = decodeDisplayText(current);
-      if (decoded !== current) element.textContent = decoded;
-    });
-  };
-  fixDisplayEntities();
-  new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'characterData') fixDisplayEntities(mutation.target.parentElement);
-      else mutation.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) fixDisplayEntities(node); });
-    }
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
-
   void start();
 })();

@@ -10,11 +10,7 @@
   let snapshot = null;
   let applying = false;
 
-  const stripHtml = (value) => {
-    const box = document.createElement('div');
-    box.innerHTML = String(value || '');
-    return (box.textContent || box.innerText || '').replace(/\s+/g, ' ').trim();
-  };
+  const stripHtml = (value) => MirsadText.normalize(value).replace(/\s*\n\s*/g, ' ').trim();
 
   const relative = (value) => {
     const time = new Date(value || 0).getTime();
@@ -103,11 +99,11 @@
     const title = content.querySelector('.mirsad-reader__title');
     const summary = content.querySelector('.mirsad-reader__summary');
     const meta = content.querySelector('.mirsad-reader__meta');
-    if (title) title.textContent = String(data.headline || 'خبر دون عنوان');
+    if (title) title.textContent = MirsadText.normalize(data.headline) || 'خبر دون عنوان';
     if (summary) summary.textContent = stripHtml(data.summary) || 'لا يتوفر ملخص لهذا الخبر.';
     if (meta) {
       const parts = [...meta.children];
-      if (parts[3]) parts[3].textContent = data.source_name || 'مصدر';
+      if (parts[3]) parts[3].textContent = MirsadText.normalize(data.source_name) || 'مصدر';
       if (parts[5]) parts[5].textContent = relative(data.published_at);
     }
     const sourceBtn = document.querySelector('.mirsad-reader__source');

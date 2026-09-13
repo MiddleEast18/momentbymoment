@@ -29,17 +29,7 @@
     raf = 0;
   };
 
-  const normalize = (value) => String(value || '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, '')
-    .replace(/[أإآا]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ؤ/g, 'و')
-    .replace(/ئ/g, 'ي')
-    .replace(/ة/g, 'ه')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const normalize = (value) => MirsadText.search(value);
 
   const signature = (items) => items.map((item) => normalize(item.headline)).join('\u0001');
 
@@ -147,7 +137,7 @@
     const clean = [];
     const seen = new Set();
     for (const item of items) {
-      const headline = String(item?.headline || '').trim();
+      const headline = MirsadText.normalize(item?.headline || '');
       const key = normalize(headline);
       if (!key || seen.has(key)) continue;
       seen.add(key);
