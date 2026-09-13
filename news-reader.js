@@ -28,6 +28,13 @@
     if (Math.abs(hours) < 24) return rtf.format(hours, 'hour');
     return rtf.format(Math.round(hours / 24), 'day');
   };
+  const articleTime = (article) => {
+    if (article?.source_name === 'Al Riyadh') {
+      const t = new Date(article.published_at || 0).getTime();
+      return Number.isFinite(t) && t > 0 ? `تاريخ الإصدار: ${new Intl.DateTimeFormat('ar', { dateStyle:'medium' }).format(new Date(t))}` : 'تاريخ الإصدار غير محدد';
+    }
+    return relative(article?.published_at);
+  };
   const safeUrl = (value) => {
     try {
       const url = new URL(value || '', window.location.href);
@@ -182,7 +189,7 @@
           ${related.map((item) => `
             <button type="button" class="mirsad-related-item" data-related-id="${escapeHtml(item.id)}">
               ${escapeHtml(MirsadText.normalize(item.headline) || 'خبر مرتبط')}
-              <small>${escapeHtml(MirsadText.normalize(item.source_name) || 'مصدر')} · ${escapeHtml(relative(item.published_at))}</small>
+              <small>${escapeHtml(MirsadText.normalize(item.source_name) || 'مصدر')} · ${escapeHtml(articleTime(item))}</small>
             </button>`).join('')}
         </div>
       </section>` : '';
@@ -190,7 +197,7 @@
     return `
       <div class="mirsad-reader__meta">
         <span class="mirsad-reader__dot" style="background:${escapeHtml(dot)}"></span>
-        <span>${escapeHtml(category)}</span><span>·</span><span>${escapeHtml(source)}</span><span>·</span><span>${escapeHtml(relative(display.published_at))}</span>
+        <span>${escapeHtml(category)}</span><span>·</span><span>${escapeHtml(source)}</span><span>·</span><span>${escapeHtml(articleTime(display))}</span>
       </div>
       <h2 id="mirsadReaderTitle" class="mirsad-reader__title">${escapeHtml(title)}</h2>
       <p class="mirsad-reader__summary">${escapeHtml(summary || 'لا يتوفر ملخص لهذا الخبر.')}</p>
