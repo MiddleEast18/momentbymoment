@@ -43,7 +43,7 @@ const confidence = (trust: number, text: string) => Math.max(0, Math.min(100, tr
 const sentiment = (s: string) => s.includes("حرب") || s.includes("هجوم") || s.includes("قتلى") || s.includes("أزمة") || s.includes("انفجار") ? "Negative" : s.includes("اتفاق") || s.includes("فوز") || s.includes("نمو") ? "Positive" : "Neutral";
 const canonicalUrl = (raw: string) => { try { const u = new URL(decode(raw)); for (const k of [...u.searchParams.keys()]) if (/^(utm_|at_|fbclid|gclid|ref$|source$|maca|ocid|ns_|ito|cmpid|ncid)/i.test(k)) u.searchParams.delete(k); u.hash = ""; return u.toString(); } catch { return raw.trim(); } };
 const publishedAt = (item: string) => { for (const tag of ["pubDate", "published", "updated", "dc:date"]) { const v = field(item, tag); if (!v) continue; const d = new Date(v); if (Number.isFinite(d.getTime())) return d.toISOString(); const m = v.match(/(?:،\s*)?(\d{1,2})\s+(يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|سبتمبر|أكتوبر|نوفمبر|ديسمبر)\s+(\d{4})\s+(\d{1,2}):(\d{2})\s+(ص|م)/); if (m) { const months: Record<string, number> = { يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, مايو: 5, يونيو: 6, يوليو: 7, أغسطس: 8, سبتمبر: 9, أكتوبر: 10, نوفمبر: 11, ديسمبر: 12 }; let hour = Number(m[4]) % 12; if (m[6] === "م") hour += 12; const parsed = new Date(`${m[3]}-${String(months[m[2]]).padStart(2, "0")}-${m[1].padStart(2, "0")}T${String(hour).padStart(2, "0")}:${m[5]}:00+03:00`); if (Number.isFinite(parsed.getTime())) return parsed.toISOString(); } } return new Date().toISOString(); };
-const rawPayload = (sourceKey: string, item: string, title: string, link: string, summary: string) => ({ source_key: sourceKey, title, link, description: summary, published: field(item, "pubDate") || field(item, "published") || field(item, "updated") || field(item, "dc:date") || null, author: field(item, "author") || field(item, "dc:creator") || null, category: field(item, "category") || null, guid: field(item, "guid") || null });
+const rawPayload = (sourceKey: string, item: string, title: string, link: string, summary: string, published: string) => ({ source_key: sourceKey, title, link, description: summary, published, author: field(item, "author") || field(item, "dc:creator") || null, category: field(item, "category") || null, guid: field(item, "guid") || null });
 const itemKey = (item: string, link: string) => field(item, "guid") || link;
 const feedHash = (text: string) => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
 
@@ -122,7 +122,8 @@ Deno.serve(async req => {
         const link = canonicalUrl(field(item, "link") || field(item, "guid"));
         if (!title || !link || !isArabic(title)) continue;
         const summary = field(item, "description") || field(item, "summary") || title;
-        observations.push({ source_key: source.source_key, item_key: itemKey(item, link), source_url: link, guid: field(item, "guid") || "", headline: title, summary, published_at: publishedAt(item) });
+        const incomingPublishedAt = publishedAt(item);
+        observations.push({ source_key: source.source_key, item_key: itemKey(item, link), source_url: link, guid: field(item, "guid") || "", headline: title, summary, published_at: incomingPublishedAt });
         seen++;
         sourceSeen++;
         const existingRow = known.get(link);
@@ -130,18 +131,19 @@ Deno.serve(async req => {
           const incomingSummary = field(item, "description") || field(item, "summary") || title;
           const normalized = (value: string) => value.replace(/\s+/g, " ").trim();
           const changed = normalized(title) !== normalized(existingRow.headline || "") ||
-            normalized(incomingSummary) !== normalized(existingRow.summary || "");
+            normalized(incomingSummary) !== normalized(existingRow.summary || "") ||
+            incomingPublishedAt !== existingRow.published_at;
           if (changed && existingRow.id) {
             const updated = await db.rpc("mirsad_apply_source_update", {
               p_article_id: existingRow.id,
               p_headline: title,
               p_summary: incomingSummary,
-              p_published_at: publishedAt(item),
+              p_published_at: incomingPublishedAt,
             });
             if (!updated.error) {
               existingRow.headline = title;
               existingRow.summary = incomingSummary;
-              existingRow.published_at = publishedAt(item);
+              existingRow.published_at = incomingPublishedAt;
               sourceUpdated++;
               continue;
             }
@@ -156,7 +158,7 @@ Deno.serve(async req => {
         const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
         if (match && match.score >= 0.66 && match.x.cluster_id) {
           const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
-          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: publishedAt(item) }); continue; }
+          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: incomingPublishedAt }); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
         }
         const row = {
@@ -166,7 +168,7 @@ Deno.serve(async req => {
           headline: title,
           summary,
           category,
-          importance_score: importance(all, publishedAt(item)),
+          importance_score: importance(all, incomingPublishedAt),
           sentiment: sentiment(all),
           cluster_id: crypto.randomUUID(),
           source_trust_score: Number(source.trust_weight),
@@ -176,8 +178,8 @@ Deno.serve(async req => {
           llm_model_used: "rss-rule-based-v5",
           ai_hints: { ingested_by: "mirsad-ingest", source_key: source.source_key, source_count: 1, source_diversity: 1, event_signature: signature(all), analysis_version: "event-v2" },
           claim_digest: { main_claim: title },
-          raw_payload: rawPayload(source.source_key, item, title, link, summary),
-          published_at: publishedAt(item),
+          raw_payload: rawPayload(source.source_key, item, title, link, summary, incomingPublishedAt),
+          published_at: incomingPublishedAt,
         };
         const result = await db.from("news_articles").insert(row);
         if (!result.error) { written++; sourceWritten++; known.set(link, { id: null, source_url: link, headline: title, summary, cluster_id: row.cluster_id, category, published_at: row.published_at }); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);

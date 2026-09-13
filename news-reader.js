@@ -28,13 +28,7 @@
     if (Math.abs(hours) < 24) return rtf.format(hours, 'hour');
     return rtf.format(Math.round(hours / 24), 'day');
   };
-  const articleTime = (article) => {
-    if (article?.source_name === 'Al Riyadh') {
-      const t = new Date(article.published_at || 0).getTime();
-      return Number.isFinite(t) && t > 0 ? `تاريخ الإصدار: ${new Intl.DateTimeFormat('ar', { dateStyle:'medium' }).format(new Date(t))}` : 'تاريخ الإصدار غير محدد';
-    }
-    return relative(article?.published_at);
-  };
+  const articleTime = (article) => relative(article?.published_at);
   const safeUrl = (value) => {
     try {
       const url = new URL(value || '', window.location.href);
