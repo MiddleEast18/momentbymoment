@@ -40,13 +40,6 @@
   z-index: 2;
 }
 
-/* Keep the importance indicator in its original upper-left position. */
-.card__importance {
-  top: 16px;
-  left: 16px;
-  right: auto;
-  z-index: 2;
-}
 
 @media (max-width: 700px) {
   .card__update-badge {
@@ -57,10 +50,5 @@
   .card__verification-badge {
     right: 12px;
     top: 47px;
-  }
-  .card__importance {
-    top: 16px;
-    left: 16px;
-    right: auto;
   }
 }

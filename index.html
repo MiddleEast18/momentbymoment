@@ -9,11 +9,11 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=202609112155">
+  <link rel="stylesheet" href="styles.css?v=202609132045">
   <link rel="stylesheet" href="logo.css?v=202609100020">
   <link rel="stylesheet" href="controls-fix.css?v=202609100035">
   <link rel="stylesheet" href="news-reader.css?v=202609130812">
-  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202609191110">
+  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202609132045">
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609120012">
   <link rel="stylesheet" href="auth.css?v=202609111110">
@@ -75,7 +75,7 @@
   <section class="insight-bar" id="insightBar" aria-label="ملخص الحالة"><div class="insight-pill"><span>الأحداث النشطة</span><strong id="insightClusterCount">0</strong></div><div class="insight-pill"><span>قيد التحقق</span><strong id="insightPendingCount">0</strong></div><div class="insight-pill"><span>متوسط الثقة</span><strong id="insightAvgConfidence">0%</strong></div><div class="insight-pill"><span>مصادر موثوقة</span><strong id="insightTrustedSources">0</strong></div></section>
   <main><section class="featured-rail-wrap"><div class="section-heading">الأبرز على الهاتف</div><div id="featuredRail" class="featured-rail" aria-label="الأخبار الأبرز"><div id="featuredLoader" class="featured-loader" role="status" aria-label="جارٍ تحميل الأخبار"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div></section><div class="news-grid" id="newsGrid" aria-live="polite" aria-relevant="additions"></div><p class="empty-state" id="emptyState" hidden>لا توجد أخبار في هذا التصنيف حاليًا.</p></main>
   <footer class="wire-footer"><p>مِرصاد — واجهة عرض للرصد الإخباري. الأخبار المعلقة للتحقق لا تظهر، وتبقى حقوق المواد الأصلية لأصحابها.</p><nav aria-label="روابط معلومات الموقع"><a href="about.html">من نحن</a><span>·</span><a href="contact.html">اتصل بنا</a><span>·</span><a href="news-24h.html">أخبار 24 ساعة</a><span>·</span><a href="privacy.html">سياسة الخصوصية</a><span>·</span><a href="terms.html">شروط الاستخدام</a></nav></footer>
-  <template id="cardTemplate"><article class="card" tabindex="0" role="button" aria-label="فتح الخبر"><div class="card__importance" aria-hidden="true"><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__bar"></span><span class="card__score"></span></div><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
+  <template id="cardTemplate"><article class="card" tabindex="0" role="button" aria-label="فتح الخبر"><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="news-text-normalizer.js?v=202609130721"></script>
   <script src="app.js?v=202609130721"></script>
