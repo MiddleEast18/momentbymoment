@@ -203,7 +203,6 @@
       content.querySelector('.mirsad-revisions')?.remove();
       const section = buildCompatSection();
       anchor.insertAdjacentElement('afterend', section);
-      setReaderText(snapshot.article);
     } finally {
       applying = false;
     }

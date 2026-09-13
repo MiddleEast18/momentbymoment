@@ -67,7 +67,7 @@
     if (!revisions.length) return { ...article, __isRevision:false, __revisionNumber:0, __capturedAt:article.updated_at || article.created_at };
     if (state.selectedRevision < 0) return { ...article, __isRevision:false, __revisionNumber:0, __capturedAt:article.updated_at || article.created_at };
     const revision = revisions[Math.min(state.selectedRevision, revisions.length - 1)];
-    return { ...article, headline:revision.headline, summary:revision.summary, source_name:revision.source_name || article.source_name, source_url:revision.source_url || article.source_url, published_at:revision.published_at || article.published_at, __isRevision:true, __revisionId:revision.id, __revisionNumber:revision.revision_number, __revisionType:revision.revision_type, __capturedAt:revision.captured_at };
+    return { ...article, headline:revision.headline || '', summary:revision.summary || '', source_name:revision.source_name || '', source_url:revision.source_url || '', published_at:revision.published_at || revision.captured_at || null, __isRevision:true, __revisionId:revision.id, __revisionNumber:revision.revision_number, __revisionType:revision.revision_type, __capturedAt:revision.captured_at };
   }
 
   const contentHash = (display) => {
@@ -318,8 +318,9 @@
     if (!state.article) return;
     content.innerHTML = articleMarkup(state.article, state.related, state.revisions);
     const display = activeDisplay(state.article, state.revisions);
-    sourceBtn.hidden = !display.source_url;
-    sourceBtn.href = safeUrl(display.source_url || (display.agency_urls || [])[0] || '');
+    const displaySourceUrl = display.__isRevision ? display.source_url : (display.source_url || (display.agency_urls || [])[0] || '');
+    sourceBtn.hidden = !displaySourceUrl;
+    sourceBtn.href = safeUrl(displaySourceUrl);
     wireRelated();
     wireRevisions();
   }
