@@ -35,5 +35,36 @@
   const start = async () => { await load(); const { data: { session } } = await sb.auth.getSession(); currentUser = Boolean(session?.user); await refreshUnread(); channel = sb.channel('mirsad-rapid-news-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rapid_news' }, () => { void load(); void refreshUnread(); }).subscribe(); timer = setInterval(async () => { await load(); await refreshUnread(); }, 60000); };
   sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });
   window.addEventListener('pagehide', () => { if (timer) clearInterval(timer); if (channel) sb.removeChannel(channel); });
+  
+  // Decode HTML entities that arrived as literal text in syndicated headlines/summaries.
+  // This is display-only; stored data and ingestion remain unchanged.
+  const displaySelectors = '.card__headline, .card__summary, .card__evidence, .card__source, .ticker-strip__item';
+  const decodeDisplayText = (value) => {
+    const source = String(value ?? '');
+    if (!source.includes('&')) return source;
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = source;
+    return textarea.value;
+  };
+  const fixDisplayEntities = (root = document) => {
+    if (root instanceof Element && root.matches(displaySelectors)) {
+      const current = root.textContent;
+      const decoded = decodeDisplayText(current);
+      if (decoded !== current) root.textContent = decoded;
+    }
+    root.querySelectorAll?.(displaySelectors).forEach((element) => {
+      const current = element.textContent;
+      const decoded = decodeDisplayText(current);
+      if (decoded !== current) element.textContent = decoded;
+    });
+  };
+  fixDisplayEntities();
+  new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'characterData') fixDisplayEntities(mutation.target.parentElement);
+      else mutation.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) fixDisplayEntities(node); });
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+
   void start();
 })();
