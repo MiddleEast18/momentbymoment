@@ -194,6 +194,7 @@
               external_id: article.id,
               headline: article.headline,
               content: longText,
+              summary: article.summary || longText,
               source_name: article.source_name,
               source_url: article.source_url,
               category: article.category,
@@ -209,7 +210,7 @@
       state.mirsadLoading = false;
       renderArticle();
 
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; attempt < 10; attempt++) {
         await new Promise(resolve => setTimeout(resolve, 1800));
         const poll = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(article.id)}`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
