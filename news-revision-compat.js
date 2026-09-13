@@ -11,6 +11,16 @@
   let applying = false;
 
   const stripHtml = (value) => MirsadText.normalize(value).replace(/\s*\n\s*/g, ' ').trim();
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[character]));
+  const changeText = (revision, previous) => {
+    const currentSummary = stripHtml(revision.summary);
+    if (!previous) return currentSummary || stripHtml(revision.headline);
+    const previousText = stripHtml(`${previous.headline} ${previous.summary}`);
+    const additions = currentSummary.split(/[.!؟]+\s*/).map((part) => part.trim()).filter((part) => part.length >= 18 && !previousText.includes(part));
+    if (additions.length) return additions.slice(0, 2).join('، ');
+    if (stripHtml(revision.headline) !== stripHtml(previous.headline)) return 'تغيّر عنوان الخبر في هذه النسخة.';
+    return '';
+  };
 
   const relative = (value) => {
     const time = new Date(value || 0).getTime();
@@ -62,7 +72,7 @@
     const revisionParams = new URLSearchParams({
       select: 'id,revision_number,revision_type,source_name,source_url,headline,summary,published_at,captured_at',
       article_id: `eq.${id}`,
-      order: 'revision_number.asc',
+      order: 'captured_at.asc,revision_number.asc',
       limit: '20',
     });
     const [articles, revisions] = await Promise.all([
@@ -114,29 +124,18 @@
   }
 
   function buildCompatSection() {
-    const article = snapshot.article;
     const revisions = snapshot.revisions;
-    const updates = savedUpdates(snapshot);
-    const declared = Math.max(0, Number(article.update_count) || 0);
-    const missing = Math.max(0, declared - updates.length);
     const section = document.createElement('section');
     section.className = 'mirsad-reader__section mirsad-revisions mirsad-revisions--compat';
     section.setAttribute('aria-labelledby', 'mirsadCompatRevisionsTitle');
 
-    const savedTabs = revisions.map((revision) => ({
-      kind: 'saved',
-      label: revision.revision_type === 'original' && Number(revision.revision_number) === 1
-        ? 'الأصل'
-        : `تحديث ${Math.max(1, Number(revision.revision_number || 1) - 1)}`,
-      time: revision.captured_at,
-    }));
-    const missingTabs = Array.from({ length: missing }, (_, index) => ({
-      kind: 'missing',
-      label: `تحديث ${updates.length + index + 1}`,
-      time: null,
-    }));
-    const currentTab = { kind: 'current', label: 'الحالي', time: article.updated_at };
-    const tabs = [...savedTabs, ...missingTabs, currentTab];
+    const hasOriginal = revisions.some((revision) => revision.revision_type === 'original');
+    const savedTimeline = revisions.map((revision, index) => ({
+      revision,
+      label: revision.revision_type === 'original' ? 'الأصل' : 'تحديث',
+      detail: changeText(revision, revisions[index - 1]),
+      hiddenBaseline: !hasOriginal && index === 0 && revision.revision_type !== 'original',
+    })).filter((item) => item.detail && !item.hiddenBaseline);
 
     section.innerHTML = `
       <div class="mirsad-revisions__header">
@@ -144,28 +143,16 @@
           <span class="mirsad-analysis__eyebrow">سجل الخبر</span>
           <h3 id="mirsadCompatRevisionsTitle">الأصل والتحديثات</h3>
         </div>
-        <span class="mirsad-revisions__count">${declared} تحديث</span>
+        <span class="mirsad-revisions__count">سجل محفوظ</span>
       </div>
-      <div class="mirsad-revisions__notice">
-        <strong>${missing ? `${missing} تحديثات سابقة غير محفوظة` : 'سجل الخبر مكتمل'}</strong>
-        ${missing ? '<span>نعرض النسخ المحفوظة فقط، والنسخة الحالية دون اختلاق محتوى تاريخي غير متاح.</span>' : ''}
+      <div class="mirsad-revisions__timeline" aria-label="التسلسل الزمني للخبر">
+        ${savedTimeline.map((item, index) => `
+          <div class="mirsad-revision-event${item.label === 'الأصل' ? ' is-original' : ''}">
+            <span class="mirsad-revision-event__marker" aria-hidden="true"></span>
+            <span class="mirsad-revision-event__body"><strong>${escapeHtml(item.label)}</strong><time datetime="${escapeHtml(item.revision.captured_at || '')}">${escapeHtml(relative(item.revision.captured_at))}</time><span>${escapeHtml(item.detail)}</span></span>
+          </div>${index < savedTimeline.length - 1 ? '<span class="mirsad-revision-event__line" aria-hidden="true"></span>' : ''}`).join('')}
       </div>
-      <div class="mirsad-revisions__tabs" role="tablist" aria-label="نسخ الخبر">
-        ${tabs.map((tab, index) => `
-          <button type="button"
-            class="mirsad-revision-tab${tab.kind === 'current' ? ' is-active' : ''}${tab.kind === 'missing' ? ' is-unavailable' : ''}"
-            data-compat-revision-index="${index}"
-            role="tab"
-            aria-selected="${tab.kind === 'current'}"
-            ${tab.kind === 'missing' ? 'disabled aria-disabled="true"' : ''}>
-            <span>${tab.label}</span>
-            <small>${tab.time ? relative(tab.time) : 'غير محفوظ'}</small>
-          </button>`).join('')}
-      </div>
-      <div class="mirsad-revisions__active">
-        <span>الحالي</span>
-        <time datetime="${article.updated_at || ''}">${formatTime(article.updated_at)}</time>
-      </div>`;
+      <p class="mirsad-revisions__note">نعرض النصوص المحفوظة فقط؛ لا تتوفر تفاصيل نصية موثوقة لبعض التحديثات السابقة.</p>`;
 
     return section;
   }
@@ -217,7 +204,6 @@
       const section = buildCompatSection();
       anchor.insertAdjacentElement('afterend', section);
       setReaderText(snapshot.article);
-      wireCompat(section);
     } finally {
       applying = false;
     }

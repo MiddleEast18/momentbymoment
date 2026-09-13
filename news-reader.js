@@ -98,7 +98,36 @@
   }
 
   function revisionLabel(revision) {
-    return revision.revision_type === 'original' && revision.revision_number === 1 ? 'الأصل' : `تحديث ${Math.max(1, Number(revision.revision_number || 1) - 1)}`;
+    return revision.revision_type === 'original' && Number(revision.revision_number) === 1 ? 'الأصل' : 'تحديث';
+  }
+
+  function revisionSentences(value) {
+    return MirsadText.normalize(value).split(/[.!؟。]+\s*/).map((part) => part.trim()).filter((part) => part.length >= 18);
+  }
+
+  function revisionChange(current, previous) {
+    if (!previous) return MirsadText.normalize(current.summary) || MirsadText.normalize(current.headline) || '';
+    const previousText = MirsadText.normalize(`${previous.headline} ${previous.summary}`);
+    const additions = revisionSentences(current.summary).filter((sentence) => !previousText.includes(sentence));
+    if (additions.length) return additions.slice(0, 2).join('، ');
+    if (MirsadText.normalize(current.headline) !== MirsadText.normalize(previous.headline)) return 'تغيّر عنوان الخبر في هذه النسخة.';
+    return '';
+  }
+
+  function revisionTimeline(revisions, article) {
+    const items = [];
+    const hasOriginal = revisions.some((revision) => revision.revision_type === 'original');
+    revisions.forEach((revision, index) => {
+      if (!hasOriginal && revision.revision_type !== 'original' && index === 0) return;
+      const previous = revisions[index - 1];
+      const detail = revisionChange(revision, previous);
+      if (!detail) return;
+      items.push({ revision, label: revision.revision_type === 'original' ? 'الأصل' : 'تحديث', detail, current: false });
+    });
+    const latest = revisions[revisions.length - 1];
+    const currentDetail = latest ? revisionChange(article, latest) : '';
+    if (currentDetail) items.push({ revision: article, label: 'الأحدث', detail: currentDetail, current: true });
+    return items;
   }
 
   function articleMarkup(article, related, revisions) {
@@ -109,19 +138,20 @@
     const summary = stripHtml(display.summary);
     const source = text(display.source_name) || 'مصدر';
 
-    const revisionMarkup = revisions.length > 1 ? `
+    const timeline = revisionTimeline(revisions, article);
+    const revisionMarkup = timeline.length ? `
       <section class="mirsad-reader__section mirsad-revisions" aria-labelledby="mirsadRevisionsTitle">
         <div class="mirsad-revisions__header">
           <div><span class="mirsad-analysis__eyebrow">سجل الخبر</span><h3 id="mirsadRevisionsTitle">الأصل والتحديثات</h3></div>
-          <span class="mirsad-revisions__count">${revisions.length - 1} تحديث</span>
+          <span class="mirsad-revisions__count">تطور الخبر</span>
         </div>
-        <div class="mirsad-revisions__tabs" role="tablist" aria-label="نسخ الخبر">
-          ${revisions.map((revision, index) => `
-            <button type="button" class="mirsad-revision-tab${index === state.selectedRevision ? ' is-active' : ''}" data-revision-index="${index}" role="tab" aria-selected="${index === state.selectedRevision}">
-              <span>${escapeHtml(revisionLabel(revision))}</span><small>${escapeHtml(relative(revision.captured_at))}</small>
-            </button>`).join('')}
+        <div class="mirsad-revisions__timeline" aria-label="التسلسل الزمني للخبر">
+          ${timeline.map((item, index) => `
+            <button type="button" class="mirsad-revision-event${item.label === 'الأصل' ? ' is-original' : ''}${item.label === 'الأحدث' ? ' is-latest' : ''}" data-revision-index="${revisions.indexOf(item.revision)}" aria-label="${escapeHtml(item.label)}">
+              <span class="mirsad-revision-event__marker" aria-hidden="true"></span>
+              <span class="mirsad-revision-event__body"><strong>${escapeHtml(item.label)}</strong><time datetime="${escapeHtml(item.revision.captured_at || item.revision.updated_at || '')}">${escapeHtml(relative(item.revision.captured_at || item.revision.updated_at))}</time><span>${escapeHtml(item.detail)}</span></span>
+            </button>${index < timeline.length - 1 ? '<span class="mirsad-revision-event__line" aria-hidden="true"></span>' : ''}`).join('')}
         </div>
-        <div class="mirsad-revisions__active"><span>${escapeHtml(revisions[state.selectedRevision] ? revisionLabel(revisions[state.selectedRevision]) : 'النسخة الحالية')}</span><time datetime="${escapeHtml(revisions[state.selectedRevision]?.captured_at || '')}">${escapeHtml(formatTime(revisions[state.selectedRevision]?.captured_at || display.__capturedAt))}</time></div>
       </section>` : '';
 
     const relatedMarkup = related.length ? `
@@ -282,7 +312,7 @@
       const { article, related, revisions } = await loadArticle(id);
       state.article = article;
       state.related = related;
-      state.revisions = revisions.sort((a,b) => Number(a.revision_number) - Number(b.revision_number));
+      state.revisions = revisions.sort((a,b) => new Date(a.captured_at || 0) - new Date(b.captured_at || 0) || Number(a.revision_number) - Number(b.revision_number));
       state.selectedRevision = state.revisions.length ? state.revisions.length - 1 : 0;
       state.mirsad = null;
       state.mirsadLoading = true;
