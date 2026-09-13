@@ -34,7 +34,54 @@ Deno.serve(async (req: Request) => {
         { headers: { accept:"application/json", authorization:"Bearer " + MIRSAD_API_KEY } }
       );
       const result = await response.json().catch(() => ({}));
-      return json(result, response.ok ? 200 : 502);
+
+      if (response.ok && result?.status === "completed" && result?.analytical_reading) {
+        return json(result);
+      }
+
+      const { data: article, error: articleError } = await db
+        .from("news_articles")
+        .select("id,headline,summary,source_name,source_url,category,published_at,raw_payload")
+        .eq("id", externalId)
+        .maybeSingle();
+
+      if (articleError) throw articleError;
+      if (!article) return json(result, response.ok ? 200 : 502);
+
+      const raw = article.raw_payload && typeof article.raw_payload === "object" ? article.raw_payload : {};
+      const suppliedText = String(
+        raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? ""
+      ).trim();
+
+      // Do not modify the main article ingestion record. Pass the existing URL and
+      // a short fallback; Mirsad will fetch the long article text server-side.
+      const content = suppliedText.length >= 120
+        ? suppliedText
+        : String(article.summary ?? "").trim();
+
+      if (!content && !article.source_url) {
+        return json({ ok:true, status:"unavailable", external_id:externalId });
+      }
+
+      const submit = await fetch(MIRSAD_API_URL, {
+        method:"POST",
+        headers:{
+          "content-type":"application/json",
+          authorization:"Bearer " + MIRSAD_API_KEY
+        },
+        body:JSON.stringify({
+          external_id:externalId,
+          headline:String(article.headline ?? "").trim(),
+          content,
+          source_name:String(article.source_name ?? "").trim(),
+          source_url:String(article.source_url ?? "").trim(),
+          category:article.category ?? null,
+          published_at:article.published_at ?? null
+        })
+      });
+
+      const queued = await submit.json().catch(() => ({}));
+      return json(queued, submit.ok ? 200 : 502);
     }
 
     const body = await req.json();
