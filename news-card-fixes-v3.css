@@ -20,7 +20,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Use a fixed three-line viewport so the reveal/blur remains consistent across cards. */
+/* Keep the first summary line clear, then mask later wrapped lines into the card background. */
 .card__summary {
   position: relative;
   height: 4.95em;
@@ -30,12 +30,15 @@
 .card__summary::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: 1.65em 0 0;
+  z-index: 1;
   pointer-events: none;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.12) 16%, rgba(0,0,0,.42) 34%, rgba(0,0,0,.86) 62%, #000 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.12) 16%, rgba(0,0,0,.42) 34%, rgba(0,0,0,.86) 62%, #000 100%);
+  background: linear-gradient(
+    to bottom,
+    rgba(20, 27, 36, 0) 0%,
+    var(--panel) 18%,
+    var(--panel) 100%
+  );
 }
 
 /* The owner/developer account has unlimited access and sees the complete summary. */
