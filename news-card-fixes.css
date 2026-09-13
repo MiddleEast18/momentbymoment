@@ -29,10 +29,15 @@
   position: absolute;
   inset: 1.65em 0 0;
   pointer-events: none;
-  backdrop-filter: blur(2.5px);
-  -webkit-backdrop-filter: blur(2.5px);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.35) 22%, #000 72%);
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.35) 22%, #000 72%);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.30) 18%, rgba(0,0,0,.78) 48%, #000 76%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.30) 18%, rgba(0,0,0,.78) 48%, #000 76%);
+}
+
+/* The owner/developer account has unlimited access and sees the complete summary. */
+body.mirsad-admin-view .card__summary::after {
+  display: none;
 }
 
 /* Update badge: centered on the card's upper edge, half inside / half outside. */

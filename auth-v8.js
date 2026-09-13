@@ -193,6 +193,7 @@
 
   function showUserMenu(user,profile=null,unlockAccount=null){
     document.getElementById('mirsadUserMenu')?.remove();
+    document.body.classList.toggle('mirsad-admin-view',Boolean(unlockAccount?.unlimited_unlocks));
     const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
     const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
     const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
@@ -201,7 +202,7 @@
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
     btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
-    wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.add('mirsad-auth-required');showGate()});
+    wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.remove('mirsad-admin-view');document.body.classList.add('mirsad-auth-required');showGate()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
   window.addEventListener('mirsad:unlock-balance',event=>{const el=document.querySelector('#mirsadUserMenu .mirsad-user-balance');if(!el)return;const detail=event.detail||{};el.textContent=detail.unlimited?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Math.max(0,Number(detail.remaining)||0)}`;});
