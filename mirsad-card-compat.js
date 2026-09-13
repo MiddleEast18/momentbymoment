@@ -10,9 +10,15 @@
     </div>`;
 
   function addNotice(card) {
-    if (!card || card.querySelector('.mirsad-analysis__notice')) return;
+    if (!card) return;
     const claim = card.querySelector('.mirsad-analysis__claim');
     if (!claim) return;
+    const existingNotice = card.querySelector('.mirsad-analysis__notice');
+    if (claim.classList.contains('mirsad-analysis__loading')) {
+      existingNotice?.remove();
+      return;
+    }
+    if (existingNotice) return;
     claim.insertAdjacentHTML('afterend', noticeMarkup);
   }
 
