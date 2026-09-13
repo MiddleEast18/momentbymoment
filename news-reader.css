@@ -35,6 +35,9 @@
 .mirsad-analysis__point { min-width:0; padding:10px 11px; border:1px solid var(--panel-border); border-radius:9px; background:rgba(255,255,255,.018); }
 .mirsad-analysis__point strong { display:block; margin-bottom:4px; color:var(--text-faint); font:600 10.5px/1.4 var(--font-mono); }
 .mirsad-analysis__point span { display:block; color:var(--text-dim); font-size:11.5px; line-height:1.65; }
+.mirsad-analysis__notice { display:flex; align-items:flex-start; gap:9px; margin-top:2px; padding-top:11px; border-top:1px solid rgba(201,162,39,.18); color:var(--text-faint); font:11px/1.75 var(--font-mono); }
+.mirsad-analysis__ai-icon { display:inline-flex; flex:0 0 auto; width:21px; height:21px; align-items:center; justify-content:center; color:var(--gold); }
+.mirsad-analysis__ai-icon svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.7; filter:drop-shadow(0 0 5px rgba(201,162,39,.22)); }
 .mirsad-revisions { margin:18px 0 8px; padding:14px; border:1px solid var(--panel-border); border-radius:14px; background:rgba(255,255,255,.018); }
 .mirsad-revisions__header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
 .mirsad-revisions__header h3 { margin:0; color:var(--text); font-family:var(--font-display); font-size:16px; font-weight:600; }

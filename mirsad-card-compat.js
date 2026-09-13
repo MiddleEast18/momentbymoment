@@ -45,9 +45,6 @@
       console.warn('[mirsad card compat] metadata unavailable', error);
     }
 
-    const sources = Math.max(1, Number(article?.source_count) || 1);
-    const updates = Math.max(0, Number(article?.update_count) || 0);
-
     card.innerHTML = `
       <div class="mirsad-analysis__header">
         <div>
@@ -56,9 +53,11 @@
         </div>
       </div>
       <p class="mirsad-analysis__claim">${escapeHtml(claim)}</p>
-      <div class="mirsad-analysis__points">
-        <div class="mirsad-analysis__point"><strong>عدد المصادر</strong><span>${sources}</span></div>
-        <div class="mirsad-analysis__point"><strong>التحديثات</strong><span>${updates}</span></div>
+      <div class="mirsad-analysis__notice" role="note">
+        <span class="mirsad-analysis__ai-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" focusable="false"><path d="M16 3.5l2.25 7.1a4.5 4.5 0 0 0 3.15 3.15L28.5 16l-7.1 2.25a4.5 4.5 0 0 0-3.15 3.15L16 28.5l-2.25-7.1a4.5 4.5 0 0 0-3.15-3.15L3.5 16l7.1-2.25a4.5 4.5 0 0 0 3.15-3.15L16 3.5Z"/><path d="M25.5 4.5v5M23 7h5M7 23v4M5 25h4"/></svg>
+        </span>
+        <span>هذا الملخص أُعدّ بواسطة الذكاء الاصطناعي. لتفاصيل أدق، يُرجى الانتقال إلى المصدر الأصلي.</span>
       </div>`;
     pending = false;
   }
