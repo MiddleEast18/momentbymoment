@@ -20,7 +20,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Keep the first summary line clear, then mask later wrapped lines into the card background. */
+/* Keep the first summary line clear, then replace later lines with an in-card skeleton preview. */
 .card__summary {
   position: relative;
   height: 4.95em;
@@ -33,12 +33,15 @@
   inset: 1.65em 0 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    var(--panel) 12%,
-    var(--panel) 100%
-  );
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--panel), white 4%) 0%, color-mix(in srgb, var(--panel), white 6%) 50%, color-mix(in srgb, var(--panel), white 4%) 68%, transparent 68%),
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--panel), white 4%) 0%, color-mix(in srgb, var(--panel), white 6%) 50%, color-mix(in srgb, var(--panel), white 4%) 88%, transparent 88%),
+    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--panel), white 4%) 0%, color-mix(in srgb, var(--panel), white 6%) 23%, color-mix(in srgb, var(--panel), white 4%) 46%, transparent 46%),
+    linear-gradient(var(--panel), var(--panel));
+  background-repeat: no-repeat;
+  background-size: 100% .48em, 100% .48em, 100% .48em, 100% 100%;
+  background-position: 0 .14em, 0 1.05em, 0 1.96em, 0 0;
 }
 
 /* The owner/developer account has unlimited access and sees the complete summary. */
