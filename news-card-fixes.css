@@ -20,6 +20,21 @@
   overflow-wrap: anywhere;
 }
 
+/* Keep the opening line readable while softly obscuring the remaining summary lines. */
+.card__summary {
+  position: relative;
+}
+.card__summary::after {
+  content: '';
+  position: absolute;
+  inset: 1.65em 0 0;
+  pointer-events: none;
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.35) 22%, #000 72%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,.35) 22%, #000 72%);
+}
+
 /* Update badge: centered on the card's upper edge, half inside / half outside. */
 .card__update-badge {
   left: 12px;
