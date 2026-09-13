@@ -213,6 +213,7 @@
     if (!article?.id) return;
     const requestId = ++state.mirsadRequest;
     const externalId = analysisKey(display) || article.id;
+    let activeExternalId = externalId;
     const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     state.mirsad = null;
     state.mirsadLoading = true;
@@ -220,7 +221,7 @@
 
     const stillCurrent = () => requestId === state.mirsadRequest;
     const readStatus = async () => {
-      const response = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(externalId)}`, { headers, cache: 'no-store' });
+      const response = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(activeExternalId)}`, { headers, cache: 'no-store' });
       const result = await response.json().catch(() => ({}));
       return { response, result };
     };
@@ -280,6 +281,37 @@
           }
         } catch (pollError) {
           console.warn('[mirsad reader] transient polling error; keeping analysis pending', pollError);
+        }
+      }
+      // A stale job can remain processing forever. Retry once with a fresh queue key,
+      // preserving the same article content and avoiding article-specific exceptions.
+      if (stillCurrent() && longText && ['queued', 'processing', 'pending'].includes(submissionStatus)) {
+        activeExternalId = `${externalId}:retry:${Date.now()}`;
+        const retry = await fetch(MIRSAD_API, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type':'application/json' },
+          body: JSON.stringify({ article: { external_id: activeExternalId, headline: display.headline, content: longText, summary: display.summary || longText, source_name: display.source_name, source_url: display.source_url, category: article.category, published_at: display.published_at } })
+        });
+        const retryResult = await retry.json().catch(() => ({}));
+        if (retry.ok) {
+          state.mirsad = { status: retryResult?.status || 'queued', analytical_reading:null };
+          renderArticle();
+          const retryDeadline = Date.now() + 120000;
+          while (Date.now() < retryDeadline) {
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            if (!stillCurrent()) return;
+            try {
+              const poll = await readStatus();
+              if (poll.response.ok && poll.result?.status === 'completed' && poll.result?.analytical_reading) {
+                state.mirsad = poll.result;
+                renderArticle();
+                return;
+              }
+              if (poll.result?.status === 'failed' || poll.result?.status === 'error') break;
+            } catch (retryPollError) {
+              console.warn('[mirsad reader] transient retry polling error; keeping analysis pending', retryPollError);
+            }
+          }
         }
       }
       // Do not convert a still-running job into "unavailable"; a later open/reload can retrieve it.
