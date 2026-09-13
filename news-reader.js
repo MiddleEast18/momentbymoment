@@ -189,27 +189,25 @@
 
       // Submit the full text through the server-side bridge, without exposing the Mirsad secret.
       const raw = article.raw_payload && typeof article.raw_payload === 'object' ? article.raw_payload : {};
-      const longText = String(raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? article.summary ?? '').trim();
+      const longText = String(raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? '').trim();
 
-      if (longText) {
-        const submit = await fetch(MIRSAD_API, {
-          method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json' },
-          body: JSON.stringify({
-            article: {
-              external_id: article.id,
-              headline: article.headline,
-              content: longText,
-              source_name: article.source_name,
-              source_url: article.source_url,
-              category: article.category,
-              published_at: article.published_at
-            }
-          })
-        });
-        const queued = await submit.json().catch(() => ({}));
-        if (!submit.ok) throw new Error(queued?.error || 'تعذر إرسال الخبر إلى مِرصاد');
-      }
+      const submit = await fetch(MIRSAD_API, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          article: {
+            external_id: article.id,
+            headline: article.headline,
+            content: longText || article.summary || '',
+            source_name: article.source_name,
+            source_url: article.source_url,
+            category: article.category,
+            published_at: article.published_at
+          }
+        })
+      });
+      const queued = await submit.json().catch(() => ({}));
+      if (!submit.ok) throw new Error(queued?.error || 'تعذر إرسال الخبر إلى مِرصاد');
 
       state.mirsad = { status:'processing', analytical_reading:null };
       state.mirsadLoading = false;
