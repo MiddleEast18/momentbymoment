@@ -42,6 +42,7 @@ Deno.serve(async (req: Request) => {
     const externalId = String(article?.external_id ?? article?.id ?? "").trim();
     const headline = String(article?.headline ?? "").trim();
     const content = String(article?.content ?? article?.body ?? article?.summary ?? "").trim();
+    const sourceUrl = String(article?.source_url ?? "").trim();
 
     if (!externalId || !headline || !sourceUrl) {
       return json({ok:false,error:"external_id, headline and source_url are required"},400);
@@ -58,7 +59,7 @@ Deno.serve(async (req: Request) => {
         headline,
         content,
         source_name:String(article?.source_name ?? "").trim(),
-        source_url:String(article?.source_url ?? "").trim(),
+        source_url:sourceUrl,
         category:article?.category ?? null,
         published_at:article?.published_at ?? null
       })
