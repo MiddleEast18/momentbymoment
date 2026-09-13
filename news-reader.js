@@ -83,6 +83,7 @@
     ? `${display.id}:revision:${display.__revisionId}`
     : `${display?.id}:current:${contentHash(display)}`;
   const revisionFingerprint = (revision) => [revision.revision_type, revision.source_url, MirsadText.normalize(revision.headline), MirsadText.normalize(revision.summary)].join('\u0001');
+  const revisionSourceCount = (revisions) => new Set((revisions || []).map((revision) => safeUrl(revision.source_url)).filter((url) => url !== '#')).size;
 
   function mirsadBlock() {
     if (state.mirsad?.status === 'completed' && state.mirsad.analytical_reading) {
@@ -154,6 +155,10 @@
     const source = text(display.source_name) || 'مصدر';
 
     const timeline = revisionTimeline(revisions, article);
+    const hasDistinctRevisionSources = revisionSourceCount(revisions) > 1;
+    const revisionSourceNote = timeline.length && !hasDistinctRevisionSources
+      ? '<p class="mirsad-revisions__note">المحتوى التاريخي محفوظ داخل سجل الخبر، بينما يفتح الرابط صفحة الناشر الحالية.</p>'
+      : '';
     const revisionMarkup = timeline.length ? `
       <section class="mirsad-reader__section mirsad-revisions" aria-labelledby="mirsadRevisionsTitle">
         <div class="mirsad-revisions__header">
@@ -167,6 +172,7 @@
               <span class="mirsad-revision-event__body"><strong>${escapeHtml(item.label)}</strong><time datetime="${escapeHtml(item.revision.captured_at || item.revision.updated_at || '')}">${escapeHtml(relative(item.revision.captured_at || item.revision.updated_at))}</time><span>${escapeHtml(item.detail)}</span></span>
             </button>${index < timeline.length - 1 ? '<span class="mirsad-revision-event__line" aria-hidden="true"></span>' : ''}`).join('')}
         </div>
+        ${revisionSourceNote}
       </section>` : '';
 
     const relatedMarkup = related.length ? `
@@ -321,6 +327,9 @@
     const displaySourceUrl = display.__isRevision ? display.source_url : (display.source_url || (display.agency_urls || [])[0] || '');
     sourceBtn.hidden = !displaySourceUrl;
     sourceBtn.href = safeUrl(displaySourceUrl);
+    sourceBtn.textContent = display.__isRevision && revisionSourceCount(state.revisions) <= 1
+      ? 'المصدر الأصلي (صفحة الناشر الحالية) ↗'
+      : 'المصدر الأصلي ↗';
     wireRelated();
     wireRevisions();
   }
