@@ -213,81 +213,80 @@
     if (!article?.id) return;
     const requestId = ++state.mirsadRequest;
     const externalId = analysisKey(display) || article.id;
+    const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
     state.mirsad = null;
     state.mirsadLoading = true;
     renderArticle();
 
-    try {
-      const response = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(externalId)}`, {
-        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-        cache: 'no-store',
-      });
-      const data = await response.json().catch(() => ({}));
+    const stillCurrent = () => requestId === state.mirsadRequest;
+    const readStatus = async () => {
+      const response = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(externalId)}`, { headers, cache: 'no-store' });
+      const result = await response.json().catch(() => ({}));
+      return { response, result };
+    };
 
-      if (response.ok && data?.status === 'completed' && data?.analytical_reading) {
-        if (requestId !== state.mirsadRequest) return;
-        state.mirsad = data;
+    try {
+      const initial = await readStatus();
+      if (initial.response.ok && initial.result?.status === 'completed' && initial.result?.analytical_reading) {
+        if (!stillCurrent()) return;
+        state.mirsad = initial.result;
         state.mirsadLoading = false;
         renderArticle();
         return;
       }
-      if (requestId !== state.mirsadRequest) return;
+      if (!stillCurrent()) return;
 
       const raw = article.raw_payload && typeof article.raw_payload === 'object' ? article.raw_payload : {};
       const longText = display.__isRevision
         ? MirsadText.normalize(display.summary || display.headline || '')
         : String(raw.content ?? raw.article_text ?? raw.text ?? raw.body ?? article.summary ?? '').trim();
-      let submissionStatus = 'processing';
+      let submissionStatus = initial.result?.status || 'processing';
 
-      if (longText) {
-        if (requestId !== state.mirsadRequest) return;
+      if (longText && !['queued', 'processing', 'pending'].includes(submissionStatus)) {
         const submit = await fetch(MIRSAD_API, {
           method: 'POST',
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json' },
-          body: JSON.stringify({
-            article: {
-              external_id: externalId,
-              headline: display.headline,
-              content: longText,
-              summary: display.summary || longText,
-              source_name: display.source_name,
-              source_url: display.source_url,
-              category: article.category,
-              published_at: display.published_at
-            }
-          })
+          headers: { ...headers, 'Content-Type':'application/json' },
+          body: JSON.stringify({ article: { external_id: externalId, headline: display.headline, content: longText, summary: display.summary || longText, source_name: display.source_name, source_url: display.source_url, category: article.category, published_at: display.published_at } })
         });
         const queued = await submit.json().catch(() => ({}));
         if (!submit.ok) throw new Error(queued?.error || 'تعذر إرسال الخبر إلى مِرصاد');
-        submissionStatus = queued?.status || submissionStatus;
+        submissionStatus = queued?.status || 'queued';
       }
 
-      if (requestId !== state.mirsadRequest) return;
+      if (!stillCurrent()) return;
       state.mirsad = { status: submissionStatus, analytical_reading:null };
       state.mirsadLoading = false;
       renderArticle();
 
-      for (let attempt = 0; attempt < 10; attempt++) {
+      // Long articles can legitimately exceed the old 18-second window. Keep the card pending
+      // through transient gateway errors instead of falsely showing "unavailable".
+      const deadline = Date.now() + 120000;
+      while (Date.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 1800));
-        if (requestId !== state.mirsadRequest) return;
-        const poll = await fetch(`${MIRSAD_API}?external_id=${encodeURIComponent(externalId)}`, {
-          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-          cache: 'no-store',
-        });
-        const result = await poll.json().catch(() => ({}));
-        if (poll.ok && result?.status === 'completed' && result?.analytical_reading) {
-          if (requestId !== state.mirsadRequest) return;
-          state.mirsad = result;
-          renderArticle();
-          return;
+        if (!stillCurrent()) return;
+        try {
+          const poll = await readStatus();
+          const result = poll.result;
+          if (poll.response.ok && result?.status === 'completed' && result?.analytical_reading) {
+            if (!stillCurrent()) return;
+            state.mirsad = result;
+            renderArticle();
+            return;
+          }
+          if (result?.status === 'failed' || result?.status === 'error') {
+            state.mirsad = { status:'unavailable', analytical_reading:null };
+            renderArticle();
+            return;
+          }
+        } catch (pollError) {
+          console.warn('[mirsad reader] transient polling error; keeping analysis pending', pollError);
         }
       }
+      // Do not convert a still-running job into "unavailable"; a later open/reload can retrieve it.
+      if (stillCurrent()) { state.mirsad = { status:'processing', analytical_reading:null }; renderArticle(); }
     } catch (error) {
-      console.warn('[mirsad reader] analysis unavailable', error);
-      if (requestId !== state.mirsadRequest) return;
-      state.mirsad = { status:'unavailable', analytical_reading:null };
-      state.mirsadLoading = false;
-      renderArticle();
+      console.warn('[mirsad reader] analysis request failed', error);
+      if (stillCurrent()) { state.mirsad = { status:'processing', analytical_reading:null }; state.mirsadLoading = false; renderArticle(); }
     }
   }
 
