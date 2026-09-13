@@ -12,6 +12,32 @@
   const sb = window.supabase.createClient(CONFIG.url, CONFIG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const cleanRichText = (value) => MirsadText.normalize(value);
+  const storyKey = (value) => MirsadText.search(value).replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
+  const storyTokens = (value) => new Set(storyKey(value).split(/\s+/).filter((token) => token.length >= 2));
+  const similarStory = (left, right) => {
+    const a = storyTokens(left);
+    const b = storyTokens(right);
+    if (!a.size || !b.size) return false;
+    let shared = 0;
+    a.forEach((token) => { if (b.has(token)) shared += 1; });
+    return shared / Math.max(1, Math.min(a.size, b.size)) >= 0.78;
+  };
+  const isMeaningful = (row) => {
+    const headline = cleanRichText(row?.headline);
+    const summary = cleanRichText(row?.summary);
+    const tokens = storyTokens(headline);
+    return headline.length >= 24 && tokens.size >= 4 && (summary.length >= 35 || Number(row?.importance_score || 0) >= 60);
+  };
+  const uniqueStories = (rows) => {
+    const result = [];
+    for (const row of rows || []) {
+      if (!isMeaningful(row)) continue;
+      const headline = cleanRichText(row.headline);
+      if (result.some((existing) => similarStory(headline, existing.headline))) continue;
+      result.push({ ...row, headline, summary: cleanRichText(row.summary) });
+    }
+    return result;
+  };
   const relative = (value) => { const time = new Date(value || 0).getTime(); if (!Number.isFinite(time)) return ''; const mins = Math.round((time - Date.now()) / 60000); const formatter = new Intl.RelativeTimeFormat('ar', { numeric: 'auto' }); return Math.abs(mins) < 60 ? formatter.format(mins, 'minute') : formatter.format(Math.round(mins / 60), 'hour'); };
   let opened = false;
   let currentUser = false;
@@ -24,7 +50,7 @@
   const captureTime = (row) => new Date(row.published_at || row.received_at || 0).getTime() || 0;
   const publicationTime = (row) => new Date(row.published_at || row.received_at || 0).getTime() || 0;
   const PIN_MAX_AGE_MS = 100 * 60 * 60 * 1000;
-  const render = (rows) => { const chronological = [...(rows || [])].sort((a, b) => captureTime(b) - captureTime(a)); const now = Date.now(); const pinnedRows = chronological.filter((row) => Number(row.importance_score || 0) >= 60 && now - publicationTime(row) <= PIN_MAX_AGE_MS).slice(0, 4); const pinnedIds = new Set(pinnedRows.map((row) => row.id)); const ordered = [...pinnedRows, ...chronological.filter((row) => !pinnedIds.has(row.id))]; currentRows = ordered; visibleCount = Math.min(Math.max(visibleCount, Math.max(3, pinnedRows.length)), ordered.length); const visible = ordered.slice(0, visibleCount); list.innerHTML = visible.length ? visible.map((row) => { const pinned = pinnedIds.has(row.id); const publishedAt = row.published_at || row.received_at; return `<article class="rapid-news__item${pinned ? ' is-pinned' : ''}">${pinned ? pinIcon : ''}<div class="rapid-news__meta"><span>${escapeHtml(row.source_name)}</span><time datetime="${escapeHtml(publishedAt)}">نُشر ${escapeHtml(relative(publishedAt))}</time></div><h3>${escapeHtml(cleanRichText(row.headline))}</h3><p>${escapeHtml(cleanRichText(row.summary))}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`; }).join('') : '<p class="rapid-news__empty">لا توجد أخبار ملتقطة حاليًا.</p>'; more.hidden = visibleCount >= ordered.length; all.hidden = visibleCount >= ordered.length; };
+  const render = (rows) => { const chronological = uniqueStories(rows).sort((a, b) => captureTime(b) - captureTime(a)); const now = Date.now(); const pinnedRows = chronological.filter((row) => Number(row.importance_score || 0) >= 60 && now - publicationTime(row) <= PIN_MAX_AGE_MS).slice(0, 4); const pinnedIds = new Set(pinnedRows.map((row) => row.id)); const ordered = [...pinnedRows, ...chronological.filter((row) => !pinnedIds.has(row.id))]; currentRows = ordered; visibleCount = Math.min(Math.max(visibleCount, Math.max(3, pinnedRows.length)), ordered.length); const visible = ordered.slice(0, visibleCount); list.innerHTML = visible.length ? visible.map((row) => { const pinned = pinnedIds.has(row.id); const publishedAt = row.published_at || row.received_at; return `<article class="rapid-news__item${pinned ? ' is-pinned' : ''}">${pinned ? pinIcon : ''}<div class="rapid-news__meta"><span>${escapeHtml(cleanRichText(row.source_name))}</span><time datetime="${escapeHtml(publishedAt)}">نُشر ${escapeHtml(relative(publishedAt))}</time></div><h3>${escapeHtml(row.headline)}</h3><p>${escapeHtml(row.summary)}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`; }).join('') : '<p class="rapid-news__empty">لا توجد أخبار ملتقطة ذات مضمون واضح حاليًا.</p>'; more.hidden = visibleCount >= ordered.length; all.hidden = visibleCount >= ordered.length; };
   const load = async () => { const { data, error } = await sb.from('rapid_news').select('id,source_name,source_url,headline,summary,published_at,received_at,importance_score').order('importance_score', { ascending: false }).order('received_at', { ascending: false }).limit(100); if (error) { status.textContent = 'تعذر تحميل الأخبار الملتقطة'; return; } render(data || []); status.textContent = data?.length ? `${data.length} خبرًا محفوظًا` : 'بانتظار الأخبار الملتقطة'; };
   const refreshUnread = async () => { if (!currentUser) return; const { data, error } = await sb.rpc('rapid_news_unread_count'); if (!error) setBadge(Number(data || 0)); };
   const open = async () => { if (!window.mirsadViewAccess) return; const access = await window.mirsadViewAccess.openRapid(); if (!access.allowed) { status.textContent = access.error?.message === 'not_authenticated' ? 'سجّل الدخول لعرض الأخبار الملتقطة' : 'تعذر فتح الأخبار الملتقطة حاليًا'; await refreshUnread(); return; } opened = true; rail.hidden = false; toggle.setAttribute('aria-expanded', 'true'); status.textContent = access.unread_count ? `تم عرض ${access.unread_count} خبرًا جديدًا` : 'لا توجد أخبار جديدة غير مقروءة'; await refreshUnread(); };
