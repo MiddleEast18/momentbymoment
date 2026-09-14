@@ -160,6 +160,7 @@
 
   const isProfilePage=()=>window.location.pathname.endsWith('/profile.html');
   const profilePageUrl=()=>new URL('profile.html',window.location.href).href;
+  const dailyRewardPageUrl=()=>new URL('daily-reward.html',window.location.href).href;
   const avatarUrl=value=>{try{const url=new URL(String(value||'').trim());return ['https:','http:'].includes(url.protocol)?url.href:''}catch{return ''}};
   function renderProfilePage(user,profile){
     const root=document.getElementById('mirsadProfilePage');if(!root)return;
@@ -197,11 +198,12 @@
     const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
     const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
     const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
-    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance">${unlockAccount?.unlimited_unlocks?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance">${unlockAccount?.unlimited_unlocks?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-daily-reward>مكافأة يومية</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
     btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
+    wrap.querySelector('[data-daily-reward]').addEventListener('click',()=>{menu.hidden=true;window.location.href=dailyRewardPageUrl()});
     wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){console.error('[mirsad auth] signout failed',error);return;}menu.hidden=true;wrap.remove();document.body.classList.remove('mirsad-admin-view');document.body.classList.add('mirsad-auth-required');showGate()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
@@ -213,7 +215,7 @@
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
-    const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount);
+    const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
     if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
