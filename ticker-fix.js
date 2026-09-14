@@ -60,7 +60,9 @@
 
   const apply = () => {
     const rail = track.firstElementChild;
-    if (rail && cycleWidth > 0) rail.style.transform = `translate3d(${-x}px,0,0)`;
+    // Start one cycle to the left, then advance rightward so headlines enter
+    // from the left and leave through the right edge.
+    if (rail && cycleWidth > 0) rail.style.transform = `translate3d(${x - cycleWidth}px,0,0)`;
   };
 
   const tick = (now) => {
