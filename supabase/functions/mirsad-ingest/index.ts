@@ -14,9 +14,11 @@ const unique = (xs: string[]) => [...new Set(xs)];
 const EVENT_ANCHORS = ["حرب","هجوم","انفجار","زلزال","انتخابات","اتفاق","عقوبات","احتجاج","مفاوضات","تصعيد","هدنه","اغتيال","قتلى","وفيات","نفط","بنك","استثمار"];
 const PLACE_ANCHORS = ["ايران","اسرائيل","لبنان","سوريا","العراق","اليمن","السعوديه","الاردن","غزه","فلسطين","امريكا","روسيا","اوكرانيا","الصين","اوروبا","المانيا","بريطانيا","فرنسا","تركيا","السودان","ليبيا"];
 const signature = (s: string) => { const normalized = s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه"); return { tokens: unique(words(s)).slice(0, 36), anchors: EVENT_ANCHORS.filter(x => normalized.includes(x)), places: PLACE_ANCHORS.filter(x => normalized.includes(x)), numbers: unique((s.match(/\b\d+(?:[\.,]\d+)?\b/g) || []).map(x => x.replace(",", "."))) }; };
+const signatureCache = new Map<string, ReturnType<typeof signature>>();
+const cachedSignature = (s: string) => { const hit = signatureCache.get(s); if (hit) return hit; const value = signature(s); signatureCache.set(s, value); return value; };
 const compatibility = (a: any, b: any) => { const share = (x: string[], y: string[]) => !x.length || !y.length || x.some(v => y.includes(v)); if (a.numbers.length && b.numbers.length && !share(a.numbers, b.numbers)) return 0.35; if (a.places.length && b.places.length && !share(a.places, b.places)) return 0.45; if (a.anchors.length && b.anchors.length && !share(a.anchors, b.anchors)) return 0.55; return 1; };
 const overlap = (a: string, b: string) => { const aa = new Set(words(a)), bb = new Set(words(b)); let n = 0; for (const x of aa) if (bb.has(x)) n++; return n / Math.max(1, Math.min(aa.size, bb.size)); };
-const eventSimilarity = (a: string, b: string) => { const aa = signature(a), bb = signature(b); const sa = new Set(aa.tokens), sb = new Set(bb.tokens); let n = 0; for (const x of sa) if (sb.has(x)) n++; const jaccard = n / Math.max(1, new Set([...sa, ...sb]).size); return (overlap(a, b) * 0.55 + jaccard * 0.45) * compatibility(aa, bb); };
+const eventSimilarity = (a: string, b: string) => { const aa = cachedSignature(a), bb = cachedSignature(b); const sa = new Set(aa.tokens), sb = new Set(bb.tokens); let n = 0; for (const x of sa) if (sb.has(x)) n++; const jaccard = n / Math.max(1, new Set([...sa, ...sb]).size); return (overlap(a, b) * 0.55 + jaccard * 0.45) * compatibility(aa, bb); };
 const classify = (text: string, url = "") => {
   const t = text.toLowerCase();
   const u = url.toLowerCase();
@@ -48,6 +50,17 @@ const itemKey = (item: string, link: string) => field(item, "guid") || link;
 const feedHash = (text: string) => { let h = 2166136261; for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const withTimeout = async <T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error(`${label}_timeout`)), ms); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
 const fetchFeed = async (source: any, state: any) => {
   let lastError = "";
   let status: number | null = null;
@@ -75,14 +88,15 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers });
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
-  const runLock = await db.from("ingest_runs").select("id,started_at").eq("status", "running").gt("started_at", new Date(Date.now() - 4 * 60 * 1000).toISOString()).limit(1);
-  if ((runLock.data || []).length) return reply({ ok: true, skipped: "already_running" });
-  await db.from("ingest_runs").update({ status: "failed", finished_at: new Date().toISOString(), notes: JSON.stringify({ reason: "stale_running_job" }) }).eq("status", "running").lt("started_at", new Date(Date.now() - 4 * 60 * 1000).toISOString());
-  const run = await db.from("ingest_runs").insert({ status: "running" }).select("id").single();
+  const claimed = await withTimeout(db.rpc("claim_mirsad_ingest_run", { p_stale_after: "4 minutes" }), 8000, "claim_ingest_run");
+  if (claimed.error) return reply({ error: claimed.error.message }, 500);
+  if (!claimed.data) return reply({ ok: true, skipped: "already_running" });
+  const runId = claimed.data as string;
   let seen = 0, written = 0, duplicates = 0, clusterUpdates = 0;
   const errors: string[] = [];
+  try {
   const sources = await db.from("news_sources").select("source_key,name,feed_url,trust_weight,default_category").eq("is_active", true).eq("source_kind", "rss").not("feed_url", "is", null).limit(20);
-  if (sources.error) return reply({ error: sources.error.message }, 500);
+  if (sources.error) throw new Error(`load_sources: ${sources.error.message}`);
   const existing = await db.from("news_articles").select("id,source_url,headline,summary,cluster_id,category,published_at").eq("is_pending_verification", false).order("updated_at", { ascending: false }).limit(400);
   const feedStates = await db.from("source_feed_state").select("source_key,etag,last_modified,last_feed_hash");
   const stateMap = new Map((feedStates.data || []).map((x: any) => [x.source_key, x]));
@@ -92,7 +106,7 @@ Deno.serve(async req => {
   const activeSources = sources.data || [];
   // Keep fetch concurrency bounded so the expanded source set cannot exhaust
   // Edge Function worker resources while every active source is still checked.
-  const FETCH_BATCH_SIZE = 4;
+  const FETCH_BATCH_SIZE = 1;
   for (let i = 0; i < activeSources.length; i += FETCH_BATCH_SIZE) {
     const batch = activeSources.slice(i, i + FETCH_BATCH_SIZE);
     const results = await Promise.all(batch.map((source) => fetchFeed(source, stateMap.get(source.source_key))));
@@ -196,9 +210,15 @@ Deno.serve(async req => {
       errors.push(`${source.source_key}: ${String(error)}`);
     }
   }
-  await db.rpc("mirsad_sync_ledger_main_status");
-  const cleanup = await db.rpc("mirsad_trim_news_to_400");
+  const ledgerSync = await withTimeout(db.rpc("mirsad_sync_ledger_main_status"), 15000, "ledger_sync");
+  if (ledgerSync.error) errors.push(`ledger_sync: ${ledgerSync.error.message}`);
+  const cleanup = await withTimeout(db.rpc("mirsad_trim_news_to_400"), 15000, "trim_news");
   if (cleanup.error) errors.push(`cleanup: ${cleanup.error.message}`);
-  if (run.data?.id) await db.from("ingest_runs").update({ status: errors.length ? "partial" : "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) }) }).eq("id", run.data.id);
-  return reply({ ok: true, seen, written, duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) });
+  await withTimeout(db.from("ingest_runs").update({ status: errors.length ? "partial" : "completed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) }) }).eq("id", runId), 15000, "finish_ingest_run");
+    return reply({ ok: true, seen, written, duplicates, clusterUpdates, cleanupDeleted: cleanup.data ?? 0, errors: errors.slice(0, 10) });
+  } catch (error) {
+    const message = String(error);
+    await db.from("ingest_runs").update({ status: "failed", finished_at: new Date().toISOString(), items_seen: seen, items_written: written, notes: JSON.stringify({ reason: message, duplicates, clusterUpdates, errors: errors.slice(0, 10) }) }).eq("id", runId);
+    return reply({ ok: false, error: message, seen, written, duplicates, clusterUpdates, errors: errors.slice(0, 10) }, 500);
+  }
 });
