@@ -9,6 +9,8 @@ const field = (b: string, n: string) => { const s = b.indexOf("<" + n), o = b.in
 const items = (xml: string) => { const out: string[] = []; for (const tag of ["item", "entry"]) { const re = new RegExp(`<${tag}(?:\\s[^>]*)?>[\\s\\S]*?</${tag}>`, "gi"); let match: RegExpExecArray | null; while ((match = re.exec(xml))) out.push(match[0]); } return out; };
 const STOP = new Set(["في","من","الى","إلى","على","عن","مع","هذا","هذه","هناك","بعد","قبل","وقد","خبر","اخبار","تقرير","مصدر","اليوم","أمس","الآن","بحسب"]);
 const words = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u064B-\u065F\u0670\u0610-\u061A\u06D6-\u06ED]/g, "").replace(/[أإآا]/g, "ا").replace(/ى/g, "ي").replace(/ؤ/g, "و").replace(/ئ/g, "ي").replace(/ة/g, "ه").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(x => x.length > 2 && !STOP.has(x));
+const wordsCache = new Map<string, string[]>();
+const cachedWords = (s: string) => { const hit = wordsCache.get(s); if (hit) return hit; const value = words(s); wordsCache.set(s, value); return value; };
 const isArabic = (s: string) => { const arabic = (s.match(/[ء-ي]/g) || []).length; const letters = (s.match(/[\p{L}]/gu) || []).length; return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2; };
 const unique = (xs: string[]) => [...new Set(xs)];
 const EVENT_ANCHORS = ["حرب","هجوم","انفجار","زلزال","انتخابات","اتفاق","عقوبات","احتجاج","مفاوضات","تصعيد","هدنه","اغتيال","قتلى","وفيات","نفط","بنك","استثمار"];
@@ -17,7 +19,7 @@ const signature = (s: string) => { const normalized = s.toLowerCase().normalize(
 const signatureCache = new Map<string, ReturnType<typeof signature>>();
 const cachedSignature = (s: string) => { const hit = signatureCache.get(s); if (hit) return hit; const value = signature(s); signatureCache.set(s, value); return value; };
 const compatibility = (a: any, b: any) => { const share = (x: string[], y: string[]) => !x.length || !y.length || x.some(v => y.includes(v)); if (a.numbers.length && b.numbers.length && !share(a.numbers, b.numbers)) return 0.35; if (a.places.length && b.places.length && !share(a.places, b.places)) return 0.45; if (a.anchors.length && b.anchors.length && !share(a.anchors, b.anchors)) return 0.55; return 1; };
-const overlap = (a: string, b: string) => { const aa = new Set(words(a)), bb = new Set(words(b)); let n = 0; for (const x of aa) if (bb.has(x)) n++; return n / Math.max(1, Math.min(aa.size, bb.size)); };
+const overlap = (a: string, b: string) => { const aa = new Set(cachedWords(a)), bb = new Set(cachedWords(b)); let n = 0; for (const x of aa) if (bb.has(x)) n++; return n / Math.max(1, Math.min(aa.size, bb.size)); };
 const eventSimilarity = (a: string, b: string) => { const aa = cachedSignature(a), bb = cachedSignature(b); const sa = new Set(aa.tokens), sb = new Set(bb.tokens); let n = 0; for (const x of sa) if (sb.has(x)) n++; const jaccard = n / Math.max(1, new Set([...sa, ...sb]).size); return (overlap(a, b) * 0.55 + jaccard * 0.45) * compatibility(aa, bb); };
 const classify = (text: string, url = "") => {
   const t = text.toLowerCase();
