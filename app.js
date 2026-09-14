@@ -77,8 +77,19 @@
     return importance * 0.34 + freshness * 0.20 + evidence * 0.18 + momentum * 0.12 + trust * 0.06 + Math.min(100, sources * 12) * 0.05 + (article?.cluster_id ? 3 : 0);
   }
 
+  // Freshness is a hard ordering tier; quality and diversity rank stories within that tier.
+  function freshnessBand(article) {
+    const published = getTime(article, 'published_at') || getTime(article, 'created_at');
+    const ageHours = Math.max(0, (Date.now() - published) / 3600000);
+    if (ageHours <= 2) return 0;
+    if (ageHours <= 6) return 1;
+    if (ageHours <= 12) return 2;
+    if (ageHours <= 24) return 3;
+    return 4;
+  }
+
   function sortPriorityIntelligently(items) {
-    const ranked = [...items].map((article) => ({ article, base: rankingSignal(article) })).sort((a, b) => b.base - a.base || compareLatest(a.article, b.article));
+    const ranked = [...items].map((article) => ({ article, base: rankingSignal(article), freshnessBand: freshnessBand(article) })).sort((a, b) => a.freshnessBand - b.freshnessBand || b.base - a.base || compareLatest(a.article, b.article));
     const selected = [];
     const clusterCounts = new Map();
     const sourceCounts = new Map();
@@ -87,8 +98,10 @@
     while (remaining.length) {
       let bestIndex = 0;
       let bestScore = -Infinity;
+      const freshestBand = Math.min(...remaining.map((entry) => entry.freshnessBand));
       for (let i = 0; i < remaining.length; i += 1) {
-        const { article, base } = remaining[i];
+        const { article, base, freshnessBand: articleFreshnessBand } = remaining[i];
+        if (articleFreshnessBand !== freshestBand) continue;
         const clusterKey = article.cluster_id || 'article:' + article.id;
         const sourceKey = String(article.source_name || article.source_url || '').trim().toLowerCase();
         const clusterPenalty = Math.min(18, (clusterCounts.get(clusterKey) || 0) * 8);
