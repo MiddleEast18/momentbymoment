@@ -139,7 +139,8 @@ Deno.serve(async req => {
         if (!title || !link || !isArabic(title)) continue;
         const summary = field(item, "description") || field(item, "summary") || title;
         const incomingPublishedAt = publishedAt(item, source.source_key);
-        observations.push({ source_key: source.source_key, item_key: itemKey(item, link), source_url: link, guid: field(item, "guid") || "", headline: title, summary, published_at: incomingPublishedAt });
+        const observation = { source_key: source.source_key, item_key: itemKey(item, link), source_url: link, guid: field(item, "guid") || "", headline: title, summary, published_at: incomingPublishedAt, ingest_decision: "pending" };
+        observations.push(observation);
         seen++;
         sourceSeen++;
         const existingRow = known.get(link);
@@ -160,11 +161,13 @@ Deno.serve(async req => {
               existingRow.headline = title;
               existingRow.summary = incomingSummary;
               existingRow.published_at = incomingPublishedAt;
+              observation.ingest_decision = "source_updated";
               sourceUpdated++;
               continue;
             }
             errors.push(source.source_key + ": source update " + updated.error.message);
           }
+          observation.ingest_decision = "duplicate";
           duplicates++;
           sourceDuplicates++;
           continue;
@@ -174,7 +177,7 @@ Deno.serve(async req => {
         const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
         if (match && match.score >= 0.66 && match.x.cluster_id) {
           const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
-          if (!merged.error) { clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: incomingPublishedAt }); continue; }
+          if (!merged.error) { observation.ingest_decision = "cluster_merged"; clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: incomingPublishedAt }); continue; }
           errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
         }
         const row = {
@@ -198,10 +201,10 @@ Deno.serve(async req => {
           published_at: incomingPublishedAt,
         };
         const result = await db.from("news_articles").insert(row);
-        if (!result.error) { written++; sourceWritten++; known.set(link, { id: null, source_url: link, headline: title, summary, cluster_id: row.cluster_id, category, published_at: row.published_at }); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { duplicates++; sourceDuplicates++; } else errors.push(`${source.source_key}: ${result.error.message}`);
+        if (!result.error) { observation.ingest_decision = "inserted"; written++; sourceWritten++; known.set(link, { id: null, source_url: link, headline: title, summary, cluster_id: row.cluster_id, category, published_at: row.published_at }); existing.data?.push({ source_url: link, headline: title, summary, cluster_id: row.cluster_id, category }); } else if (result.error.code === "23505") { observation.ingest_decision = "duplicate"; duplicates++; sourceDuplicates++; } else { observation.ingest_decision = `insert_failed:${result.error.code || "unknown"}`; errors.push(`${source.source_key}: ${result.error.message}`); }
       }
       if (observations.length) {
-        const obs = await db.from("source_item_ledger").insert(observations);
+        const obs = await db.from("source_item_ledger").upsert(observations, { onConflict: "source_key,item_key" });
         if (obs.error && obs.error.code !== "23505") errors.push(source.source_key + ": ledger " + obs.error.message);
       }
       await db.from("source_feed_state").upsert({ source_key: source.source_key, etag: fetched.etag, last_modified: fetched.lastModified, last_feed_hash: feedHash(xml), last_checked_at: new Date().toISOString(), last_changed_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: "source_key" });
