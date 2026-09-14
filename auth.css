@@ -23,4 +23,5 @@ body.mirsad-auth-required > :not(#mirsadAuthGate){visibility:hidden!important}
 .mirsad-profile-grid label{display:grid;gap:6px;color:var(--text-dim);font-size:13px}
 .mirsad-profile-grid input{min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--panel-border-strong);background:rgba(255,255,255,.03);color:var(--text)}
 .mirsad-profile-footer{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.mirsad-user-balance{display:flex;align-items:center;justify-content:space-between;gap:10px}.mirsad-balance-recharge{width:22px;height:22px;padding:0;border:1px solid var(--gold);border-radius:50%;background:rgba(201,162,39,.12);color:var(--gold);font:700 17px/19px var(--font-mono);cursor:pointer}.mirsad-balance-recharge:hover{background:rgba(201,162,39,.24);transform:scale(1.06)}
 @media(max-width:700px){.mirsad-auth-card{padding:24px 12px}.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}}
