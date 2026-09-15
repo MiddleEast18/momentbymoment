@@ -131,7 +131,7 @@ Deno.serve(async req => {
         continue;
       }
       const xml = fetched.xml;
-      const sourceItems = items(xml).slice(0, 100);
+      const sourceItems = items(xml).slice(0, 400);
       const observations = [];
       for (const item of sourceItems) {
         const title = field(item, "title");
@@ -174,12 +174,6 @@ Deno.serve(async req => {
         }
         const all = `${title} ${summary}`;
         const category = source.default_category || classify(all, link);
-        const match = (existing.data || []).filter((x: any) => !x.category || x.category === category).map((x: any) => ({ x, score: eventSimilarity(all, `${x.headline || ""} ${x.summary || ""}`) })).sort((a: any, b: any) => b.score - a.score)[0];
-        if (match && match.score >= 0.66 && match.x.cluster_id) {
-          const merged = await db.rpc("merge_cluster_update", { p_cluster_id: match.x.cluster_id, p_summary: summary, p_agency_url: link, p_claim_digest: { main_claim: title }, p_source_trust_score: Number(source.trust_weight) });
-          if (!merged.error) { observation.ingest_decision = "cluster_merged"; clusterUpdates++; sourceUpdated++; known.set(link, { id: match.x.id || null, source_url: link, headline: title, summary, cluster_id: match.x.cluster_id, category: match.x.category, published_at: incomingPublishedAt }); continue; }
-          errors.push(`${source.source_key}: cluster merge ${merged.error.message}`);
-        }
         const row = {
           source_name: source.name,
           source_url: link,
