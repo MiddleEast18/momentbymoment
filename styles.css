@@ -54,7 +54,7 @@ button, input, select { font: inherit; }
 .search-box { min-width: 260px; }
 .sort-box { min-width: 160px; }
 .sort-trigger { appearance: none; cursor: pointer; text-align: right; position: relative; padding-left: 38px; }
-.sort-trigger::after { content: '⌄'; position: absolute; left: 15px; top: 50%; transform: translateY(-58%); color: var(--text-dim); font-size: 16px; }
+  .sort-trigger::after { content: ''; position: absolute; left: 15px; top: 50%; width: 6px; height: 6px; border-right: 1.5px solid var(--text-dim); border-bottom: 1.5px solid var(--text-dim); transform: translateY(-65%) rotate(45deg); }
 .search-box::placeholder { color: var(--text-faint); }
 .control-bar__filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border-strong); background: transparent; color: var(--text-dim); font-size: 13px; cursor: pointer; }
