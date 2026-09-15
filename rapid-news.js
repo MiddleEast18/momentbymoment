@@ -33,7 +33,6 @@
     for (const row of rows || []) {
       if (!isMeaningful(row)) continue;
       const headline = cleanRichText(row.headline);
-      if (result.some((existing) => similarStory(headline, existing.headline))) continue;
       result.push({ ...row, headline, summary: cleanRichText(row.summary) });
     }
     return result;
