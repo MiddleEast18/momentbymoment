@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const INITIAL_COUNT = 400;
+  const INITIAL_COUNT = 7;
   const MORE_COUNT = 5;
   const grid = document.getElementById('newsGrid');
   if (!grid) return;
@@ -91,6 +91,7 @@
 
   allButton.addEventListener('click', async () => {
     if (!(await consume('all'))) return;
+    shown = 400;
     showAll = true;
     apply();
   });
