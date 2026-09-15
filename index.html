@@ -17,12 +17,14 @@
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609120012">
   <link rel="stylesheet" href="auth.css?v=202609142349">
-  <link rel="stylesheet" href="rapid-news.css?v=202609151759">
+  <link rel="stylesheet" href="rapid-news.css?v=202609151815">
   <style>
     .rapid-news__bar, .rapid-news__panel { position: relative; z-index: 10; }
     .rapid-news__bar { min-height: 56px; }
     .rapid-news__toggle { padding: 14px 16px; }
     .rapid-news__status { position: absolute; inset-inline-start: auto; inset-inline-end: 16px; z-index: 2; width: auto; max-width: calc(100% - 128px); overflow: hidden; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; }
+    .rapid-news__notice { position: fixed; left: 14px; right: 14px; bottom: 14px; z-index: 6000; width: max-content; max-width: calc(100% - 28px); margin: 0 auto; padding: 8px 12px; border: 1px solid rgba(201,162,39,.45); border-radius: 10px; background: rgba(16,21,28,.96); color: var(--text); font: 600 12px/1.4 var(--font-body); text-align: center; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
+    .rapid-news__notice.is-visible { opacity: 1; transform: translateY(0); }
     @media (max-width: 700px), (pointer: coarse) {
       .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
       .featured-rail > .card { flex: 0 0 86% !important; width: 86% !important; min-width: 86% !important; max-width: 86% !important; scroll-snap-align: center; }
@@ -91,6 +93,6 @@
   <script src="news-pagination.js?v=202609120012"></script>
   <script src="news-revision-compat.js?v=202609130819"></script>
   <script src="auth-v8.js?v=202609150024"></script>
-  <script src="rapid-news.js?v=202609151813"></script>
+  <script src="rapid-news.js?v=202609151815"></script>
 </body>
 </html>
