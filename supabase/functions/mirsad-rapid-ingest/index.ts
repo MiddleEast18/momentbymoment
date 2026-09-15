@@ -4,6 +4,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const db = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
 const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
 const RECENT_MS = 48 * 60 * 60 * 1000;
+const executionId = () => crypto.randomUUID();
+const writeLog = (execution_id: string, event: string, details: Record<string, unknown> = {}) => {
+  console.log(JSON.stringify({ function: "mirsad-rapid-ingest", execution_id, event, at: new Date().toISOString(), ...details }));
+};
+const writeError = (execution_id: string, event: string, error: unknown, details: Record<string, unknown> = {}) => {
+  console.error(JSON.stringify({ function: "mirsad-rapid-ingest", execution_id, event, at: new Date().toISOString(), error: error instanceof Error ? error.message : String(error), ...details }));
+};
 const MONTHS: Record<string, number> = {
   يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, ابريل: 4, مايو: 5, يونيو: 6,
   يوليو: 7, أغسطس: 8, سبتمبر: 9, أكتوبر: 10, نوفمبر: 11, ديسمبر: 12,
@@ -130,6 +137,11 @@ const stableKey = (value: string) => {
 const LIVE_FALLBACK_URLS: Record<string, string> = {
   aljazeera: "https://www.aljazeera.net/news/breaking",
 };
+const RAPID_SOURCE = {
+  source_key: "daraj",
+  name: "Daraj",
+  feed_url: "https://daraj.media/feed/",
+};
 
 const extractJsonLdObjects = (html: string) => {
   const out: any[] = [];
@@ -209,15 +221,19 @@ const fetchLiveFallback = async (source: any) => {
   }
 };
 
+const URL_BATCH_SIZE = 20;
 const urlsInTable = async (table: "rapid_news" | "news_articles", urls: string[]) => {
   const found = new Set<string>();
-  for (let i = 0; i < urls.length; i += 100) {
-    const chunk = urls.slice(i, i + 100);
+  for (let i = 0; i < urls.length; i += URL_BATCH_SIZE) {
+    const chunk = urls.slice(i, i + URL_BATCH_SIZE);
     if (!chunk.length) continue;
     const query = table === "news_articles"
       ? db.from(table).select("source_url").in("source_url", chunk).eq("is_pending_verification", false)
       : db.from(table).select("source_url").in("source_url", chunk);
     const result = await query;
+    if (result.error) {
+      throw new Error(`comparison_batch_failed: table=${table}, batch_start=${i}, batch_size=${chunk.length}, error=${result.error.message}`);
+    }
     for (const row of result.data || []) found.add(canonical(row.source_url));
   }
   return found;
@@ -227,13 +243,12 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+  const runId = executionId();
+  const runStartedAt = Date.now();
+  writeLog(runId, "run_started", { method: req.method });
 
-  const sources = await db.from("news_sources")
-    .select("source_key,name,feed_url")
-    .eq("is_active", true)
-    .eq("source_kind", "rss")
-    .not("feed_url", "is", null);
-  if (sources.error) return reply({ error: sources.error.message }, 500);
+  const sources = { data: [RAPID_SOURCE], error: null };
+  writeLog(runId, "independent_source_loaded", { source_key: RAPID_SOURCE.source_key, count: 1 });
 
   const feedStates = await db.from("source_feed_state").select("source_key,etag,last_modified,last_feed_hash");
   const stateMap = new Map((feedStates.data || []).map((row: any) => [row.source_key, row]));
@@ -306,12 +321,19 @@ Deno.serve(async (req) => {
     const source = sources.data?.[i];
     if (!source || result.status === "rejected") continue;
 
+    writeLog(runId, "source_fetch_finished", {
+      source_key: source.source_key,
+      status: result.value.status,
+      duration_ms: result.value.duration,
+      xml_bytes: result.value.xml.length,
+      live_rows: result.value.liveRows?.length || 0,
+      error: result.value.error || null,
+    });
+
     if (result.value.error) {
       const message = `${source.source_key}: ${result.value.error}`;
       errors.push(message);
-      await db.rpc("record_source_health", {
-        p_source_key: source.source_key, p_ok: false, p_error: result.value.error,
-      });
+      writeError(runId, "source_fetch_failed", result.value.error, { source_key: source.source_key });
       continue;
     }
 
@@ -391,8 +413,13 @@ Deno.serve(async (req) => {
 
       // The ledger is the source of truth: observing an item never makes it captured.
       if (observations.length) {
+        const ledgerStartedAt = Date.now();
         const obs = await db.from("source_item_ledger").upsert(observations, { onConflict: "source_key,item_key", ignoreDuplicates: false });
-        if (obs.error) throw new Error(obs.error.message);
+        if (obs.error) {
+          writeError(runId, "ledger_upsert_failed", obs.error, { source_key: source.source_key, observations: observations.length, duration_ms: Date.now() - ledgerStartedAt });
+          throw new Error(obs.error.message);
+        }
+        writeLog(runId, "ledger_upsert_finished", { source_key: source.source_key, observations: observations.length, duration_ms: Date.now() - ledgerStartedAt });
       }
 
       await db.from("source_feed_state").upsert({
@@ -405,19 +432,6 @@ Deno.serve(async (req) => {
         updated_at: nowIso,
       }, { onConflict: "source_key" });
 
-      await db.rpc("record_source_health", {
-        p_source_key: source.source_key, p_ok: true, p_error: null,
-      });
-      await db.from("source_health").update({
-        last_attempt_at: nowIso,
-        last_http_status: result.value.status,
-        last_duration_ms: result.value.duration,
-        last_items_seen: observations.length,
-        last_items_written: 0,
-        last_items_updated: 0,
-        last_duplicates: 0,
-      }).eq("source_key", source.source_key);
-
       stats[source.source_key] = {
         status: result.value.status,
         duration_ms: result.value.duration,
@@ -429,15 +443,15 @@ Deno.serve(async (req) => {
     } catch (error) {
       const message = String(error).slice(0, 500);
       errors.push(`${source.source_key}: ${message}`);
-      await db.rpc("record_source_health", {
-        p_source_key: source.source_key, p_ok: false, p_error: message,
-      });
+      writeError(runId, "source_processing_failed", error, { source_key: source.source_key });
     }
   }
 
   // Reconcile what already made it into the main store before any capture decision.
   const sync = await db.rpc("mirsad_sync_ledger_main_status");
   if (sync.error) errors.push("ledger_sync: " + sync.error.message);
+  if (sync.error) writeError(runId, "ledger_sync_failed", sync.error);
+  else writeLog(runId, "ledger_sync_finished", { changed: sync.data || 0 });
 
   // Only items first observed at least one hour ago and still absent from the main store
   // are eligible for the captured-news safety net.
@@ -445,6 +459,7 @@ Deno.serve(async (req) => {
   const maxAgeIso = new Date(Date.now() - RECENT_MS).toISOString();
   const due = await db.from("source_item_ledger")
     .select("source_key,source_url,headline,summary,published_at,first_seen_at,item_key")
+    .eq("source_key", RAPID_SOURCE.source_key)
     .eq("status", "observed")
     .lte("first_seen_at", cutoffIso)
     .gte("first_seen_at", maxAgeIso)
@@ -452,19 +467,28 @@ Deno.serve(async (req) => {
 
   if (due.error) {
     errors.push("due_query: " + due.error.message);
+    writeError(runId, "due_query_failed", due.error, { duration_ms: Date.now() - runStartedAt });
   } else if (due.data?.length) {
+    writeLog(runId, "due_items_loaded", { count: due.data.length, cutoff: cutoffIso, max_age: maxAgeIso });
     const urls = due.data.map((row: any) => canonical(row.source_url));
-    const existing = await db.from("news_articles")
-      .select("source_url")
-      .in("source_url", urls)
-      .eq("is_pending_verification", false);
-    if (existing.error) {
-      errors.push("main_check: " + existing.error.message);
-    } else {
-      const mainUrls = new Set((existing.data || []).map((row: any) => canonical(row.source_url)));
-      const rows = due.data.filter((row: any) => !mainUrls.has(canonical(row.source_url)));
+    let mainUrls: Set<string>;
+    let mainCheckOk = true;
+    try {
+      mainUrls = await urlsInTable("news_articles", urls);
+    } catch (error) {
+      errors.push("main_check: " + String(error).slice(0, 500));
+      writeError(runId, "main_news_comparison_failed", error, { due_count: due.data.length });
+      mainUrls = new Set<string>();
+      mainCheckOk = false;
+    }
+    const rows = mainCheckOk
+      ? due.data.filter((row: any) => !mainUrls.has(canonical(row.source_url)))
+      : [];
+    writeLog(runId, "main_news_comparison_finished", { due_count: due.data.length, main_matches: mainUrls.size, rapid_candidates: rows.length });
 
-      if (rows.length) {
+    if (rows.length && mainCheckOk) {
+        const rapidInsertStartedAt = Date.now();
+        writeLog(runId, "rapid_insert_started", { candidate_count: rows.length });
         const inserted = await db.from("rapid_news").upsert(
           rows.map((row: any) => ({
             source_key: row.source_key,
@@ -480,22 +504,37 @@ Deno.serve(async (req) => {
 
         if (inserted.error) {
           errors.push("rapid_insert: " + inserted.error.message);
+          writeError(runId, "rapid_insert_failed", inserted.error, { candidate_count: rows.length, duration_ms: Date.now() - rapidInsertStartedAt });
         } else {
           captured = inserted.data?.length || 0;
+          writeLog(runId, "rapid_insert_finished", { candidate_count: rows.length, inserted_count: captured, duration_ms: Date.now() - rapidInsertStartedAt });
+          let captureUpdated = 0;
+          let captureUpdateFailed = 0;
           for (const row of rows) {
-            await db.from("source_item_ledger").update({
+            const update = await db.from("source_item_ledger").update({
               status: "captured",
               captured_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             }).eq("source_key", row.source_key).eq("item_key", row.item_key);
+            if (update.error) {
+              captureUpdateFailed += 1;
+              writeError(runId, "ledger_capture_update_failed", update.error, { source_key: row.source_key });
+            } else captureUpdated += 1;
           }
-        }
+          writeLog(runId, "ledger_capture_updates_finished", { attempted: rows.length, updated: captureUpdated, failed: captureUpdateFailed });
       }
     }
+  } else if (!due.error) {
+    writeLog(runId, "due_items_loaded", { count: 0, cutoff: cutoffIso, max_age: maxAgeIso });
   }
 
   const trim = await db.rpc("mirsad_trim_rapid_news_to_400");
-  if (trim.error) errors.push("trim: " + trim.error.message);
+  if (trim.error) {
+    errors.push("trim: " + trim.error.message);
+    writeError(runId, "rapid_trim_failed", trim.error);
+  } else writeLog(runId, "rapid_trim_finished", { deleted: trim.data || 0 });
+
+  writeLog(runId, "run_finished", { duration_ms: Date.now() - runStartedAt, items_seen: itemsSeen, captured, error_count: errors.length });
 
   return reply({
     ok: errors.length === 0,
