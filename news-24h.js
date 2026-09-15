@@ -16,7 +16,7 @@
     n.dataset.id=a.id;
     n.querySelector('.card__category').textContent=CATEGORY_LABELS[a.category]||a.category||'عام';
     n.querySelector('.card__dot').style.background=CATEGORY_COLORS[a.category]||'#888';
-    n.querySelector('.card__source').textContent=a.source_name||'مصدر';
+    n.querySelector('.card__source').textContent=a.verified_source?`${a.source_name||'مصدر'} · موثوق`:a.source_name||'مصدر';
     n.querySelector('.card__headline').textContent=String(a.headline||'');
     n.querySelector('.card__summary').textContent=String(a.summary||'');
     n.querySelector('.card__confidence').textContent=`ثقة ${Math.round(Number(a.confidence_score??0))}%`;
@@ -26,7 +26,7 @@
     badge.hidden=Number(a.update_count||0)<=0;
     if(!badge.hidden)badge.textContent=`+${a.update_count} تحديث`;
     n.addEventListener('click',async()=>{
-      try{const {error}=await sb.rpc('open_article',{p_article_id:a.id});if(error)throw error;window.open(a.source_url,'_blank','noopener,noreferrer')}
+      try{if(!a.verified_source){const {error}=await sb.rpc('open_article',{p_article_id:a.id});if(error)throw error;}window.open(a.source_url,'_blank','noopener,noreferrer')}
       catch(error){console.warn('[mirsad 24h] open failed',error);window.open(a.source_url,'_blank','noopener,noreferrer')}
     });
     n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();n.click()}});
@@ -45,12 +45,17 @@
     }
     status.textContent='جارٍ تحميل أخبار آخر 24 ساعة…';
     const now=new Date();const cutoff=new Date(now.getTime()-24*60*60*1000).toISOString();
-    const {data,error}=await sb.from('news_24h_articles').select('id,source_name,source_url,headline,summary,category,importance_score,update_count,confidence_score,published_at').gte('published_at',cutoff).lte('published_at',now.toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false});
-    if(error){console.error(error);status.textContent='تعذر تحميل أخبار آخر 24 ساعة.';return}
+    const [mainResult,trustedResult]=await Promise.all([
+      sb.from('news_24h_articles').select('id,source_name,source_url,headline,summary,category,importance_score,update_count,confidence_score,published_at').gte('published_at',cutoff).lte('published_at',now.toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false}),
+      sb.from('trusted_news_articles').select('id,source_name,source_url,headline,summary,category,confidence_score,published_at,verified_source').gte('published_at',cutoff).lte('published_at',now.toISOString()).order('published_at',{ascending:false}).order('updated_at',{ascending:false})
+    ]);
+    if(mainResult.error){console.error(mainResult.error);status.textContent='تعذر تحميل أخبار آخر 24 ساعة.';return}
+    if(trustedResult.error)console.warn('[mirsad 24h] trusted source unavailable',trustedResult.error);
+    const data=[...(mainResult.data||[]),...(trustedResult.data||[])].sort((a,b)=>new Date(b.published_at||0)-new Date(a.published_at||0));
     grid.innerHTML='';
     (data||[]).forEach(a=>grid.appendChild(card(a)));
-    count.textContent=`${(data||[]).length} خبر · حتى 20 من كل مصدر`;
-    status.textContent=(data||[]).length?`آخر تحديث للصفحة: ${new Intl.DateTimeFormat('ar',{hour:'2-digit',minute:'2-digit'}).format(now)}`:'لا توجد أخبار منشورة خلال آخر 24 ساعة.';
+    count.textContent=`${data.length} خبر · حتى 20 من كل مصدر`;
+    status.textContent=data.length?`آخر تحديث للصفحة: ${new Intl.DateTimeFormat('ar',{hour:'2-digit',minute:'2-digit'}).format(now)}`:'لا توجد أخبار منشورة خلال آخر 24 ساعة.';
   }
   load(true);setInterval(()=>load(false),5*60*1000);
 })();
