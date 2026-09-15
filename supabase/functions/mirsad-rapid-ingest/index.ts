@@ -447,15 +447,9 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Reconcile what already made it into the main store before any capture decision.
-  const sync = await db.rpc("mirsad_sync_ledger_main_status");
-  if (sync.error) errors.push("ledger_sync: " + sync.error.message);
-  if (sync.error) writeError(runId, "ledger_sync_failed", sync.error);
-  else writeLog(runId, "ledger_sync_finished", { changed: sync.data || 0 });
-
-  // Only items first observed at least one hour ago and still absent from the main store
-  // are eligible for the captured-news safety net.
-  const cutoffIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // Daraj is an independent rapid-news source. Capture observed items after a short
+  // stabilization window without consulting the main news store.
+  const cutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const maxAgeIso = new Date(Date.now() - RECENT_MS).toISOString();
   const due = await db.from("source_item_ledger")
     .select("source_key,source_url,headline,summary,published_at,first_seen_at,item_key")
@@ -470,23 +464,9 @@ Deno.serve(async (req) => {
     writeError(runId, "due_query_failed", due.error, { duration_ms: Date.now() - runStartedAt });
   } else if (due.data?.length) {
     writeLog(runId, "due_items_loaded", { count: due.data.length, cutoff: cutoffIso, max_age: maxAgeIso });
-    const urls = due.data.map((row: any) => canonical(row.source_url));
-    let mainUrls: Set<string>;
-    let mainCheckOk = true;
-    try {
-      mainUrls = await urlsInTable("news_articles", urls);
-    } catch (error) {
-      errors.push("main_check: " + String(error).slice(0, 500));
-      writeError(runId, "main_news_comparison_failed", error, { due_count: due.data.length });
-      mainUrls = new Set<string>();
-      mainCheckOk = false;
-    }
-    const rows = mainCheckOk
-      ? due.data.filter((row: any) => !mainUrls.has(canonical(row.source_url)))
-      : [];
-    writeLog(runId, "main_news_comparison_finished", { due_count: due.data.length, main_matches: mainUrls.size, rapid_candidates: rows.length });
+    const rows = due.data;
 
-    if (rows.length && mainCheckOk) {
+    if (rows.length) {
         const rapidInsertStartedAt = Date.now();
         writeLog(runId, "rapid_insert_started", { candidate_count: rows.length });
         const inserted = await db.from("rapid_news").upsert(
