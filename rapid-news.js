@@ -31,7 +31,6 @@
   const uniqueStories = (rows) => {
     const result = [];
     for (const row of rows || []) {
-      if (!isMeaningful(row)) continue;
       const headline = cleanRichText(row.headline);
       result.push({ ...row, headline, summary: cleanRichText(row.summary) });
     }

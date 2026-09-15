@@ -362,7 +362,7 @@ Deno.serve(async (req) => {
       const cutoff = Date.now() - RECENT_MS;
       const observations: any[] = [];
       const localKeys = new Set<string>();
-      const parsed = items(result.value.xml).slice(0, 100);
+      const parsed = items(result.value.xml);
 
       for (const item of parsed) {
         const headline = cleanRichText(field(item, "title"));
@@ -370,11 +370,7 @@ Deno.serve(async (req) => {
           ? canonical(field(item, "link"))
           : itemUrl(item);
         const ms = (() => { const value = publishedMs(item); return value ? new Date(value).toISOString() : null; })();
-        if (!headline || !isArabic(headline) || !url) continue;
-        if (ms) {
-          const age = Date.now() - new Date(ms).getTime();
-          if (age > RECENT_MS) continue;
-        }
+        if (!headline || !url) continue;
 
         const key = itemKey(item, url);
         if (localKeys.has(key)) continue;
@@ -449,8 +445,8 @@ Deno.serve(async (req) => {
 
   // Daraj is an independent rapid-news source. Capture observed items after a short
   // stabilization window without consulting the main news store.
-  const cutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  const maxAgeIso = new Date(Date.now() - RECENT_MS).toISOString();
+  const cutoffIso = new Date(0).toISOString();
+  const maxAgeIso = new Date(0).toISOString();
   const due = await db.from("source_item_ledger")
     .select("source_key,source_url,headline,summary,published_at,first_seen_at,item_key")
     .eq("source_key", RAPID_SOURCE.source_key)
