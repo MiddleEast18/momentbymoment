@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const INITIAL_COUNT = 7;
+  const INITIAL_COUNT = 400;
   const MORE_COUNT = 5;
   const grid = document.getElementById('newsGrid');
   if (!grid) return;
