@@ -27,6 +27,14 @@ Deno.serve(async (req: Request) => {
   if (userError || !user) return json({ error: 'Unauthorized' }, 401);
 
   const admin = createClient(supabaseUrl, serviceRoleKey);
+  const { data: owner, error: ownerError } = await admin
+    .from('mirsad_owner')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (ownerError) return json({ error: 'Unable to verify account role' }, 500);
+  if (owner) return json({ error: 'Owner account cannot be deleted' }, 409);
+
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) return json({ error: 'Unable to delete account' }, 500);
 
