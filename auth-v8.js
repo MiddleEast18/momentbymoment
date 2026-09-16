@@ -203,7 +203,11 @@
     const {data,error}=await sb.rpc('claim_first_signup_reward');
     if(error){console.error('[mirsad onboarding] reward claim failed',error);signupOnboardingInFlight=false;return;}
     const reward=Array.isArray(data)?data[0]:data;
-    if(reward?.claimed){
+    if(reward?.restored){
+      const restoredBalance=Math.max(0,Number(reward.remaining_unlocks)||0);
+      const restoredDialog=onboardingDialog(`<div class="mirsad-onboarding__reward"><h2>مرحبًا بعودتك</h2><strong>${restoredBalance} فتحة</strong><p>تم استعادة الرصيد المتبقي من حسابك السابق بعد حذف الحساب. لن تُمنح مكافأة التسجيل الأولى مرة أخرى لهذا البريد الإلكتروني.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>متابعة</button></div></div>`);
+      await new Promise(resolve=>restoredDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{restoredDialog.remove();resolve()}, {once:true}));
+    }else if(reward?.claimed){
       const rewardDialog=onboardingDialog('<div class="mirsad-onboarding__reward"><h2>تهانينا، حصلت على رصيدك المجاني</h2><strong>1000 فتحة</strong><p>تمت إضافة 1000 فتحة مجانية إلى حسابك لتجربة الموقع لفترة محدودة.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>بدء التجربة</button></div></div>');
       await new Promise(resolve=>rewardDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{rewardDialog.remove();resolve()}, {once:true}));
     }
