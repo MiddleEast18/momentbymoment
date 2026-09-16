@@ -66,7 +66,7 @@
     let notice = document.getElementById('newsPaginationGuestNotice');
     if (!notice) {
       const style = document.createElement('style');
-      style.textContent = '.news-pagination__guest-notice{position:fixed;left:16px;right:16px;bottom:16px;z-index:5600;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid rgba(201,162,39,.5);border-radius:12px;background:rgba(16,21,28,.97);color:var(--text,#f2eee6);box-shadow:0 10px 30px rgba(0,0,0,.3);font:600 12px/1.5 var(--font-sans,inherit)}.news-pagination__guest-notice button{border:1px solid var(--gold,#c9a227);border-radius:999px;padding:7px 12px;background:rgba(201,162,39,.12);color:var(--gold,#c9a227);font:inherit;white-space:nowrap;cursor:pointer}';
+      style.textContent = '.news-pagination__guest-notice{position:fixed;left:16px;right:16px;bottom:16px;z-index:5600;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid rgba(201,162,39,.5);border-radius:12px;background:rgba(16,21,28,.97);color:var(--text,#f2eee6);box-shadow:0 10px 30px rgba(0,0,0,.3);font:600 12px/1.5 var(--font-sans,inherit)}.news-pagination__guest-notice[hidden]{display:none!important}.news-pagination__guest-notice button{border:1px solid var(--gold,#c9a227);border-radius:999px;padding:7px 12px;background:rgba(201,162,39,.12);color:var(--gold,#c9a227);font:inherit;white-space:nowrap;cursor:pointer}';
       document.head.appendChild(style);
       notice = document.createElement('div');
       notice.id = 'newsPaginationGuestNotice';
