@@ -2,7 +2,7 @@
   'use strict';
   const SUPABASE_URL = 'https://dndlkenyfymlrjnslyzb.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
-  const REQUIRED = 19;
+  const REQUIRED_BY_KIND = { article: 19, rapid: 20 };
   const inFlight = new Map();
 
   const showGuestDialog = () => {
@@ -45,7 +45,8 @@
   const getClient = () => window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
   const open = async (url, sourceKind, sourceId) => {
     const sourceUrl = String(url || '').trim();
-    if (!/^https?:\/\//i.test(sourceUrl) || !['article', 'rapid'].includes(sourceKind) || !sourceId) return false;
+    const required = REQUIRED_BY_KIND[sourceKind];
+    if (!/^https?:\/\//i.test(sourceUrl) || !required || !sourceId) return false;
     const client = getClient();
     if (!client) { showNotice('تعذر الاتصال بالخدمة. حاول مرة أخرى.'); return false; }
     const { data: { session } = {} } = await client.auth.getSession();
@@ -54,13 +55,17 @@
     if (inFlight.has(key)) return inFlight.get(key);
     const request = (async () => {
       const requestId = crypto.randomUUID();
-      const { data, error } = await client.rpc('open_original_source', { p_source_url: sourceUrl, p_request_id: requestId, p_source_kind: sourceKind, p_source_id: sourceId });
+      const rpcName = sourceKind === 'article' ? 'open_main_article_source' : 'open_rapid_news_source';
+      const params = sourceKind === 'article'
+        ? { p_source_url: sourceUrl, p_request_id: requestId, p_article_id: sourceId }
+        : { p_source_url: sourceUrl, p_request_id: requestId, p_rapid_news_id: sourceId };
+      const { data, error } = await client.rpc(rpcName, params);
       if (error) { showNotice('تعذر التحقق من الرصيد. حاول مرة أخرى.'); return false; }
       const result = Array.isArray(data) ? data[0] : data;
       const remaining = Number(result?.remaining_unlocks ?? 0);
-      if (!result?.opened) { showNotice(`فتح المصدر الأصلي يحتاج إلى ${REQUIRED} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
+      if (!result?.opened) { showNotice(`فتح المصدر الأصلي يحتاج إلى ${required} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
       window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining, unlimited: Boolean(result?.unlimited) } }));
-      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction(`المصدر الأصلي: تم خصم ${REQUIRED} فتحة، المتبقي ${remaining}`, REQUIRED);
+      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('المصدر الأصلي', required);
       window.location.assign(sourceUrl);
       return true;
     })();
