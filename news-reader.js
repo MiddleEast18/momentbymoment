@@ -465,7 +465,7 @@
     });
   }
 
-  sourceBtn.addEventListener('click', (event) => { event.preventDefault(); if (!sourceBtn.hidden && typeof window.mirsadOpenOriginalSource === 'function') void window.mirsadOpenOriginalSource(sourceBtn.href); });
+  sourceBtn.addEventListener('click', (event) => { event.preventDefault(); if (!sourceBtn.hidden && typeof window.mirsadOpenOriginalSource === 'function') void window.mirsadOpenOriginalSource(sourceBtn.href, 'article', state.article?.id); });
   closeBtn.addEventListener('click', closeReader);
   backdrop.addEventListener('click', (event) => { if (event.target === backdrop) closeReader(); });
   document.addEventListener('keydown', (event) => {

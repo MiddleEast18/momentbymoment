@@ -43,18 +43,18 @@
   };
 
   const getClient = () => window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
-  const open = async (url) => {
+  const open = async (url, sourceKind, sourceId) => {
     const sourceUrl = String(url || '').trim();
-    if (!/^https?:\/\//i.test(sourceUrl)) return false;
+    if (!/^https?:\/\//i.test(sourceUrl) || !['article', 'rapid'].includes(sourceKind) || !sourceId) return false;
     const client = getClient();
     if (!client) { showNotice('تعذر الاتصال بالخدمة. حاول مرة أخرى.'); return false; }
     const { data: { session } = {} } = await client.auth.getSession();
     if (!session?.user) { showGuestDialog(); return false; }
-    const key = sourceUrl;
+    const key = `${sourceKind}:${sourceId}`;
     if (inFlight.has(key)) return inFlight.get(key);
     const request = (async () => {
       const requestId = crypto.randomUUID();
-      const { data, error } = await client.rpc('open_original_source', { p_source_url: sourceUrl, p_request_id: requestId });
+      const { data, error } = await client.rpc('open_original_source', { p_source_url: sourceUrl, p_request_id: requestId, p_source_kind: sourceKind, p_source_id: sourceId });
       if (error) { showNotice('تعذر التحقق من الرصيد. حاول مرة أخرى.'); return false; }
       const result = Array.isArray(data) ? data[0] : data;
       const remaining = Number(result?.remaining_unlocks ?? 0);
