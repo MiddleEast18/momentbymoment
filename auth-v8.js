@@ -12,6 +12,7 @@
   let googleFlowActive=false;
   let googleFlowStartedAt=0;
   let googleFlowTimer=null;
+  let accountDeletionInFlight=false;
   const GOOGLE_FLOW_TIMEOUT_MS=15000;
   const AUTH_HASH_KEYS=['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','provider_token','provider_refresh_token'];
   function cleanAuthUrl(){
@@ -238,7 +239,39 @@
     root.querySelector('[data-back]').addEventListener('click',()=>{window.location.href=new URL('index.html',window.location.href).href});
     root.querySelector('[data-signout]').addEventListener('click',async()=>{const{error}=await sb.auth.signOut({scope:'local'});if(error){statusText(root.querySelector('#mirsadProfilePageStatus'),'تعذر تسجيل الخروج. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
     root.querySelector('[data-save]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus'),btn=root.querySelector('[data-save]');const payload={id:user.id,display_name:root.querySelector('#profilePageName').value.trim(),avatar_url:avatarUrl(root.querySelector('#profilePageAvatar').value)||null,username:root.querySelector('#profilePageUsername').value.trim()||null,bio:root.querySelector('#profilePageBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;root.querySelectorAll('.mirsad-profile-field').forEach(label=>{if(fieldValue(label))label.classList.add('is-saving')});statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){root.querySelectorAll('.is-saving').forEach(label=>label.classList.remove('is-saving'));statusText(status,'تعذر حفظ الملف. تحقق من البيانات وحاول مجددًا.');return}const nextAvatar=avatarUrl(root.querySelector('#profilePageAvatar').value);const avatarBox=root.querySelector('.mirsad-profile-page__avatar');avatarBox.innerHTML=nextAvatar?`<img src="${safe(nextAvatar)}" alt="" loading="lazy">`:`<span>${safe(initial)}</span>`;avatarBox.querySelector('img')?.addEventListener('error',event=>{event.currentTarget.remove();const fallback=document.createElement('span');fallback.textContent=initial;avatarBox.appendChild(fallback)});const menuButton=document.querySelector('#mirsadUserMenu .mirsad-user-button');if(menuButton)menuButton.innerHTML=nextAvatar?`<img src="${safe(nextAvatar)}" alt="">`:`<span class="mirsad-user-initial">${safe(initial)}</span>`;root.querySelectorAll('.mirsad-profile-field').forEach(makeFieldSaved);statusText(status,'تم حفظ الملف بنجاح.')});
-    root.querySelector('[data-delete]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus');if(!await showDeleteAccountConfirm())return;const{error}=await sb.functions.invoke('delete-account',{body:{}});if(error){statusText(status,'تعذر حذف الحساب. حاول مرة أخرى.');return}window.location.href=new URL('index.html',window.location.href).href});
+    root.querySelector('[data-delete]').addEventListener('click',async()=>{
+      const status=root.querySelector('#mirsadProfilePageStatus');
+      const deleteButton=root.querySelector('[data-delete]');
+      if(accountDeletionInFlight)return;
+      if(!await showDeleteAccountConfirm())return;
+      accountDeletionInFlight=true;
+      deleteButton.disabled=true;
+      deleteButton.textContent='جارٍ حذف الحساب…';
+      statusText(status,'جارٍ حذف الحساب وبياناته…');
+      try{
+        const{data,error}=await sb.functions.invoke('delete-account',{body:{}});
+        if(error||data?.ok!==true){
+          const httpStatus=error?.context?.status||error?.status;
+          const message=httpStatus===401?'انتهت جلسة الدخول، سجّل الدخول مرة أخرى.':httpStatus===403?'لا تملك صلاحية حذف هذا الحساب.':'تعذر إكمال حذف الحساب. لم يتم تغيير بيانات الحساب.';
+          statusText(status,message);
+          return;
+        }
+        try{await sb.auth.signOut({scope:'local'})}catch{}
+        localStorage.removeItem(CONFIG.GUEST_KEY);
+        clearSignupOnboardingPending();
+        document.getElementById('mirsadUserMenu')?.remove();
+        window.location.replace(new URL('index.html',window.location.href).href);
+      }catch(error){
+        console.error('[mirsad auth] account deletion failed',error);
+        statusText(status,'تعذر الاتصال بالخدمة. لم يتم تغيير الحساب.');
+      }finally{
+        if(document.body.contains(deleteButton)){
+          deleteButton.disabled=false;
+          deleteButton.textContent='حذف الحساب';
+        }
+        accountDeletionInFlight=false;
+      }
+    });
   }
 
   async function openProfile(user){
