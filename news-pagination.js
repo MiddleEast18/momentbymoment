@@ -86,8 +86,13 @@
     showGuestAccessNotice.timer = setTimeout(() => { notice.hidden = true; }, 5000);
   }
 
+  function isGuestVisitor() {
+    try { return localStorage.getItem('mirsad.guest.v1') === '1'; } catch { return false; }
+  }
+
   async function consume(kind) {
     if (busy || !window.mirsadViewAccess) return false;
+    if (isGuestVisitor()) { status.textContent = 'تسجيل الدخول مطلوب'; showGuestAccessNotice(); return false; }
     busy = true;
     moreButton.disabled = true;
     allButton.disabled = true;
