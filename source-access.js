@@ -65,7 +65,11 @@
       const remaining = Number(result?.remaining_unlocks ?? 0);
       if (!result?.opened) { showNotice(`فتح المصدر الأصلي يحتاج إلى ${required} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
       window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining, unlimited: Boolean(result?.unlimited) } }));
-      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('المصدر الأصلي', required);
+      if (result?.charged) {
+        showNotice(`تم خصم ${required} فتحة لفتح المصدر الأصلي. الرصيد المتبقي ${remaining} فتحة.`);
+        if (typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('المصدر الأصلي', required);
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+      }
       window.location.assign(sourceUrl);
       return true;
     })();
