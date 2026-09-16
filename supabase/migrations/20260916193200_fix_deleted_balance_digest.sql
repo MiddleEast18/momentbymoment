@@ -7,7 +7,7 @@ as $function$
 declare prior public.deleted_account_balances;
 begin
   select * into prior from public.deleted_account_balances
-  where email_hash = encode(digest(convert_to(lower(trim(new.email)), 'UTF8'), 'sha256'), 'hex')
+  where email_hash = encode(extensions.digest(convert_to(lower(trim(new.email)), 'UTF8'), 'sha256'), 'hex')
     and restored_at is null for update;
   if prior.email_hash is not null then
     insert into public.user_unlocks(user_id, unlock_balance, unlimited_unlocks)
