@@ -30,8 +30,12 @@ Deno.serve(async (req: Request) => {
   if (balanceError) return json({ error: 'Unable to preserve account balance' }, 500);
   const hash = await emailHash(user.email);
   const remaining = Math.max(0, Number(balance?.unlock_balance || 0));
-  const { error: preserveError } = await admin.from('deleted_account_balances').upsert({ email_hash: hash, remaining_unlocks: remaining, restored_at: null }, { onConflict: 'email_hash' });
-  if (preserveError) return json({ error: 'Unable to preserve account balance' }, 500);
+  const { data: previousBalance, error: previousBalanceError } = await admin.from('deleted_account_balances').select('restored_at').eq('email_hash', hash).maybeSingle();
+  if (previousBalanceError) return json({ error: 'Unable to preserve account balance' }, 500);
+  if (!previousBalance?.restored_at) {
+    const { error: preserveError } = await admin.from('deleted_account_balances').upsert({ email_hash: hash, remaining_unlocks: remaining, restored_at: null }, { onConflict: 'email_hash' });
+    if (preserveError) return json({ error: 'Unable to preserve account balance' }, 500);
+  }
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
     await admin.from('deleted_account_balances').delete().eq('email_hash', hash).is('restored_at', null);
