@@ -151,7 +151,7 @@
     if(existing){
       const userCreated=Date.parse(user.created_at||'');
       const profileCreated=Date.parse(existing.created_at||'');
-      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=15*60*1000;
+      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=24*60*60*1000;
       return {...existing,__createdNow:createdNow};
     }
     const payload={id:user.id,display_name:meta.full_name||meta.name||'',avatar_url:meta.avatar_url||meta.picture||null};
@@ -161,7 +161,7 @@
     if(again){
       const userCreated=Date.parse(user.created_at||'');
       const profileCreated=Date.parse(again.created_at||'');
-      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=15*60*1000;
+      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=24*60*60*1000;
       return {...again,__createdNow:createdNow};
     }
     if(error)throw error;
@@ -169,6 +169,10 @@
   }
 
   let signupOnboardingInFlight=false;
+  const SIGNUP_ONBOARDING_KEY='mirsad.signup-onboarding.v1';
+  const signupOnboardingPending=(user)=>{try{return localStorage.getItem(SIGNUP_ONBOARDING_KEY)===user.id}catch{return false}};
+  const setSignupOnboardingPending=(user)=>{try{localStorage.setItem(SIGNUP_ONBOARDING_KEY,user.id)}catch{}};
+  const clearSignupOnboardingPending=()=>{try{localStorage.removeItem(SIGNUP_ONBOARDING_KEY)}catch{}};
   function onboardingStyles(){
     if(document.getElementById('mirsadSignupOnboardingStyles'))return;
     const style=document.createElement('style');style.id='mirsadSignupOnboardingStyles';
@@ -180,8 +184,9 @@
     const backdrop=document.createElement('div');backdrop.className='mirsad-onboarding-backdrop';backdrop.innerHTML=`<section class="mirsad-onboarding" role="dialog" aria-modal="true">${markup}</section>`;document.body.appendChild(backdrop);return backdrop;
   }
   async function showSignupRules(user,profile){
-    if(signupOnboardingInFlight||!profile?.__createdNow)return;
+    if(signupOnboardingInFlight||(!profile?.__createdNow&&!signupOnboardingPending(user)))return;
     signupOnboardingInFlight=true;
+    setSignupOnboardingPending(user);
     const rules=onboardingDialog('<h2>مهم: قواعد الخصم في مِرصاد</h2><p>يرجى قراءة القواعد التالية قبل بدء التجربة المجانية:</p><table><thead><tr><th>العملية</th><th>الخصم</th><th>الملاحظة</th></tr></thead><tbody><tr><td>فتح بطاقة من الأخبار الرئيسية</td><td>فتحة واحدة</td><td>تُخصم عند فتح تفاصيل الخبر.</td></tr><tr><td>المصدر الأصلي للبطاقة الرئيسية</td><td>19 فتحة</td><td>مرة واحدة فقط لكل خبر؛ يصبح الإجمالي 20 فتحة.</td></tr><tr><td>المصدر الأصلي لأخبار الشرق الأوسط بالإنجليزية</td><td>20 فتحة</td><td>نظام مستقل، ومرة واحدة فقط لكل خبر.</td></tr><tr><td>عرض مزيد</td><td>5 فتحات</td><td>تُخصم عند تجاوز نافذة الأخبار الحالية وطلب مجموعة إضافية.</td></tr><tr><td>عرض الكل</td><td>100 فتحة</td><td>تُخصم عند طلب فتح جميع الأخبار المتاحة.</td></tr><tr><td>إعادة فتح المصدر نفسه</td><td>بدون خصم</td><td>بعد تسجيل الفتح الأول لنفس الخبر.</td></tr></tbody></table><label class="mirsad-onboarding__check"><input type="checkbox" data-rules-accepted><span>لقد قرأت قواعد الخصم وأنا مستعد لتجربة الموقع مجانًا لفترة محدودة.</span></label><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-rules-next disabled>التالي</button></div>');
     const check=rules.querySelector('[data-rules-accepted]');const next=rules.querySelector('[data-rules-next]');check.addEventListener('change',()=>{next.disabled=!check.checked});
     await new Promise(resolve=>next.addEventListener('click',()=>{rules.remove();resolve()}, {once:true}));
@@ -192,6 +197,7 @@
       const rewardDialog=onboardingDialog('<div class="mirsad-onboarding__reward"><h2>تهانينا، حصلت على رصيدك المجاني</h2><strong>1000 فتحة</strong><p>تمت إضافة 1000 فتحة مجانية إلى حسابك لتجربة الموقع لفترة محدودة.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>بدء التجربة</button></div></div>');
       await new Promise(resolve=>rewardDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{rewardDialog.remove();resolve()}, {once:true}));
     }
+    clearSignupOnboardingPending();
     if(isProfilePage()){renderProfilePage(user,profile);return}
     if(!profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),250);
   }
@@ -265,7 +271,7 @@
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
     const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && profile.__createdNow){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(profile && (profile.__createdNow||signupOnboardingPending(user))){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
