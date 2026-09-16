@@ -182,7 +182,8 @@
       const rewardDialog=onboardingDialog('<div class="mirsad-onboarding__reward"><h2>تهانينا، حصلت على رصيدك المجاني</h2><strong>1000 فتحة</strong><p>تمت إضافة 1000 فتحة مجانية إلى حسابك لتجربة الموقع لفترة محدودة.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>بدء التجربة</button></div></div>');
       await new Promise(resolve=>rewardDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{rewardDialog.remove();resolve()}, {once:true}));
     }
-    if(!isProfilePage()&&!profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),250);
+    if(isProfilePage()){renderProfilePage(user,profile);return}
+    if(!profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),250);
   }
 
   const isProfilePage=()=>window.location.pathname.endsWith('/profile.html');
@@ -254,7 +255,7 @@
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
     const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && profile.__createdNow){void showSignupRules(user,profile);}else if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(profile && profile.__createdNow){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
