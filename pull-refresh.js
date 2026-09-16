@@ -13,6 +13,8 @@
   let indicator;
   let icon;
   let label;
+  let renderFrame = 0;
+  let pendingDistance = 0;
 
   function ensureIndicator() {
     if (indicator) return;
@@ -41,13 +43,26 @@
   }
 
   function reset() {
-    if (!indicator) return;
-    indicator.classList.remove('is-visible', 'is-refreshing');
-    indicator.style.transform = '';
-    label.textContent = 'اسحب للتحديث';
+    if (renderFrame) { cancelAnimationFrame(renderFrame); renderFrame = 0; }
+    if (indicator) {
+      indicator.classList.remove('is-visible', 'is-refreshing');
+      indicator.style.transform = '';
+      label.textContent = 'اسحب للتحديث';
+    }
     pullDistance = 0;
+    pendingDistance = 0;
     pulling = false;
     tracking = false;
+  }
+
+  function renderPull(distance) {
+    renderFrame = 0;
+    if (!indicator || !pulling) return;
+    const progress = Math.min(1, distance / THRESHOLD);
+    indicator.classList.add('is-visible');
+    indicator.style.transform = `translate(-50%, ${Math.max(0, distance - 58)}px) scale(${.82 + progress * .18})`;
+    icon.style.transform = `rotate(${progress * 300}deg)`;
+    label.textContent = progress >= 1 ? 'اترك للتحديث' : 'اسحب للتحديث';
   }
 
   document.addEventListener('touchstart', (event) => {
@@ -67,11 +82,8 @@
     pulling = true;
     const distance = Math.min(MAX_PULL, dy * .58);
     pullDistance = distance;
-    const progress = Math.min(1, distance / THRESHOLD);
-    indicator.classList.add('is-visible');
-    indicator.style.transform = `translate(-50%, ${Math.max(0, distance - 58)}px) scale(${.82 + progress * .18})`;
-    icon.style.transform = `rotate(${progress * 300}deg)`;
-    label.textContent = progress >= 1 ? 'اترك للتحديث' : 'اسحب للتحديث';
+    pendingDistance = distance;
+    if (!renderFrame) renderFrame = requestAnimationFrame(() => renderPull(pendingDistance));
     event.preventDefault();
   }, { passive: false });
 
