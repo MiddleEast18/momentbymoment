@@ -2,7 +2,7 @@
   'use strict';
   const SUPABASE_URL = 'https://dndlkenyfymlrjnslyzb.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
-  const REQUIRED = 20;
+  const REQUIRED = 19;
   const inFlight = new Map();
 
   const showGuestDialog = () => {
@@ -60,7 +60,7 @@
       const remaining = Number(result?.remaining_unlocks ?? 0);
       if (!result?.opened) { showNotice(`فتح المصدر الأصلي يحتاج إلى ${REQUIRED} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
       window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining, unlimited: Boolean(result?.unlimited) } }));
-      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('المصدر الأصلي', REQUIRED);
+      if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction(`المصدر الأصلي: تم خصم ${REQUIRED} فتحة، المتبقي ${remaining}`, REQUIRED);
       window.location.assign(sourceUrl);
       return true;
     })();
