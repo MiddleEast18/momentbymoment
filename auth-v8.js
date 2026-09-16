@@ -92,7 +92,7 @@
   }
 
   function showGuestLockToast(){
-    injectStyles();let toast=document.getElementById('mirsadGuestLockToast');
+    injectStyles();document.getElementById('newsPaginationGuestNotice')?.remove();let toast=document.getElementById('mirsadGuestLockToast');
     if(!toast){
       toast=document.createElement('aside');toast.id='mirsadGuestLockToast';toast.className='mirsad-guest-lock-toast';
       toast.innerHTML='<div class="mirsad-guest-lock-toast__text"><strong>سجّل الدخول لقراءة تفاصيل الخبر</strong><small>يمكنك متابعة الأخبار كزائر، لكن قراءة التفاصيل تتطلب حسابًا.</small></div><button class="mirsad-guest-lock-toast__button" type="button">تسجيل الدخول</button>';
