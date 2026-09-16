@@ -330,7 +330,7 @@
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
     const unlockAccount=await ensureUnlockAccount(); const serverOnboarding=await shouldShowSignupOnboarding(); if(serverOnboarding)setSignupOnboardingPending(user); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && (serverOnboarding||profile.__createdNow||signupOnboardingPending(user))){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(profile && serverOnboarding){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
