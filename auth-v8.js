@@ -146,14 +146,24 @@
 
   async function ensureProfile(user){
     const meta=user.user_metadata||{};
-    const selectCols='id,display_name,username,bio,avatar_url,onboarding_completed';
+    const selectCols='id,display_name,username,bio,avatar_url,onboarding_completed,created_at';
     const{data:existing}=await sb.from(CONFIG.PROFILE_TABLE).select(selectCols).eq('id',user.id).maybeSingle();
-    if(existing)return {...existing,__createdNow:false};
+    if(existing){
+      const userCreated=Date.parse(user.created_at||'');
+      const profileCreated=Date.parse(existing.created_at||'');
+      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=15*60*1000;
+      return {...existing,__createdNow:createdNow};
+    }
     const payload={id:user.id,display_name:meta.full_name||meta.name||'',avatar_url:meta.avatar_url||meta.picture||null};
     const{data,error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'}).select(selectCols).maybeSingle();
     if(data)return {...data,__createdNow:true};
     const{data:again}=await sb.from(CONFIG.PROFILE_TABLE).select(selectCols).eq('id',user.id).maybeSingle();
-    if(again)return {...again,__createdNow:false};
+    if(again){
+      const userCreated=Date.parse(user.created_at||'');
+      const profileCreated=Date.parse(again.created_at||'');
+      const createdNow=Number.isFinite(userCreated)&&Number.isFinite(profileCreated)&&profileCreated>=userCreated&&profileCreated-userCreated<=15*60*1000;
+      return {...again,__createdNow:createdNow};
+    }
     if(error)throw error;
     return {id:user.id,display_name:payload.display_name,username:null,bio:null,onboarding_completed:false,__createdNow:true};
   }
