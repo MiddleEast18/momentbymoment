@@ -43,28 +43,25 @@
   };
 
   const getClient = () => window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_KEY);
-  const closePending = (pendingWindow) => { try { pendingWindow?.close(); } catch {} };
   const open = async (url) => {
     const sourceUrl = String(url || '').trim();
     if (!/^https?:\/\//i.test(sourceUrl)) return false;
     const client = getClient();
     if (!client) { showNotice('تعذر الاتصال بالخدمة. حاول مرة أخرى.'); return false; }
-    const pendingWindow = window.open('about:blank', '_blank', 'noopener,noreferrer');
     const { data: { session } = {} } = await client.auth.getSession();
-    if (!session?.user) { closePending(pendingWindow); showGuestDialog(); return false; }
+    if (!session?.user) { showGuestDialog(); return false; }
     const key = sourceUrl;
-    if (inFlight.has(key)) { closePending(pendingWindow); return inFlight.get(key); }
+    if (inFlight.has(key)) return inFlight.get(key);
     const request = (async () => {
       const requestId = crypto.randomUUID();
       const { data, error } = await client.rpc('open_original_source', { p_source_url: sourceUrl, p_request_id: requestId });
-      if (error) { closePending(pendingWindow); showNotice('تعذر التحقق من الرصيد. حاول مرة أخرى.'); return false; }
+      if (error) { showNotice('تعذر التحقق من الرصيد. حاول مرة أخرى.'); return false; }
       const result = Array.isArray(data) ? data[0] : data;
       const remaining = Number(result?.remaining_unlocks ?? 0);
-      if (!result?.opened) { closePending(pendingWindow); showNotice(`فتح المصدر الأصلي يحتاج إلى ${REQUIRED} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
+      if (!result?.opened) { showNotice(`فتح المصدر الأصلي يحتاج إلى ${REQUIRED} فتحة. رصيدك الحالي ${remaining} فتحة، وهو غير كافٍ.`); return false; }
       window.dispatchEvent(new CustomEvent('mirsad:unlock-balance', { detail: { remaining, unlimited: Boolean(result?.unlimited) } }));
       if (result?.charged && typeof window.mirsadNotifyDeduction === 'function') window.mirsadNotifyDeduction('المصدر الأصلي', REQUIRED);
-      if (pendingWindow) pendingWindow.location.href = sourceUrl;
-      else window.open(sourceUrl, '_blank', 'noopener,noreferrer');
+      window.location.assign(sourceUrl);
       return true;
     })();
     inFlight.set(key, request);
