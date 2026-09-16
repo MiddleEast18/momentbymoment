@@ -39,9 +39,9 @@
   };
   window.mirsadViewAccess = {
     async openRapid() {
-      const { data, error } = await sb.rpc('open_rapid_news');
-      if (error) return { allowed: false, charged: false, error };
-      return publishBalance({ ...(data?.[0] || data || {}), error: null }, '');
+      // Reading the rapid-news rail is public. Authentication remains required
+      // by consume() for actions that expand the paid view window.
+      return { allowed: true, charged: false, unread_count: 0, error: null };
     },
     async consume(kind) {
       const { data, error } = await sb.rpc('consume_news_view', { p_view_kind: kind });
