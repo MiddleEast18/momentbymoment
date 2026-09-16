@@ -87,7 +87,7 @@
   }
 
   function isGuestVisitor() {
-    try { return localStorage.getItem('mirsad.guest.v1') === '1'; } catch { return false; }
+    try { return localStorage.getItem('mirsad.guest.v1') === '1' || Boolean(document.getElementById('mirsadGuestExit')); } catch { return Boolean(document.getElementById('mirsadGuestExit')); }
   }
 
   async function consume(kind) {
