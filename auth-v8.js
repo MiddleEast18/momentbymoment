@@ -69,6 +69,11 @@
     try{const{data,error}=await sb.rpc('ensure_unlock_account');if(error)throw error;return Array.isArray(data)?data[0]:data}
     catch(error){console.warn('[mirsad unlocks] account setup failed',error);return null}
   }
+  async function shouldShowSignupOnboarding(){
+    if(!sb)return false;
+    try{const{data,error}=await sb.rpc('should_show_signup_onboarding');if(error)throw error;return Boolean(Array.isArray(data)?data[0]:data)}
+    catch(error){console.warn('[mirsad onboarding] state lookup failed',error);return false}
+  }
   function rememberReferralCode(){
     try{const code=new URL(window.location.href).searchParams.get('ref');if(code&&/^[A-Za-z0-9_-]{4,64}$/.test(code.trim()))localStorage.setItem('mirsad.pendingReferral.v1',code.trim().toUpperCase())}catch{}
   }
@@ -270,8 +275,8 @@
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
     let profile=null;
     try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
-    const unlockAccount=await ensureUnlockAccount(); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && (profile.__createdNow||signupOnboardingPending(user))){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    const unlockAccount=await ensureUnlockAccount(); const serverOnboarding=await shouldShowSignupOnboarding(); if(serverOnboarding)setSignupOnboardingPending(user); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
+    if(profile && (serverOnboarding||profile.__createdNow||signupOnboardingPending(user))){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
