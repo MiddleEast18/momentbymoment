@@ -72,7 +72,7 @@ const fetchFeed = async (source: any, state: any) => {
       const conditional: Record<string,string> = { "user-agent": "MirsadRSS/3.0", "accept": "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.1" };
       if (state?.etag) conditional["if-none-match"] = state.etag;
       if (state?.last_modified) conditional["if-modified-since"] = state.last_modified;
-      const response = await fetch(source.feed_url, { headers: conditional, signal: AbortSignal.timeout(10000) });
+      const response = await fetch(source.feed_url, { headers: conditional, signal: AbortSignal.timeout(20000) });
       status = response.status;
       if (response.status === 304) return { source, xml: "", status, duration: Date.now() - started, error: "", unchanged: true, etag: state?.etag || null, lastModified: state?.last_modified || null };
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
