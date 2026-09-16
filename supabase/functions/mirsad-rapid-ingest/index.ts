@@ -138,9 +138,9 @@ const LIVE_FALLBACK_URLS: Record<string, string> = {
   aljazeera: "https://www.aljazeera.net/news/breaking",
 };
 const RAPID_SOURCE = {
-  source_key: "daraj",
-  name: "Daraj",
-  feed_url: "https://daraj.media/feed/",
+  source_key: "middleeasteye",
+  name: "Middle East Eye",
+  feed_url: "https://www.middleeasteye.net/rss",
 };
 
 const extractJsonLdObjects = (html: string) => {
@@ -443,10 +443,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Daraj is an independent rapid-news source. Capture observed items after a short
-  // stabilization window without consulting the main news store.
-  const cutoffIso = new Date(0).toISOString();
-  const maxAgeIso = new Date(0).toISOString();
+  // The rapid source is independent of the main news store. Capture observed items
+  // after a short stabilization window so they become rapid-news cards reliably.
+  const cutoffIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const maxAgeIso = new Date(Date.now() - RECENT_MS).toISOString();
   const due = await db.from("source_item_ledger")
     .select("source_key,source_url,headline,summary,published_at,first_seen_at,item_key")
     .eq("source_key", RAPID_SOURCE.source_key)
