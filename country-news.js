@@ -9,8 +9,9 @@
   const setStatus = (text) => { const el = document.getElementById('countryStatus'); if (el) el.textContent = text; };
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('slug') || '';
-  const containsLatin = (value) => /[A-Za-zÀ-ÿŒœ]/.test(String(value || ''));
-  const foreignLanguage = (language, sourceKey, headline, summary) => !String(language || 'ar').toLowerCase().startsWith('ar') || containsLatin(headline) || containsLatin(summary) || ['dz_tsa', 'eg_dailynewsegypt'].includes(sourceKey);
+  const FOREIGN_SOURCE_KEYS = new Set(['dz_tsa', 'dz_algerie360', 'eg_dailynewsegypt']);
+  const mostlyLatin = (value) => { const text = String(value || ''); const latin = (text.match(/[A-Za-zÀ-ÿŒœ]/g) || []).length; const arabic = (text.match(/[\u0600-\u06ff]/g) || []).length; return latin > 12 && latin > arabic; };
+  const foreignLanguage = (language, sourceKey, headline, summary) => !String(language || 'ar').toLowerCase().startsWith('ar') || FOREIGN_SOURCE_KEYS.has(sourceKey) || mostlyLatin(headline) || mostlyLatin(summary);
   const translationButton = (article) => foreignLanguage(article.language, article.country_news_sources?.source_key, article.headline, article.summary) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى العربية">ترجمة إلى العربية</button>` : '';
   const translateArticle = async (button) => {
     const articleId = button.dataset.articleId;
