@@ -18,7 +18,7 @@
     document.getElementById('countrySubtitle').textContent = `${country.name_en} — تغطية محلية من ثلاثة مصادر منتقاة`;
     const [{ data: sources, error: sourceError }, { data: articles, error: articleError }] = await Promise.all([
       client.from('country_news_sources').select('source_name,source_type,priority,source_url').eq('country_id', country.id).eq('is_active', true).order('priority').limit(3),
-      client.from('country_news_articles').select('id,source_id,source_url,headline,summary,category,published_at,importance_score,confidence_score,country_news_sources(source_name,source_url)').eq('country_id', country.id).eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(30)
+      client.from('country_news_articles').select('id,source_id,source_url,headline,summary,category,published_at,importance_score,confidence_score,country_news_sources(source_name,source_url)').eq('country_id', country.id).eq('is_published', true).order('published_at', { ascending: false, nullsFirst: false }).limit(100)
     ]);
     if (sourceError || articleError) { console.error('[mirsad country]', sourceError || articleError); setStatus('تعذر تحميل أخبار الدولة حاليًا.'); return; }
     document.getElementById('sourceList').innerHTML = (sources || []).map((source) => `<a class="source-chip" href="${esc(source.source_url)}" target="_blank" rel="noopener noreferrer">${esc(source.source_name)}</a>`).join('');

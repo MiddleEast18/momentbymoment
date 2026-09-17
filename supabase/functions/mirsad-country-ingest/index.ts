@@ -5,7 +5,7 @@ type Source = { id: string; country_id: string; source_key: string; source_name:
 type ExistingArticle = { id: string; source_id: string; source_url: string; headline: string; summary: string; cluster_id: string | null; update_count: number; published_at: string | null };
 
 const stripHtml = (value: string) => value.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-const decode = (value: string) => value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+const decode = (value: string) => value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&#x([0-9a-f]+);|&#([0-9]+);|&(?:amp|quot|apos|lt|gt|rsquo|lsquo|rdquo|ldquo|ndash|mdash|hellip);/gi, (match, hex, decimal) => { if (hex) return String.fromCodePoint(parseInt(hex, 16)); if (decimal) return String.fromCodePoint(parseInt(decimal, 10)); return ({ '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>', '&rsquo;': '’', '&lsquo;': '‘', '&rdquo;': '”', '&ldquo;': '“', '&ndash;': '–', '&mdash;': '—', '&hellip;': '…' } as Record<string, string>)[match.toLowerCase()] || match; });
 const normalize = (value: string) => decode(stripHtml(value)).toLocaleLowerCase('ar').replace(/[ًٌٍَُِّْـ]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const tag = (item: string, name: string) => { const match = item.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'i')); return match ? decode(match[1]) : ''; };
 const attr = (item: string, name: string) => { const match = item.match(new RegExp(`${name}=["']([^"']+)["']`, 'i')); return match ? decode(match[1]) : ''; };
