@@ -22,18 +22,18 @@ Deno.serve(async (request) => {
   const { data: article, error: articleError } = await db.from('country_news_articles').select('id,headline,summary,language,is_published').eq('id', articleId).eq('is_published', true).maybeSingle();
   if (articleError || !article) return json({ error: 'Published article not found' }, 404);
   const headline = clean(article.headline, 500);
-  const summary = clean(article.summary, 1800);
+  const summary = clean(article.summary, 1200);
   const prompt = `Translate the following news headline and summary into Modern Standard Arabic. Preserve meaning and names. Do not add facts, commentary, markdown, or HTML. Return JSON only with exactly two string fields: translated_headline and translated_summary.\n\nHEADLINE:\n${headline}\n\nSUMMARY:\n${summary}`;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 1200 } }), signal: AbortSignal.timeout(25_000) });
-  if (!response.ok) return json({ error: 'Translation provider request failed' }, 502);
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2000 } }), signal: AbortSignal.timeout(25_000) });
+  if (!response.ok) { const providerError = await response.text(); console.error('[mirsad translation provider]', response.status, providerError.slice(0, 500)); return json({ error: 'Translation provider request failed', provider_status: response.status }, 502); }
   const payload = await response.json();
   const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
   let translated: { translated_headline?: string; translated_summary?: string };
-  try { translated = JSON.parse(raw.replace(/^```json\s*|\s*```$/g, '').trim()); } catch { return json({ error: 'Translation response was invalid' }, 502); }
+  try { const start = raw.indexOf('{'); const end = raw.lastIndexOf('}'); translated = JSON.parse((start >= 0 && end > start ? raw.slice(start, end + 1) : raw).trim()); } catch { return json({ error: 'Translation response was invalid' }, 502); }
   const translatedHeadline = clean(translated.translated_headline, 700);
   const translatedSummary = clean(translated.translated_summary, 2200);
   if (!translatedHeadline) return json({ error: 'Translation was empty' }, 502);
-  const row = { article_id: articleId, target_language: 'ar', translated_headline: translatedHeadline, translated_summary: translatedSummary, model: 'gemini-2.5-flash' };
+  const row = { article_id: articleId, target_language: 'ar', translated_headline: translatedHeadline, translated_summary: translatedSummary, model: 'gemini-3.6-flash' };
   const { data: saved, error: saveError } = await db.from('country_article_translations').upsert(row, { onConflict: 'article_id,target_language' }).select('article_id,target_language,translated_headline,translated_summary,model').single();
   if (saveError) return json({ error: 'Translation cache save failed' }, 500);
   return json({ translation: saved, cached: false });

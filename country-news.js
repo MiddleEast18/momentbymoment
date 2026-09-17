@@ -9,8 +9,9 @@
   const setStatus = (text) => { const el = document.getElementById('countryStatus'); if (el) el.textContent = text; };
   const params = new URLSearchParams(window.location.search);
   const slug = params.get('slug') || '';
-  const foreignLanguage = (language, sourceKey) => !String(language || 'ar').toLowerCase().startsWith('ar') || ['dz_tsa', 'eg_dailynewsegypt'].includes(sourceKey);
-  const translationButton = (article) => foreignLanguage(article.language, article.country_news_sources?.source_key) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى العربية">ترجمة إلى العربية</button>` : '';
+  const containsLatin = (value) => /[A-Za-zÀ-ÿŒœ]/.test(String(value || ''));
+  const foreignLanguage = (language, sourceKey, headline, summary) => !String(language || 'ar').toLowerCase().startsWith('ar') || containsLatin(headline) || containsLatin(summary) || ['dz_tsa', 'eg_dailynewsegypt'].includes(sourceKey);
+  const translationButton = (article) => foreignLanguage(article.language, article.country_news_sources?.source_key, article.headline, article.summary) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى العربية">ترجمة إلى العربية</button>` : '';
   const translateArticle = async (button) => {
     const articleId = button.dataset.articleId;
     button.disabled = true; button.textContent = 'جارٍ الترجمة…';
@@ -42,7 +43,8 @@
     if (!articles?.length) { grid.innerHTML = ''; document.getElementById('emptyState').hidden = false; setStatus('لا توجد بطاقات منشورة لهذه الدولة حاليًا.'); return; }
     grid.innerHTML = articles.map((article) => {
       const source = Array.isArray(article.country_news_sources) ? article.country_news_sources[0] : article.country_news_sources;
-      return `<article class="country-article" data-article-id="${esc(article.id)}"><div class="country-article__meta"><span>${esc(source?.source_name || 'مصدر غير محدد')}</span><span>${foreignLanguage(article.language, source?.source_key) ? 'لغة أجنبية' : esc(article.category || 'عام')}</span></div><h2>${esc(article.headline)}</h2><p>${esc(article.summary)}</p>${translationButton({ ...article, country_news_sources: source })}<div class="country-translation-note" aria-live="polite">${foreignLanguage(article.language, source?.source_key) ? 'الترجمة عند الطلب' : ''}</div><time class="country-article__time" datetime="${esc(article.published_at || '')}">${esc(formatTime(article.published_at))}</time></article>`;
+      const isForeign = foreignLanguage(article.language, source?.source_key, article.headline, article.summary);
+      return `<article class="country-article" data-article-id="${esc(article.id)}"><div class="country-article__meta"><span>${esc(source?.source_name || 'مصدر غير محدد')}</span><span>${isForeign ? 'لغة أجنبية' : esc(article.category || 'عام')}</span></div><h2>${esc(article.headline)}</h2><p>${esc(article.summary)}</p>${translationButton({ ...article, country_news_sources: source })}<div class="country-translation-note" aria-live="polite">${isForeign ? 'الترجمة عند الطلب' : ''}</div><time class="country-article__time" datetime="${esc(article.published_at || '')}">${esc(formatTime(article.published_at))}</time></article>`;
     }).join('');
     grid.querySelectorAll('.country-translate').forEach((button) => button.addEventListener('click', () => translateArticle(button)));
     setStatus(`${articles.length} خبرًا منشورًا`);
