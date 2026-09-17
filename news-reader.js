@@ -407,7 +407,10 @@
       void loadMirsadAnalysis(article, activeDisplay(article, state.revisions));
     } catch (error) {
       console.error('[mirsad reader] load failed', error);
-      content.innerHTML = `<div class="mirsad-reader__error">${escapeHtml(error?.message || 'تعذر تحميل تفاصيل الخبر. حاول مرة أخرى.')}</div>`;
+      const message = error?.message || 'تعذر تحميل تفاصيل الخبر. حاول مرة أخرى.';
+      content.innerHTML = message === 'لا تملك فتحات أخبار كافية لفتح هذا الخبر.'
+        ? `<div class="mirsad-reader__error"><div>${escapeHtml(message)}</div><a class="mirsad-reader__recharge" href="billing.html">شحن الفتحات</a></div>`
+        : `<div class="mirsad-reader__error">${escapeHtml(message)}</div>`;
       sourceBtn.hidden = true;
     }
   }

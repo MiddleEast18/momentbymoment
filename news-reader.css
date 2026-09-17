@@ -74,6 +74,10 @@
 .mirsad-reader__footer { flex:0 0 auto; display:flex; align-items:center; justify-content:flex-start; gap:10px; padding:14px 18px 18px; border-top:1px solid var(--panel-border); background:rgba(255,255,255,.02); }
 .mirsad-reader__source { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 16px; border:1px solid var(--gold); border-radius:999px; background:var(--gold-soft); color:var(--gold); text-decoration:none; font:600 12px/1 var(--font-mono); }
 .mirsad-reader__loading, .mirsad-reader__error { padding:42px 8px; text-align:center; color:var(--text-faint); font-family:var(--font-mono); }
+.mirsad-reader__recharge { display:inline-flex; align-items:center; justify-content:center; min-height:42px; margin-top:18px; padding:0 22px; border:1px solid var(--gold); border-radius:999px; background:linear-gradient(110deg,rgba(201,162,39,.12),rgba(240,212,122,.32),rgba(201,162,39,.12)); background-size:220% 100%; color:var(--gold); text-decoration:none; font:700 12px/1 var(--font-mono); box-shadow:0 0 0 0 rgba(201,162,39,.28); animation:mirsad-recharge-in .65s ease-out both,mirsad-recharge-shimmer 3.2s ease-in-out .65s infinite; transition:transform .2s ease,box-shadow .2s ease,color .2s ease; }
+.mirsad-reader__recharge:hover,.mirsad-reader__recharge:focus-visible { color:#111820; background:var(--gold); box-shadow:0 8px 24px rgba(201,162,39,.22); transform:translateY(-2px); outline:none; }
+@keyframes mirsad-recharge-in { from { opacity:0; transform:translateY(10px) scale(.94); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes mirsad-recharge-shimmer { 0%,100% { background-position:100% 0; } 50% { background-position:0 0; } }
 body.mirsad-reader-open { overflow:hidden; }
 .card { cursor:pointer; }
 .card:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
@@ -103,3 +107,4 @@ body.mirsad-reader-open { overflow:hidden; }
 }
 @media (max-width:430px) { .mirsad-reader__stats { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (prefers-reduced-motion:reduce) { .mirsad-reader-backdrop { backdrop-filter:none; -webkit-backdrop-filter:none; } }
+@media (prefers-reduced-motion:reduce) { .mirsad-reader__recharge { animation:none; } }
