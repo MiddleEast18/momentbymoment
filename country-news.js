@@ -13,17 +13,34 @@
   const mostlyLatin = (value) => { const text = String(value || ''); const latin = (text.match(/[A-Za-zÀ-ÿŒœ]/g) || []).length; const arabic = (text.match(/[\u0600-\u06ff]/g) || []).length; return latin > 12 && latin > arabic; };
   const foreignLanguage = (language, sourceKey, headline, summary) => !String(language || 'ar').toLowerCase().startsWith('ar') || FOREIGN_SOURCE_KEYS.has(sourceKey) || mostlyLatin(headline) || mostlyLatin(summary);
   const translationButton = (article) => foreignLanguage(article.language, article.country_news_sources?.source_key, article.headline, article.summary) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى العربية">ترجمة إلى العربية</button>` : '';
+  const showTranslation = (button) => {
+    const card = button.closest('.country-article');
+    card.querySelector('h2').textContent = button.dataset.translatedHeadline || '';
+    const summary = card.querySelector('p'); if (summary) summary.textContent = button.dataset.translatedSummary || '';
+    button.textContent = 'عرض النص الأصلي'; button.setAttribute('aria-label', 'عرض النص الأصلي للخبر'); button.classList.add('is-translated'); button.dataset.state = 'translated';
+  };
+  const showOriginal = (button) => {
+    const card = button.closest('.country-article');
+    card.querySelector('h2').textContent = button.dataset.originalHeadline || '';
+    const summary = card.querySelector('p'); if (summary) summary.textContent = button.dataset.originalSummary || '';
+    button.textContent = 'عرض الترجمة'; button.setAttribute('aria-label', 'عرض الترجمة العربية للخبر'); button.classList.remove('is-translated'); button.dataset.state = 'original';
+  };
   const translateArticle = async (button) => {
+    if (button.dataset.state === 'translated') { showOriginal(button); return; }
+    if (button.dataset.state === 'original' && button.dataset.translatedHeadline) { showTranslation(button); return; }
     const articleId = button.dataset.articleId;
+    const card = button.closest('.country-article');
+    button.dataset.originalHeadline = card.querySelector('h2')?.textContent || '';
+    button.dataset.originalSummary = card.querySelector('p')?.textContent || '';
     button.disabled = true; button.textContent = 'جارٍ الترجمة…';
     try {
       const { data: cached, error: cacheError } = await client.from('country_article_translations').select('translated_headline,translated_summary,model').eq('article_id', articleId).eq('target_language', 'ar').maybeSingle();
       if (cacheError) throw cacheError;
       const result = cached ? { translation: cached, cached: true } : await fetch(TRANSLATE_FUNCTION, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify({ article_id: articleId }) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Translation failed'); return data; });
-      const card = button.closest('.country-article');
-      card.querySelector('h2').textContent = result.translation.translated_headline;
-      const summary = card.querySelector('p'); if (summary) summary.textContent = result.translation.translated_summary;
-      button.textContent = 'مترجم آليًا'; button.classList.add('is-translated');
+      button.dataset.translatedHeadline = result.translation.translated_headline || '';
+      button.dataset.translatedSummary = result.translation.translated_summary || '';
+      showTranslation(button);
+      button.disabled = false;
     } catch (error) { console.error('[mirsad translation]', error); button.disabled = false; button.textContent = 'إعادة المحاولة'; }
   };
 
