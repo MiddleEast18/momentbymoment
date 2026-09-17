@@ -32,7 +32,7 @@ Deno.serve(async (request) => {
   const byKey = new Map<string, ExistingArticle>(); for (const article of (existing || []) as ExistingArticle[]) byKey.set(`${article.source_id}|${article.source_url}`, article);
   for (const source of (sources || []) as Source[]) {
     try {
-      const response = await fetch(source.feed_url, { headers: { 'user-agent': 'MirsadCountryNews/2.0', accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1' }, signal: AbortSignal.timeout(20_000) });
+      const response = await fetch(source.feed_url, { headers: { 'user-agent': 'MirsadCountryNews/2.0', accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1' }, signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`); const items = parseItems(await response.text()).slice(0, 50);
       for (const item of items) {
         result.seen += 1; const title = stripHtml(item.title).slice(0, 500); const summary = stripHtml(item.summary).slice(0, 2_000); const haystack = `${title} ${summary}`.toLocaleLowerCase('ar');
