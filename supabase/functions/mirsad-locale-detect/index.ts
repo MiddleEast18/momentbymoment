@@ -30,7 +30,7 @@ const clean = (value: unknown, max: number) => String(value ?? "").replace(/[^\p
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  const geminiKey = Deno.env.get("GOOGLE_GEMINI_KEY2") || Deno.env.get("GEMINI_API_KEY");
+  const geminiKey = Deno.env.get("GOOGLE_GEMINI_KEY2");
   if (!geminiKey) return json({ error: "Locale AI is not configured" }, 503);
   let supplied: { country_code?: string; country_name?: string; region?: string; city?: string } = {};
   try { supplied = await request.json(); } catch { /* empty body uses server-side fallback */ }
@@ -54,8 +54,10 @@ Deno.serve(async (request) => {
   const prompt = `You are a conservative locale classifier. Choose the most commonly used public website language for this approximate location. Do not use browser language. Return JSON only with language (BCP-47 code), language_name, confidence (0 to 1), and reason. If the region is ambiguous, choose the country's safest majority language and lower confidence. Location: country=${countryName || country || "unknown"}; region=${region || "unknown"}; city=${city || "unknown"}.`;
   let result = known ? { language: known.language, language_name: known.name, confidence: known.confidence, reason: "regional default" } : { language: "en", language_name: "English", confidence: 0.2, reason: "unknown location" };
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 300 } }), signal: AbortSignal.timeout(9000) });
-    if (response.ok) {
+    const models = [Deno.env.get("GEMINI_MODEL") || "gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash"];
+    for (const model of models) {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 300 } }), signal: AbortSignal.timeout(9000) });
+      if (!response.ok) { if ([400, 404, 429, 500, 502, 503].includes(response.status)) continue; break; }
       const payload = await response.json();
       const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
       const start = raw.indexOf("{"); const end = raw.lastIndexOf("}");
@@ -63,6 +65,7 @@ Deno.serve(async (request) => {
         const ai = JSON.parse(raw.slice(start, end + 1));
         if (/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(String(ai.language || "")) && Number(ai.confidence) >= 0.35) result = { language: String(ai.language), language_name: clean(ai.language_name, 60), confidence: Math.min(1, Number(ai.confidence)), reason: clean(ai.reason, 180) };
       }
+      break;
     }
   } catch { /* deterministic regional fallback remains active */ }
   return json({ country_code: country || null, country_name: countryName || null, region: region || null, city: city || null, ...result, source: "approximate_ip_region", expires_in_seconds: 604800 });
