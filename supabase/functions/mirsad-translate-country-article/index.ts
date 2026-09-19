@@ -3,8 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Content-Type': 'application/json' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: cors });
 const clean = (value: unknown, max: number) => String(value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
-const allowed = new Set(['ar', 'en', 'ja', 'fr', 'de', 'es', 'it', 'tr', 'nl']);
-const languageNames: Record<string, string> = { ar: 'Modern Standard Arabic', en: 'English', ja: 'Japanese', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', tr: 'Turkish', nl: 'Dutch' };
+const validLanguage = (value: string) => /^[a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2}|-[0-9]{3})?$/.test(value) && value.length <= 20;
+const languageScript: Record<string, string> = { ar: 'Arabic', en: 'Latin English', ja: 'Japanese', zh: 'Chinese', ko: 'Korean', ru: 'Cyrillic Russian', hi: 'Devanagari Hindi', bn: 'Bengali', fa: 'Persian', ur: 'Urdu', he: 'Hebrew', th: 'Thai', vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay', sw: 'Swahili', am: 'Amharic', ta: 'Tamil', te: 'Telugu', mr: 'Marathi', gu: 'Gujarati', pa: 'Punjabi' };
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -16,9 +16,9 @@ Deno.serve(async (request) => {
   let body: { article_id?: string; target_language?: string };
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
   const articleId = clean(body.article_id, 80);
-  const targetLanguage = clean(body.target_language || 'ar', 8).toLowerCase();
+  const targetLanguage = clean(body.target_language || 'ar', 20);
   if (!/^[0-9a-f-]{36}$/i.test(articleId)) return json({ error: 'Invalid article id' }, 400);
-  if (!allowed.has(targetLanguage)) return json({ error: 'Unsupported target language' }, 400);
+  if (!validLanguage(targetLanguage)) return json({ error: 'Invalid BCP-47 target language' }, 400);
   const db = createClient(supabaseUrl, serviceKey);
   const { data: existing, error: existingError } = await db.from('country_article_translations').select('article_id,target_language,translated_headline,translated_summary,model').eq('article_id', articleId).eq('target_language', targetLanguage).maybeSingle();
   if (existingError) return json({ error: 'Translation cache lookup failed' }, 500);
@@ -27,10 +27,10 @@ Deno.serve(async (request) => {
   if (articleError || !article) return json({ error: 'Published article not found' }, 404);
   const headline = clean(article.headline, 500);
   const summary = clean(article.summary, 1200);
-  const targetName = languageNames[targetLanguage];
-  const prompt = `Translate the following news headline and summary into ${targetName}. Preserve meaning, names, places, numbers, and neutral news tone. Do not add facts, commentary, markdown, or HTML. Return JSON only with exactly two string fields: translated_headline and translated_summary.\n\nHEADLINE:\n${headline}\n\nSUMMARY:\n${summary}`;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2000 } }), signal: AbortSignal.timeout(25_000) });
-  if (!response.ok) { const providerError = await response.text(); console.error('[mirsad translation provider]', response.status, providerError.slice(0, 500)); return json({ error: 'Translation provider request failed', provider_status: response.status }, 502); }
+  const scriptHint = languageScript[targetLanguage.split('-')[0]] || 'the standard script used by this language';
+  const prompt = `Translate this news headline and summary into the language identified by BCP-47 code ${targetLanguage}, using ${scriptHint}. Preserve names, places, numbers, and neutral news tone. Do not add facts, commentary, markdown, or HTML. If the language code is uncommon, still use its standard literary form. Return JSON only with exactly two string fields: translated_headline and translated_summary.\n\nHEADLINE:\n${headline}\n\nSUMMARY:\n${summary}`;
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2500 } }), signal: AbortSignal.timeout(25_000) });
+  if (!response.ok) return json({ error: 'Translation provider request failed', provider_status: response.status }, 502);
   const payload = await response.json();
   const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
   let translated: { translated_headline?: string; translated_summary?: string };
