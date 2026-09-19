@@ -1,0 +1,3 @@
+-- Locale detection is isolated from news data and UI rendering.
+-- The Edge Function reads GOOGLE_GEMINI_KEY2 first, then GEMINI_API_KEY as fallback.
+-- No IP address or raw location is stored by this migration.
