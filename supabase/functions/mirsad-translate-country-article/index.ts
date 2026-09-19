@@ -11,7 +11,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  const geminiKey = Deno.env.get('GOOGLE_GEMINI_KEY2') || Deno.env.get('GEMINI_API_KEY');
   if (!supabaseUrl || !serviceKey || !geminiKey) return json({ error: 'Translation service is not configured' }, 503);
   let body: { article_id?: string; target_language?: string };
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -29,16 +29,31 @@ Deno.serve(async (request) => {
   const summary = clean(article.summary, 1200);
   const scriptHint = languageScript[targetLanguage.split('-')[0]] || 'the standard script used by this language';
   const prompt = `Translate this news headline and summary into the language identified by BCP-47 code ${targetLanguage}, using ${scriptHint}. Preserve names, places, numbers, and neutral news tone. Do not add facts, commentary, markdown, or HTML. If the language code is uncommon, still use its standard literary form. Return JSON only with exactly two string fields: translated_headline and translated_summary.\n\nHEADLINE:\n${headline}\n\nSUMMARY:\n${summary}`;
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(geminiKey)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 2500 } }), signal: AbortSignal.timeout(25_000) });
-  if (!response.ok) return json({ error: 'Translation provider request failed', provider_status: response.status }, 502);
-  const payload = await response.json();
-  const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
-  let translated: { translated_headline?: string; translated_summary?: string };
-  try { const start = raw.indexOf('{'); const end = raw.lastIndexOf('}'); translated = JSON.parse((start >= 0 && end > start ? raw.slice(start, end + 1) : raw).trim()); } catch { return json({ error: 'Translation response was invalid' }, 502); }
-  const translatedHeadline = clean(translated.translated_headline, 700);
-  const translatedSummary = clean(translated.translated_summary, 2200);
-  if (!translatedHeadline) return json({ error: 'Translation was empty' }, 502);
-  const row = { article_id: articleId, target_language: targetLanguage, translated_headline: translatedHeadline, translated_summary: translatedSummary, model: 'gemini-3.6-flash' };
+  const providerUrls = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(geminiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(geminiKey)}`,
+  ];
+  let translatedHeadline = '';
+  let translatedSummary = '';
+  let providerStatus = 502;
+  for (let attempt = 0; attempt < 2 && !translatedHeadline; attempt += 1) {
+    try {
+      const response = await fetch(providerUrls[attempt], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 1200 } }), signal: AbortSignal.timeout(25_000) });
+      providerStatus = response.status;
+      if (!response.ok) { if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 350)); continue; }
+      const payload = await response.json();
+      const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
+      try {
+        const start = raw.indexOf('{'); const end = raw.lastIndexOf('}');
+        const translated = JSON.parse((start >= 0 && end > start ? raw.slice(start, end + 1) : raw).trim()) as { translated_headline?: string; translated_summary?: string };
+        translatedHeadline = clean(translated.translated_headline, 700);
+        translatedSummary = clean(translated.translated_summary, 2200);
+      } catch { translatedHeadline = ''; translatedSummary = ''; }
+    } catch { providerStatus = 504; }
+    if (!translatedHeadline && attempt === 0) await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+  if (!translatedHeadline) return json({ error: 'Translation provider request failed', provider_status: providerStatus }, 502);
+  const row = { article_id: articleId, target_language: targetLanguage, translated_headline: translatedHeadline, translated_summary: translatedSummary, model: 'gemini-2.5-flash-lite' };
   const { data: saved, error: saveError } = await db.from('country_article_translations').upsert(row, { onConflict: 'article_id,target_language' }).select('article_id,target_language,translated_headline,translated_summary,model').single();
   if (saveError) return json({ error: 'Translation cache save failed' }, 500);
   return json({ translation: saved, cached: false });
