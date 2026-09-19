@@ -47,5 +47,15 @@ Deno.serve(async (request) => {
     } catch (error) { result.errors.push(`${source.source_key}: ${String(error)}`); await db.from('country_news_sources').update({ last_error_at: new Date().toISOString(), last_error_message: String(error).slice(0, 500), updated_at: new Date().toISOString() }).eq('id', source.id); }
   }
   const { count: deleted } = await db.from('country_news_articles').delete({ count: 'exact' }).lt('fetched_at', new Date(Date.now() - 45 * 86_400_000).toISOString()); result.cleaned = deleted || 0;
+  const countryIds = [...new Set((sources || []).map((source) => source.country_id))];
+  for (const countryId of countryIds) {
+    const { count: countryCount, error: countError } = await db.from('country_news_articles').select('id', { count: 'exact', head: true }).eq('country_id', countryId).eq('is_published', true);
+    if (countError || !countryCount || countryCount < 100) continue;
+    const trimCount = Math.floor(countryCount / 2);
+    const { data: oldest, error: oldestError } = await db.from('country_news_articles').select('id').eq('country_id', countryId).eq('is_published', true).order('fetched_at', { ascending: true }).limit(trimCount);
+    if (oldestError || !oldest?.length) continue;
+    const { count: trimmed } = await db.from('country_news_articles').delete({ count: 'exact' }).in('id', oldest.map((article) => article.id));
+    result.cleaned += trimmed || 0;
+  }
   return json({ ...result, duplicates: result.updated, duration_ms: Date.now() - started, errors: result.errors.slice(0, 10) });
 });
