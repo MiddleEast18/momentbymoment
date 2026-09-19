@@ -62,7 +62,7 @@
     grid.innerHTML = articles.map((article) => {
       const source = Array.isArray(article.country_news_sources) ? article.country_news_sources[0] : article.country_news_sources;
       const isForeign = foreignLanguage(article.language, source?.source_key, article.headline, article.summary);
-      return `<article class="country-article" data-article-id="${esc(article.id)}"><div class="country-article__meta"><span>${esc(source?.source_name || 'مصدر غير محدد')}</span><span>${isForeign ? 'لغة أجنبية' : esc(article.category || 'عام')}</span></div><h2>${esc(article.headline)}</h2><p>${esc(article.summary)}</p>${translationButton({ ...article, country_news_sources: source })}<div class="country-translation-note" aria-live="polite">${isForeign ? 'الترجمة عند الطلب' : ''}</div><time class="country-article__time" datetime="${esc(article.published_at || '')}">${esc(formatTime(article.published_at))}</time></article>`;
+      return `<article class="country-article" data-article-id="${esc(article.id)}"><div class="country-article__meta"><span>${esc(source?.source_name || 'مصدر غير محدد')}</span><span>${isForeign ? 'لغة أجنبية' : 'لغة عربية'}</span></div><h2>${esc(article.headline)}</h2><p>${esc(article.summary)}</p>${translationButton({ ...article, country_news_sources: source })}<div class="country-translation-note" aria-live="polite">${isForeign ? 'الترجمة عند الطلب' : ''}</div><time class="country-article__time" datetime="${esc(article.published_at || '')}">${esc(formatTime(article.published_at))}</time></article>`;
     }).join('');
     grid.querySelectorAll('.country-translate').forEach((button) => button.addEventListener('click', () => translateArticle(button)));
     setStatus(`${articles.length} خبرًا منشورًا`);
