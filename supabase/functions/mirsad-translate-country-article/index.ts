@@ -11,7 +11,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const geminiKey = Deno.env.get('GEMINI_KEY') || Deno.env.get('GEMINI_API_KEY');
+  const geminiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GEMINI_KEY');
   if (!supabaseUrl || !serviceKey || !geminiKey) return json({ error: 'Translation service is not configured' }, 503);
   let body: { article_id?: string; target_language?: string };
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -35,13 +35,14 @@ Deno.serve(async (request) => {
   let translatedHeadline = '';
   let translatedSummary = '';
   let providerStatus = 502;
+  let providerMessage = '';
   let usedModel = providerModels[0];
   for (let attempt = 0; attempt < providerUrls.length && !translatedHeadline; attempt += 1) {
     if (retryDelays[attempt] > 0) await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]));
     try {
       const response = await fetch(providerUrls[attempt], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: { type: 'OBJECT', properties: { translated_headline: { type: 'STRING' }, translated_summary: { type: 'STRING' } }, required: ['translated_headline', 'translated_summary'] }, maxOutputTokens: 1400 } }), signal: AbortSignal.timeout(25_000) });
       providerStatus = response.status;
-      if (!response.ok) continue;
+      if (!response.ok) { providerMessage = (await response.text()).slice(0, 300); continue; }
       usedModel = providerModels[attempt];
       const payload = await response.json();
       const raw = payload?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || '').join('') || '';
@@ -53,7 +54,7 @@ Deno.serve(async (request) => {
       } catch { translatedHeadline = ''; translatedSummary = ''; }
     } catch { providerStatus = 504; }
   }
-  if (!translatedHeadline) return json({ error: 'Translation provider request failed', provider_status: providerStatus }, 502);
+  if (!translatedHeadline) return json({ error: 'Translation provider request failed', provider_status: providerStatus, provider_message: providerMessage }, 502);
   const row = { article_id: articleId, target_language: targetLanguage, translated_headline: translatedHeadline, translated_summary: translatedSummary, model: usedModel };
   const { data: saved, error: saveError } = await db.from('country_article_translations').upsert(row, { onConflict: 'article_id,target_language' }).select('article_id,target_language,translated_headline,translated_summary,model').single();
   if (saveError) return json({ error: 'Translation cache save failed' }, 500);
