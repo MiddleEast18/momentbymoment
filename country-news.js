@@ -37,9 +37,8 @@
     button.disabled = true; button.textContent = 'جارٍ الترجمة…';
     try {
       const targetLanguage = String(button.dataset.targetLanguage || locale()).toLowerCase().split('-')[0];
-      const { data: cached, error: cacheError } = await client.from('country_article_translations').select('translated_headline,translated_summary,model').eq('article_id', articleId).eq('target_language', targetLanguage).maybeSingle();
-      if (cacheError) throw cacheError;
-      const result = cached ? { translation: cached, cached: true } : await fetch(TRANSLATE_FUNCTION, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify({ article_id: articleId, target_language: targetLanguage }) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Translation failed'); return data; });
+      const result = await fetch(TRANSLATE_FUNCTION, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify({ article_id: articleId, target_language: targetLanguage }) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Translation failed'); return data; });
+      if (!result?.translation) throw new Error('Translation result was empty');
       button.dataset.translatedHeadline = result.translation.translated_headline || '';
       button.dataset.translatedSummary = result.translation.translated_summary || '';
       showTranslation(button);
