@@ -11,7 +11,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const geminiKey = Deno.env.get('GOOGLE_GEMINI_KEY2') || Deno.env.get('GEMINI_API_KEY');
+  const geminiKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GEMINI_KEY');
   if (!supabaseUrl || !serviceKey || !geminiKey) return json({ error: 'Translation service is not configured' }, 503);
   let body: { article_id?: string; target_language?: string };
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
