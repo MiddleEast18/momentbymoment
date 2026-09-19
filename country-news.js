@@ -12,7 +12,9 @@
   const FOREIGN_SOURCE_KEYS = new Set(['dz_tsa', 'dz_algerie360', 'eg_dailynewsegypt']);
   const mostlyLatin = (value) => { const text = String(value || ''); const latin = (text.match(/[A-Za-zÀ-ÿŒœ]/g) || []).length; const arabic = (text.match(/[\u0600-\u06ff]/g) || []).length; return latin > 12 && latin > arabic; };
   const foreignLanguage = (language, sourceKey, headline, summary) => !String(language || 'ar').toLowerCase().startsWith('ar') || FOREIGN_SOURCE_KEYS.has(sourceKey) || mostlyLatin(headline) || mostlyLatin(summary);
-  const translationButton = (article) => foreignLanguage(article.language, article.country_news_sources?.source_key, article.headline, article.summary) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى العربية">ترجمة إلى العربية</button>` : '';
+  const locale = () => String(document.documentElement.dataset.mirsadLocale || 'ar').toLowerCase().split('-')[0];
+  const localeName = { ar: 'العربية', en: 'English', ja: '日本語', fr: 'Français', de: 'Deutsch', es: 'Español', it: 'Italiano', tr: 'Türkçe', nl: 'Nederlands' };
+  const translationButton = (article) => { const target = locale(); const sourceLanguage = String(article.language || 'ar').toLowerCase().split('-')[0]; return target !== sourceLanguage || foreignLanguage(article.language, article.country_news_sources?.source_key, article.headline, article.summary) ? `<button class="country-translate" type="button" data-article-id="${esc(article.id)}" aria-label="ترجمة عنوان وملخص الخبر إلى ${esc(localeName[target] || 'العربية')}" data-target-language="${esc(target)}">ترجمة إلى ${esc(localeName[target] || 'العربية')}</button>` : ''; };
   const showTranslation = (button) => {
     const card = button.closest('.country-article');
     card.querySelector('h2').textContent = button.dataset.translatedHeadline || '';
@@ -34,9 +36,10 @@
     button.dataset.originalSummary = card.querySelector('p')?.textContent || '';
     button.disabled = true; button.textContent = 'جارٍ الترجمة…';
     try {
-      const { data: cached, error: cacheError } = await client.from('country_article_translations').select('translated_headline,translated_summary,model').eq('article_id', articleId).eq('target_language', 'ar').maybeSingle();
+      const targetLanguage = String(button.dataset.targetLanguage || locale()).toLowerCase().split('-')[0];
+      const { data: cached, error: cacheError } = await client.from('country_article_translations').select('translated_headline,translated_summary,model').eq('article_id', articleId).eq('target_language', targetLanguage).maybeSingle();
       if (cacheError) throw cacheError;
-      const result = cached ? { translation: cached, cached: true } : await fetch(TRANSLATE_FUNCTION, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify({ article_id: articleId }) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Translation failed'); return data; });
+      const result = cached ? { translation: cached, cached: true } : await fetch(TRANSLATE_FUNCTION, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }, body: JSON.stringify({ article_id: articleId, target_language: targetLanguage }) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Translation failed'); return data; });
       button.dataset.translatedHeadline = result.translation.translated_headline || '';
       button.dataset.translatedSummary = result.translation.translated_summary || '';
       showTranslation(button);
