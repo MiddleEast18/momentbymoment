@@ -32,13 +32,19 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
   const geminiKey = Deno.env.get("GOOGLE_GEMINI_KEY2") || Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) return json({ error: "Locale AI is not configured" }, 503);
+  let supplied: { country_code?: string; country_name?: string; region?: string; city?: string } = {};
+  try { supplied = await request.json(); } catch { /* empty body uses server-side fallback */ }
   const forwarded = request.headers.get("x-forwarded-for") || request.headers.get("cf-connecting-ip") || "";
   const ip = forwarded.split(",")[0].trim();
   let geo: { country_code?: string; country_name?: string; region?: string; city?: string } = {};
   try {
+    if (supplied.country_code || supplied.country_name || supplied.region || supplied.city) {
+      geo = supplied;
+    } else {
     const url = ip && !["127.0.0.1", "::1"].includes(ip) ? `https://ipapi.co/${encodeURIComponent(ip)}/json/` : "https://ipapi.co/json/";
     const response = await fetch(url, { signal: AbortSignal.timeout(3500) });
     if (response.ok) geo = await response.json();
+    }
   } catch { /* use a neutral fallback without blocking the site */ }
   const country = clean(geo.country_code || "", 2).toUpperCase();
   const countryName = clean(geo.country_name || "", 80);
