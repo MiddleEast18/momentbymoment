@@ -29,7 +29,7 @@ Deno.serve(async (request) => {
   const summary = clean(article.summary, 1200);
   const scriptHint = languageScript[targetLanguage.split('-')[0]] || 'the standard script used by this language';
   const prompt = `Translate this news headline and summary into the language identified by BCP-47 code ${targetLanguage}, using ${scriptHint}. Preserve names, places, numbers, and neutral news tone. Do not add facts, commentary, markdown, or HTML. If the language code is uncommon, still use its standard literary form. Return JSON only with exactly two string fields: translated_headline and translated_summary.\n\nHEADLINE:\n${headline}\n\nSUMMARY:\n${summary}`;
-  const providerModels = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+  const providerModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-flash'];
   const providerUrls = providerModels.map((model) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`);
   const retryDelays = [0, 1500, 3500];
   let translatedHeadline = '';
