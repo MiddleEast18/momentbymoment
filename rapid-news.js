@@ -78,7 +78,39 @@
   const render = (rows) => { const chronological = uniqueStories(rows).sort((a, b) => captureTime(b) - captureTime(a)); const now = Date.now(); const pinnedRows = chronological.filter((row) => Number(row.importance_score || 0) >= 60 && now - publicationTime(row) <= PIN_MAX_AGE_MS).slice(0, 4); const pinnedIds = new Set(pinnedRows.map((row) => row.id)); const ordered = chronological; currentRows = ordered; visibleCount = Math.min(Math.max(visibleCount, 3), ordered.length); const visible = ordered.slice(0, visibleCount); list.innerHTML = visible.length ? visible.map((row) => { const pinned = pinnedIds.has(row.id); const publishedAt = row.published_at || row.received_at; return `<article class="rapid-news__item${pinned ? ' is-pinned' : ''}" data-source-id="${escapeHtml(row.id)}">${pinned ? pinIcon : ''}<div class="rapid-news__meta"><span>${escapeHtml(cleanRichText(row.source_name))}</span><time datetime="${escapeHtml(publishedAt)}">نُشر ${escapeHtml(relative(publishedAt))}</time></div><h3>${escapeHtml(row.headline)}</h3><p>${escapeHtml(row.summary)}</p><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">المصدر الأصلي</a></article>`; }).join('') : '<p class="rapid-news__empty">لا توجد أخبار الشرق الأوسط بالإنجليزية ذات مضمون واضح حاليًا.</p>'; more.hidden = visibleCount >= ordered.length; all.hidden = visibleCount >= ordered.length; };
   const load = async () => { const { data, error } = await sb.from('rapid_news').select('id,source_key,source_name,source_url,headline,summary,published_at,received_at,importance_score').eq('source_key', 'middleeasteye').order('published_at', { ascending: false, nullsFirst: false }).order('received_at', { ascending: false, nullsFirst: false }).limit(400); if (error) { showRapidNotice('تعذر تحميل أخبار الشرق الأوسط بالإنجليزية'); status.textContent = ''; return; } render(data || []); status.textContent = ''; };
   const refreshUnread = async () => { if (!currentUser) { setBadge(0); return; } const { data, error } = await sb.rpc('rapid_news_unread_count'); if (error) { setBadge(0); return; } setBadge(Number(data || 0)); };
-  const open = async () => { if (!window.mirsadViewAccess) return; const { data: unreadBeforeOpen } = currentUser ? await sb.rpc('rapid_news_unread_count') : { data: 0 }; const access = await window.mirsadViewAccess.openRapid(); if (!access.allowed) { showRapidNotice(access.error?.message === 'not_authenticated' ? 'سجّل الدخول' : 'تعذر الفتح، حاول مجددًا'); status.textContent = ''; await refreshUnread(); return; } opened = true; rail.hidden = false; toggle.setAttribute('aria-expanded', 'true'); const unreadCount = Number(unreadBeforeOpen ?? access.unread_count ?? 0); showRapidNotice(unreadCount > 0 ? `تم عرض ${unreadCount} خبرًا جديدًا` : 'لا أخبار جديدة غير مقروءة'); status.textContent = ''; const { data: { session: latestSession } = {} } = await sb.auth.getSession(); currentUser = Boolean(latestSession?.user); if (currentUser) { const { error: seenError } = await sb.rpc('rapid_news_mark_seen'); if (!seenError) { setBadge(0); return; } } await refreshUnread(); };
+  let opening = false;
+  const open = async () => {
+    if (!window.mirsadViewAccess || opening) return;
+    opening = true;
+    toggle.disabled = true;
+    try {
+      const access = await window.mirsadViewAccess.openRapid();
+      if (!access.allowed) {
+        const err = String(access.error?.message || '').toLowerCase();
+        const unread = Number(access.unread_count || 0);
+        const remaining = Number(access.remaining_unlocks || 0);
+        const notice = (!currentUser || err.includes('not_authenticated'))
+          ? 'سجّل الدخول'
+          : (unread > 0 ? `تحتاج ${unread} فتحة لعرض الأخبار غير المقروءة (رصيدك ${remaining})` : 'لا توجد فتحات كافية');
+        showRapidNotice(notice);
+        status.textContent = '';
+        await refreshUnread();
+        return;
+      }
+      opened = true;
+      rail.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      const unreadCount = Number(access.unread_count || 0);
+      showRapidNotice(access.charged
+        ? `خُصمت ${unreadCount} فتحة حسب الأخبار غير المقروءة`
+        : (unreadCount > 0 ? `تم عرض ${unreadCount} خبرًا جديدًا` : 'لا أخبار جديدة غير مقروءة'));
+      status.textContent = '';
+      setBadge(0);
+    } finally {
+      opening = false;
+      toggle.disabled = false;
+    }
+  };
   const consume = async (kind) => { if (!window.mirsadViewAccess || !ACCESS_KINDS.has(kind)) return false; more.disabled = true; all.disabled = true; let result; try { result = await window.mirsadViewAccess.consume(kind); } catch (error) { result = { allowed: false, error }; } more.disabled = false; all.disabled = false; if (!result || result.allowed !== true) { const message = String(result?.error?.message || result?.error?.code || '').toLowerCase(); const requiresLogin = !currentUser || message.includes('not_authenticated') || message.includes('jwt') || message.includes('unauthorized') || message === '401'; const notice = requiresLogin ? 'سجّل الدخول' : (result?.error ? 'تعذر التحقق، حاول مجددًا' : 'لا توجد فتحات كافية'); showRapidNotice(notice); status.textContent = ''; return false; } showRapidNotice(result.charged ? `خُصمت ${kind === 'more' ? 5 : 100} فتحات` : 'مجاني هذه الدورة'); status.textContent = ''; return true; };
   list.addEventListener('click', (event) => { const link = event.target.closest?.('a[href]'); if (!link) return; event.preventDefault(); if (typeof window.mirsadOpenOriginalSource === 'function') void window.mirsadOpenOriginalSource(link.href, 'rapid', link.closest('[data-source-id]')?.dataset.sourceId); });
   more.addEventListener('click', async () => { if (!(await consume('more'))) return; visibleCount += 5; render(currentRows); });

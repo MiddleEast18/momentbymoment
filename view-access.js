@@ -39,9 +39,14 @@
   };
   window.mirsadViewAccess = {
     async openRapid() {
-      // Reading the rapid-news rail is public. Authentication remains required
-      // by consume() for actions that expand the paid view window.
-      return { allowed: true, charged: false, unread_count: 0, error: null };
+      const { data: { session } = {} } = await sb.auth.getSession();
+      if (!session?.user) return { allowed: false, charged: false, unread_count: 0, remaining_unlocks: 0, error: { message: 'not_authenticated' } };
+      const { data, error } = await sb.rpc('open_rapid_news');
+      if (error) return { allowed: false, charged: false, unread_count: 0, remaining_unlocks: 0, error };
+      const result = { ...(data?.[0] || data || {}), error: null };
+      const unread = Number(result.unread_count || 0);
+      const label = unread === 1 ? 'فتحة واحدة' : `${unread} فتحة`;
+      return publishBalance(result, result.charged ? label : null);
     },
     async consume(kind) {
       const { data, error } = await sb.rpc('consume_news_view', { p_view_kind: kind });
