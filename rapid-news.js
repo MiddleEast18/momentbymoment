@@ -116,6 +116,7 @@
   more.addEventListener('click', async () => { if (!(await consume('more'))) return; visibleCount += 5; render(currentRows); });
   all.addEventListener('click', async () => { if (!(await consume('all'))) return; visibleCount = currentRows.length; render(currentRows); });
   toggle.addEventListener('click', () => { if (opened) { opened = false; rail.hidden = true; toggle.setAttribute('aria-expanded', 'false'); } else void open(); });
+  window.addEventListener('mirsad:session-end', () => { opened = false; rail.hidden = true; toggle.setAttribute('aria-expanded', 'false'); visibleCount = 3; if (currentRows.length) render(currentRows); });
   const start = async () => { await load(); const { data: { session } } = await sb.auth.getSession(); currentUser = Boolean(session?.user); await refreshUnread(); channel = sb.channel('mirsad-rapid-news-live').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rapid_news' }, () => { void load(); void refreshUnread(); }).subscribe(); timer = setInterval(async () => { await load(); await refreshUnread(); }, 60000); };
   sb.auth.onAuthStateChange((_event, session) => { currentUser = Boolean(session?.user); if (currentUser) void refreshUnread(); else setBadge(0); });
   window.addEventListener('pagehide', () => { if (timer) clearInterval(timer); if (channel) sb.removeChannel(channel); });

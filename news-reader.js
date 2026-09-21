@@ -493,4 +493,6 @@
     const id = card.dataset.id;
     if (id) openReader(id, card);
   });
+  window.addEventListener('mirsad:session-end', closeReader);
+  window.addEventListener('mirsad:authenticated', closeReader);
 })();

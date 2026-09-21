@@ -135,7 +135,7 @@
     });
     const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
     gate.querySelector('#mirsadEmailContinue').addEventListener('click',sendOtp);email.addEventListener('keydown',e=>{if(e.key==='Enter')sendOtp()});
-    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();});
+    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');discardTransientUi();gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();});
   }
 
   function showOtp(email){
@@ -183,6 +183,24 @@
   const profileLater=(user)=>{try{return localStorage.getItem(PROFILE_LATER_KEY)===user.id}catch{return false}};
   const setProfileLater=(user)=>{try{localStorage.setItem(PROFILE_LATER_KEY,user.id)}catch{}};
   const clearProfileLater=()=>{try{localStorage.removeItem(PROFILE_LATER_KEY)}catch{}};
+  let clientSessionEnding=false;
+  const sessionHomeUrl=()=>new URL('index.html',window.location.href).href;
+  function discardTransientUi(){
+    document.getElementById('mirsadUserMenu')?.remove();
+    document.getElementById('mirsadProfileBanner')?.remove();
+    document.getElementById('mirsadGuestLockToast')?.remove();
+    document.querySelectorAll('.mirsad-onboarding-backdrop,.mirsad-delete-dialog').forEach(node=>node.remove());
+    document.body.classList.remove('mirsad-admin-view','mirsad-reader-open','mirsad-guest-view');
+    try{window.dispatchEvent(new CustomEvent('mirsad:session-end'))}catch{}
+  }
+  function endClientSession(){
+    if(clientSessionEnding)return;
+    clientSessionEnding=true;
+    try{localStorage.removeItem(CONFIG.GUEST_KEY)}catch{}
+    clearSignupOnboardingPending();
+    discardTransientUi();
+    window.location.replace(sessionHomeUrl());
+  }
   function onboardingStyles(){
     if(document.getElementById('mirsadSignupOnboardingStyles'))return;
     const style=document.createElement('style');style.id='mirsadSignupOnboardingStyles';
@@ -277,7 +295,7 @@
     applySavedFields();
     root.querySelector('.mirsad-profile-page__avatar img')?.addEventListener('error',event=>{event.currentTarget.remove();const fallback=document.createElement('span');fallback.textContent=initial;root.querySelector('.mirsad-profile-page__avatar')?.appendChild(fallback)});
     root.querySelector('[data-back]').addEventListener('click',()=>{window.location.href=new URL('index.html',window.location.href).href});
-    root.querySelector('[data-signout]').addEventListener('click',async()=>{const button=root.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');statusText(root.querySelector('#mirsadProfilePageStatus'),'تعذر تسجيل الخروج. حاول مرة أخرى.');return}completeLogoutAnimation(animation);window.location.href=new URL('index.html',window.location.href).href});
+    root.querySelector('[data-signout]').addEventListener('click',async()=>{const button=root.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');statusText(root.querySelector('#mirsadProfilePageStatus'),'تعذر تسجيل الخروج. حاول مرة أخرى.');return}completeLogoutAnimation(animation);endClientSession()});
     root.querySelector('[data-save]').addEventListener('click',async()=>{const status=root.querySelector('#mirsadProfilePageStatus'),btn=root.querySelector('[data-save]');const payload={id:user.id,display_name:root.querySelector('#profilePageName').value.trim(),avatar_url:avatarUrl(root.querySelector('#profilePageAvatar').value)||null,username:root.querySelector('#profilePageUsername').value.trim()||null,bio:root.querySelector('#profilePageBio').value.trim()||null,onboarding_completed:true};btn.disabled=true;root.querySelectorAll('.mirsad-profile-field').forEach(label=>{if(fieldValue(label))label.classList.add('is-saving')});statusText(status,'جارٍ الحفظ…');const{error}=await sb.from(CONFIG.PROFILE_TABLE).upsert(payload,{onConflict:'id'});btn.disabled=false;if(error){root.querySelectorAll('.is-saving').forEach(label=>label.classList.remove('is-saving'));statusText(status,'تعذر حفظ الملف. تحقق من البيانات وحاول مجددًا.');return}const nextAvatar=avatarUrl(root.querySelector('#profilePageAvatar').value);const avatarBox=root.querySelector('.mirsad-profile-page__avatar');avatarBox.innerHTML=nextAvatar?`<img src="${safe(nextAvatar)}" alt="" loading="lazy">`:`<span>${safe(initial)}</span>`;avatarBox.querySelector('img')?.addEventListener('error',event=>{event.currentTarget.remove();const fallback=document.createElement('span');fallback.textContent=initial;avatarBox.appendChild(fallback)});const menuButton=document.querySelector('#mirsadUserMenu .mirsad-user-button');if(menuButton)menuButton.innerHTML=nextAvatar?`<img src="${safe(nextAvatar)}" alt="">`:`<span class="mirsad-user-initial">${safe(initial)}</span>`;root.querySelectorAll('.mirsad-profile-field').forEach(makeFieldSaved);clearProfileLater();statusText(status,'تم حفظ الملف بنجاح.')});
     root.querySelector('[data-delete]').addEventListener('click',async()=>{
       const status=root.querySelector('#mirsadProfilePageStatus');
@@ -297,10 +315,7 @@
           return;
         }
         try{await sb.auth.signOut({scope:'local'})}catch{}
-        localStorage.removeItem(CONFIG.GUEST_KEY);
-        clearSignupOnboardingPending();
-        document.getElementById('mirsadUserMenu')?.remove();
-        window.location.replace(new URL('index.html',window.location.href).href);
+        endClientSession();
       }catch(error){
         console.error('[mirsad auth] account deletion failed',error);
         statusText(status,'تعذر الاتصال بالخدمة. لم يتم تغيير الحساب.');
@@ -356,7 +371,7 @@
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
     wrap.querySelector('[data-consumption-recovery]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('consumption-recovery.html',window.location.href).href});wrap.querySelector('[data-daily-reward]').addEventListener('click',()=>{menu.hidden=true;window.location.href=dailyRewardPageUrl()});wrap.querySelector('[data-wheel-reward]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('wheel-reward.html',window.location.href).href});
     wrap.querySelector('[data-recharge]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('billing.html',window.location.href).href});
-    wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const button=wrap.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');menu.hidden=true;const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');console.error('[mirsad auth] signout failed',error);return;}completeLogoutAnimation(animation);wrap.remove();document.body.classList.remove('mirsad-admin-view');document.body.classList.add('mirsad-auth-required');showGate()});
+    wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const button=wrap.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');menu.hidden=true;const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');console.error('[mirsad auth] signout failed',error);return;}completeLogoutAnimation(animation);endClientSession()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
   window.addEventListener('mirsad:unlock-balance',event=>{const el=document.querySelector('#mirsadUserMenu [data-balance-label]');if(!el)return;const detail=event.detail||{};el.textContent=detail.unlimited?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Math.max(0,Number(detail.remaining)||0)}`;});
@@ -381,7 +396,7 @@
     if(status && status.textContent==='جارٍ فتح Google…')status.textContent='';
   }
 
-  window.addEventListener('pageshow',()=>resetOAuthButtonAfterReturn());
+  window.addEventListener('pageshow',(event)=>{resetOAuthButtonAfterReturn();if(event.persisted && !isGuest()){void (async()=>{const session=await withAuthTimeout(recoverSession(),AUTH_RECOVERY_TIMEOUT_MS);if(!session?.user)endClientSession()})()}});
   window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
 

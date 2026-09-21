@@ -216,5 +216,14 @@
   loadPreferences();
   wireControls();
   syncControlsFromState();
+  window.addEventListener('mirsad:session-end', () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    state.searchQuery = '';
+    state.activeFilter = 'all';
+    state.sortMode = 'priority';
+    if (searchBoxEl) searchBoxEl.value = '';
+    syncControlsFromState();
+    renderWithFlip(undefined, { animateNew: false, animateMoves: false });
+  });
   initialLoad();
 })();

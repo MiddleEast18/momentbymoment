@@ -144,5 +144,10 @@
 
   const observer = new MutationObserver(scheduleApply);
   observer.observe(grid, { childList: true });
+  window.addEventListener('mirsad:session-end', () => {
+    shown = INITIAL_COUNT;
+    showAll = false;
+    scheduleApply();
+  });
   scheduleApply();
 })();
