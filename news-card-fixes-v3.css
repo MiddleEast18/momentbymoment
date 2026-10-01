@@ -20,35 +20,28 @@
   overflow-wrap: anywhere;
 }
 
-/* Update badge: centered on the card's upper edge, half inside / half outside. */
+/* Update badge stays inside the card. The phone rail clips anything that hangs past the edge. */
 .card__update-badge {
-  left: 12px;
+  top: 10px;
+  left: auto;
   right: auto;
-  top: 0;
-  transform: translateY(-50%);
-  z-index: 4;
-  border-radius: 9px 9px 9px 3px;
-  padding: 6px 11px;
-  border: 1px solid rgba(251,191,36,.30);
-  background: rgba(22,29,39,.98);
-  box-shadow: 0 4px 12px rgba(0,0,0,.16);
+  inset-inline-start: 10px;
+  transform: none;
+  z-index: 5;
+  max-width: calc(100% - 20px);
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 10px;
+  border: 1px solid rgba(251,191,36,.45);
+  background: rgba(16, 21, 28, .96);
+  box-shadow: 0 4px 12px rgba(0,0,0,.2);
 }
 
 .card__verification-badge {
-  top: 47px;
-  right: 14px;
-  z-index: 2;
-}
-
-
-@media (max-width: 700px) {
-  .card__update-badge {
-    left: 12px;
-    right: auto;
-    top: 0;
-  }
-  .card__verification-badge {
-    right: 12px;
-    top: 47px;
-  }
+  top: 10px;
+  right: auto;
+  left: auto;
+  inset-inline-end: 10px;
+  z-index: 5;
+  border-radius: 999px;
 }

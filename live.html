@@ -50,7 +50,7 @@
   <link rel="stylesheet" href="logo.css?v=202609100020">
   <link rel="stylesheet" href="controls-fix.css?v=202609100035">
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
-  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202609132045">
+  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610020030">
   <link rel="stylesheet" href="guest-summary-shimmer.css?v=202609210748">
   <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
   <link rel="stylesheet" href="news-pagination.css?v=202609120012">
@@ -64,8 +64,8 @@
     .rapid-news__notice { position: fixed; left: 14px; right: 14px; bottom: 14px; z-index: 6000; width: max-content; max-width: calc(100% - 28px); margin: 0 auto; padding: 8px 12px; border: 1px solid rgba(201,162,39,.45); border-radius: 10px; background: rgba(16,21,28,.96); color: var(--text); font: 600 12px/1.4 var(--font-body); text-align: center; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
     .rapid-news__notice.is-visible { opacity: 1; transform: translateY(0); }
     @media (max-width: 700px), (pointer: coarse) {
-      .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
-      .featured-rail > .card { flex: 0 0 86% !important; width: 86% !important; min-width: 86% !important; max-width: 86% !important; scroll-snap-align: center; }
+      .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; padding-top: 4px; }
+      .featured-rail > .card { flex: 0 0 86% !important; width: 86% !important; min-width: 86% !important; max-width: 86% !important; scroll-snap-align: center; overflow: hidden; }
       .featured-rail > .card:first-of-type { border-color: rgba(201,162,39,.24); box-shadow: inset 0 0 0 1px rgba(201,162,39,.08), 0 10px 30px -18px rgba(201,162,39,.22); }
       .featured-rail .card__headline { font-size: 22px; line-height: 1.42; }
     }
