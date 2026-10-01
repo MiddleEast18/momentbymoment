@@ -5,7 +5,7 @@
   const root=document.getElementById('mirsadRewardPage');
   const safe=v=>String(v??'').replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
   const fmtDate=v=>{try{return new Intl.DateTimeFormat('ar',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(`${v}T00:00:00Z`))}catch{return v}};
-  const days=[1,1,2,2,3,3,5];
+  const days=[3,4,5,6,7,8,10];
   const reasonText={claimed:'تتجدد المكافأة عند انتهاء العدّاد.',unlimited:'حسابك غير محدود، ولا تُضاف فتحات يومية إليه.',balance_high:'رصيدك كافٍ الآن. استخدم الفتحات أولاً، والمكافأة اليومية للتذكير لا لتكديس الرصيد.',inactive:'استخدم الموقع اليوم (فتح تفاصيل أو مصدر) حتى تُفعَّل المكافأة.',ok:''};
   let countdownTimer;
   const countdownText=ms=>{const total=Math.max(0,Math.floor(ms/1000)),h=Math.floor(total/3600),m=Math.floor((total%3600)/60),s=total%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
