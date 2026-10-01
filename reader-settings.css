@@ -1,11 +1,29 @@
 /* Local reading preferences. Default attributes are absent, so an empty store changes nothing. */
-html[data-rs-scale="90"] { zoom: .9; }
-html[data-rs-scale="95"] { zoom: .95; }
-html[data-rs-scale="105"] { zoom: 1.05; }
-html[data-rs-scale="110"] { zoom: 1.1; }
-html[data-rs-scale="115"] { zoom: 1.15; }
-html[data-rs-scale="120"] { zoom: 1.2; }
-html[data-rs-scale="125"] { zoom: 1.25; }
+/* Scale text only. Zoom on the page breaks the article sheet and covers the analysis. */
+html[data-rs-scale="90"] { --rs: 0.9; }
+html[data-rs-scale="95"] { --rs: 0.95; }
+html[data-rs-scale="105"] { --rs: 1.05; }
+html[data-rs-scale="110"] { --rs: 1.1; }
+html[data-rs-scale="115"] { --rs: 1.15; }
+html[data-rs-scale="120"] { --rs: 1.2; }
+html[data-rs-scale="125"] { --rs: 1.25; }
+html[data-rs-scale] .card__headline { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .card-medium .card__headline { font-size: calc(18px * var(--rs)); }
+html[data-rs-scale] .card-large .card__headline { font-size: calc(24px * var(--rs)); }
+html[data-rs-scale] .featured-rail .card__headline { font-size: calc(22px * var(--rs)); }
+html[data-rs-scale] .card__summary { font-size: calc(13.5px * var(--rs)); }
+html[data-rs-scale] .mirsad-reader__title { font-size: calc(clamp(24px, 4vw, 34px) * var(--rs)); line-height: 1.45; }
+html[data-rs-scale] .mirsad-reader__summary { font-size: calc(16px * var(--rs)); line-height: 1.9; }
+html[data-rs-scale] .mirsad-analysis__header h3 { font-size: calc(17px * var(--rs)); }
+html[data-rs-scale] .mirsad-analysis__claim { font-size: calc(14px * var(--rs)); line-height: 1.9; }
+html[data-rs-scale] .mirsad-reader { max-height: min(92dvh, 860px); }
+html[data-rs-scale] .mirsad-reader__body { overflow: auto; }
+html[data-rs-scale] .mirsad-reader__footer { position: relative; z-index: 2; flex: 0 0 auto; background: #10151c; }
+@media (max-width: 700px) {
+  html[data-rs-scale] .mirsad-reader__title { font-size: calc(23px * var(--rs)); }
+  html[data-rs-scale] .mirsad-reader__summary { font-size: calc(14.5px * var(--rs)); }
+  html[data-rs-scale] .mirsad-analysis__claim { font-size: calc(13.5px * var(--rs)); }
+}
 html[data-rs-leading="tight"] .card__headline { line-height: 1.25; }
 html[data-rs-leading="tight"] .card__summary { line-height: 1.45; }
 html[data-rs-leading="roomy"] .card__headline { line-height: 1.6; }
