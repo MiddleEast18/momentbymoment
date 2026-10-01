@@ -26,7 +26,7 @@
 }
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html { color-scheme: dark; width: 100%; min-width: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: none; }
-body { margin: 0; width: 100%; min-width: 0; max-width: 100%; overflow-x: hidden; overflow-wrap: break-word; word-break: normal; overscroll-behavior-y: none; background: radial-gradient(ellipse at top left, rgba(201,162,39,0.05), transparent 45%), var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+body { margin: 0; width: 100%; min-width: 0; max-width: 100%; overflow-wrap: break-word; word-break: normal; overscroll-behavior-y: none; background: radial-gradient(ellipse at top left, rgba(201,162,39,0.05), transparent 45%), var(--bg); color: var(--text); font-family: var(--font-body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 button, input, select { font: inherit; }
 button, [role="button"], .card, .chip, .sort-option, .sort-box, .mirsad-revision-tab { -webkit-user-select: none; user-select: none; }
  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
@@ -125,6 +125,6 @@ main, .featured-rail-wrap, .insight-bar, .wire-footer { width: 100%; min-width: 
 
 /* Cross-browser layout guard: contain width to the viewport without changing the intentional mobile featured carousel. */
 @supports (overflow: clip) {
-  html, body { overflow-x: clip; }
+  html { overflow-x: clip; }
 }
 main, .wire-header, .ticker-strip, .control-bar, .wire-footer, .insight-bar, .featured-rail-wrap { max-width: 100vw; }

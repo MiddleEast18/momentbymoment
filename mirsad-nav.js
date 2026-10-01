@@ -16,9 +16,43 @@
       btn.innerHTML = '<svg viewBox="0 0 64 64" focusable="false" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 13v9M32 42v9M13 32h9M42 32h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.5" fill="currentColor"/></svg>';
     }
     btn.className = 'mirsad-logo-btn mirsad-logo-btn--fixed';
-    if (btn.parentElement !== document.body) document.body.appendChild(btn);
+    if (btn.parentElement !== document.documentElement) document.documentElement.appendChild(btn);
     document.body.classList.add('mirsad-has-logo');
+    pinLogo(btn);
     return btn;
+  }
+  function pinLogo(btn) {
+    if (btn.dataset.mirsadPinned) return;
+    btn.dataset.mirsadPinned = '1';
+    var mode = 'fixed';
+    var frame = 0;
+    var y = function () { return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; };
+    var want = function () { return 14 + (window.visualViewport ? window.visualViewport.offsetTop : 0); };
+    var place = function () {
+      frame = 0;
+      var target = want();
+      if (mode === 'fixed') {
+        var drift = Math.abs(btn.getBoundingClientRect().top - target);
+        if (drift <= 1.5) {
+          if (y() > 24) {
+            document.removeEventListener('scroll', schedule, true);
+            window.removeEventListener('resize', schedule);
+          }
+          return;
+        }
+        mode = 'abs';
+        btn.style.setProperty('position', 'absolute', 'important');
+      }
+      btn.style.setProperty('top', (y() + target) + 'px', 'important');
+    };
+    var schedule = function () { if (!frame) frame = requestAnimationFrame(place); };
+    document.addEventListener('scroll', schedule, { passive: true, capture: true });
+    window.addEventListener('resize', schedule);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('scroll', schedule);
+      window.visualViewport.addEventListener('resize', schedule);
+    }
+    place();
   }
   function boot() {
     if (!document.body) return;
