@@ -1,4 +1,4 @@
-button.mirsad-logo-btn{position:fixed;z-index:7000;top:max(14px,env(safe-area-inset-top));inset-inline-start:max(16px,env(safe-area-inset-inline-start,0px));width:42px;height:42px;display:grid;place-items:center;margin:0;padding:0;border:1px solid rgba(201,162,39,.85);border-radius:50%;background:radial-gradient(circle at center,rgba(201,162,39,.16),#0b0f14 70%);color:var(--gold,#c9a227);cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+button.mirsad-logo-btn{position:fixed;z-index:900;top:max(14px,env(safe-area-inset-top));inset-inline-start:max(16px,env(safe-area-inset-inline-start,0px));width:42px;height:42px;display:grid;place-items:center;margin:0;padding:0;border:1px solid rgba(201,162,39,.85);border-radius:50%;background:radial-gradient(circle at center,rgba(201,162,39,.16),#0b0f14 70%);color:var(--gold,#c9a227);cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28)}
 button.mirsad-logo-btn svg{width:100%;height:100%;display:block}
 button.mirsad-logo-btn.mirsad-logo-spin{transform:rotate(360deg);transition:transform .6s ease-in-out}
 body.mirsad-has-logo .wire-header,

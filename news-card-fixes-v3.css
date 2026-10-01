@@ -20,28 +20,27 @@
   overflow-wrap: anywhere;
 }
 
-/* Update badge stays inside the card. The phone rail clips anything that hangs past the edge. */
-.card__update-badge {
-  top: 10px;
+/* Update chip sits on its own line, above the source and category, never on top of them. */
+.card__update-badge,
+.card__verification-badge {
+  position: static;
+  top: auto;
   left: auto;
   right: auto;
-  inset-inline-start: 10px;
+  inset: auto;
   transform: none;
-  z-index: 5;
-  max-width: calc(100% - 20px);
+  align-self: flex-start;
+  z-index: 1;
+  max-width: 100%;
   white-space: nowrap;
   border-radius: 999px;
-  padding: 5px 10px;
+}
+.card__update-badge {
+  padding: 4px 10px;
   border: 1px solid rgba(251,191,36,.45);
   background: rgba(16, 21, 28, .96);
-  box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  box-shadow: none;
 }
-
 .card__verification-badge {
-  top: 10px;
-  right: auto;
-  left: auto;
-  inset-inline-end: 10px;
-  z-index: 5;
-  border-radius: 999px;
+  padding: 4px 10px;
 }
