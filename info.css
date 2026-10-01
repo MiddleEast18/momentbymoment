@@ -37,10 +37,11 @@ li { margin: 0 0 6px; }
 .pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
 .pills li { margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-dim); font-size: 13px; }
 .swatch { display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; }
-.nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
-.nav a { color: var(--text-dim); text-decoration: none; padding: 6px 10px; border-radius: 999px; border: 1px solid transparent; }
-.nav a[aria-current="page"] { color: var(--gold); border-color: rgba(201, 162, 39, .45); }
-.nav a:hover { color: var(--gold); }
+.wire-footer { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--text-faint); font-size: 12px; text-align: center; line-height: 1.7; }
+.wire-footer p { margin: 0; }
+.wire-footer nav { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.wire-footer nav a, .wire-footer nav span { color: var(--text-dim); text-decoration: none; }
+.wire-footer nav a:hover { color: var(--gold); }
 .note { color: var(--text-dim); }
 @media (max-width: 640px) {
   .top { align-items: flex-start; }
