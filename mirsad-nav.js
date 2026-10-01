@@ -59,7 +59,9 @@
     };
     btn.addEventListener('click', function () {
       if (btn.getAttribute('aria-expanded') === 'true') { close(); return; }
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { open(); return; }
+      var motion = document.documentElement.getAttribute('data-rs-motion');
+      var reduce = motion === 'reduce' || (motion !== 'full' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      if (reduce) { open(); return; }
       btn.classList.remove('mirsad-logo-spin');
       void btn.offsetWidth;
       btn.classList.add('mirsad-logo-spin');

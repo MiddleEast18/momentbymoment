@@ -50,6 +50,10 @@
     next.contrast = next.contrast === 'high' ? 'high' : 'standard';
     next.gold = next.gold === 'soft' ? 'soft' : 'standard';
     next.motion = ['system', 'reduce', 'full'].indexOf(next.motion) >= 0 ? next.motion : 'system';
+    return next;
+  }
+  function effective(raw) {
+    var next = normalize(raw);
     if (next.scale >= 120 && next.density === 'compact') next.density = 'relaxed';
     if (next.contrast === 'high') next.gold = 'standard';
     return next;
@@ -84,7 +88,7 @@
     else document.documentElement.setAttribute(name, String(value));
   }
   function apply(raw) {
-    var next = normalize(raw);
+    var next = effective(raw);
     attr('data-rs-scale', next.scale, 100);
     attr('data-rs-leading', next.leading, 'normal');
     attr('data-rs-track', next.track, 'off');
@@ -101,18 +105,21 @@
     attr('data-rs-motion', next.motion, 'system');
   }
   function links(raw) {
-    var next = normalize(raw);
+    var intent = normalize(raw);
+    var next = effective(intent);
     var notes = [];
-    if (next.scale >= 120) notes.push('التكبير ' + next.scale + ' يمنع الكثافة المضغوطة، لأن الخط الكبير مع البطاقات الضيقة يقص العنوان. الكثافة تبقى مريحة أو عادية.');
-    if (next.contrast === 'high') notes.push('التباين العالي يثبت اللون الذهبي على درجته الأصلية حتى تبقى الحدود والأزرار واضحة.');
-    if (next.motion === 'reduce' && next.chrome === 'quiet') notes.push('تقليل الحركة مع اللوحة الهادئة يوقف النبض ويخفي شريط المؤشرات، ويُبقي الأخبار كما هي.');
-    if (next.font === 'kufi' && next.track === 'wide') notes.push('الخط الكوفي مع التباعد الواسع يبطئ المسح ويناسب القراءة المتأنية لا تصفح العناوين السريع.');
-    if (next.lines === 2 && next.density === 'compact') notes.push('سطران مع كثافة مضغوطة وضع مسح سريع: سياق العنوان أقل، واللوحة تعرض عدداً أكبر في الشاشة.');
-    if (next.width === 'narrow' && next.chrome === 'quiet') notes.push('عرض القراءة مع إخفاء المؤشرات يركّز العين على البطاقات دون أرقام اللوحة.');
-    if (next.badges === 'hide') notes.push('إخفاء الشارات يخفي علامة التحديث وعلامة المراجعة عن العين فقط، ولا يغيّر حالة الخبر.');
-    if (!notes.length) notes.push('الإعدادات الحالية متوافقة، ولا يوجد قيد يغيّر اختياراً آخر.');
+    if (intent.density === 'compact' && next.density !== 'compact') notes.push('الحجم ' + intent.scale + ' لا يُبقي الكثافة المضغوطة حتى لا يُقص العنوان. اللوحة تُعرض مريحة الآن، والمضغوطة تعود وحدها إذا نزل الحجم تحت 120.');
+    if (intent.gold === 'soft' && next.gold !== 'soft') notes.push('التباين العالي يثبت الذهبي الأصلي مؤقتاً حتى تبقى الحدود واضحة. الدرجة الهادئة محفوظة وتعود عند الرجوع إلى هوية الموقع.');
+    if (next.motion === 'reduce') notes.push('تقليل الحركة يهدّئ النبض والبطاقات، ويبقي دوران الشعار وفتح القائمة حتى لا تتعطل الإعدادات نفسها.');
+    if (next.motion === 'full') notes.push('الحركة الكاملة تبقي دوران الشعار والقائمة حتى لو كان الجهاز طالباً تقليل الحركة.');
+    if (next.font === 'kufi' && next.track === 'wide') notes.push('الكوفي مع التباعد الواسع يبطئ المسح. يناسب القراءة المتأنية لا العناوين السريعة.');
+    if (next.lines === 2 && next.density === 'compact') notes.push('سطران مع كثافة مضغوطة وضع مسح: سياق أقل، وبطاقات أكثر في الشاشة.');
+    if (next.lines === 4 && next.leading === 'roomy') notes.push('أربعة أسطر مع ارتفاع واسع تحتاج بطاقة أطول. إن قُصّ العنوان فالسبب ارتفاع صف اللوحة الثابت، لا اختفاء النص.');
+    if (next.width === 'narrow' && next.chrome === 'quiet') notes.push('عمود القراءة مع إخفاء المؤشرات يركّز العين على البطاقات دون أرقام اللوحة.');
+    if (next.badges === 'hide') notes.push('إخفاء الشارات مظهر فقط. حالة التحديث والمراجعة في البيانات لا تتغير.');
+    if (!notes.length) notes.push('لا قيد نشط. كل اختيار محفوظ كما هو، ويظهر على هذا الجهاز فقط.');
     return notes;
   }
   apply(read());
-  window.MirsadReaderSettings = { KEY: KEY, defaults: defaults, presets: presets, scales: scales, read: read, write: write, normalize: normalize, apply: apply, links: links };
+  window.MirsadReaderSettings = { KEY: KEY, defaults: defaults, presets: presets, scales: scales, read: read, write: write, normalize: normalize, effective: effective, apply: apply, links: links };
 })();

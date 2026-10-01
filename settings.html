@@ -7,39 +7,132 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="info.css?v=202610012315">
-  <link rel="stylesheet" href="reader-settings.css?v=202610012330">
-  <script src="reader-settings.js?v=202610012315"></script>
+  <link rel="stylesheet" href="info.css?v=202610012355">
+  <link rel="stylesheet" href="reader-settings.css?v=202610012355">
+  <script src="reader-settings.js?v=202610012355"></script>
+  <link rel="stylesheet" href="mirsad-nav.css?v=202610012355">
+  <script src="mirsad-nav.js?v=202610012355" defer></script>
   <style>
-    .presets, .choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
-    .presets button, .choices button, .row button { border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; padding: 8px 12px; cursor: pointer; }
-    .presets button[aria-pressed="true"], .choices button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(201,162,39,.12); }
-    button:disabled { opacity: .4; cursor: not-allowed; }
-    .field { margin: 0 0 16px; }
-    .field span, .scale-label { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 13px; }
-    input[type="range"] { width: 100%; accent-color: var(--gold); }
-    .links { margin: 0; padding: 0 18px 0 0; color: var(--text-dim); }
-    .sample { margin-top: 8px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius, 10px); background: var(--panel); }
-    .sample .card__headline { margin: 8px 0; font-family: var(--font-display); }
-    .sample .card__summary { margin: 0; color: var(--text-dim); }
-    .badges { display: flex; gap: 6px; }
-    .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 999px; font-size: 11px; color: var(--gold); border: 1px solid rgba(201,162,39,.4); }
-    .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .rs-wrap { width: min(1080px, calc(100% - 28px)); }
+    .rs-head { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; margin-bottom: 18px; }
+    .rs-meter { min-width: 180px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: rgba(16, 21, 28, .9); }
+    .rs-meter strong, .rs-meter span { display: block; font-family: var(--font-display); }
+    .rs-meter small { color: var(--text-dim); }
+    .rs-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 16px; align-items: start; }
+    .rs-side { position: sticky; top: 12px; display: grid; gap: 12px; }
+    .rs-panel { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, rgba(22,29,39,.96), rgba(12,16,22,.94)); }
+    .rs-panel h2 { margin-bottom: 12px; }
+    .rs-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .rs-preset, .rs-seg button, .rs-actions button { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line); cursor: pointer; }
+    .rs-preset { display: grid; gap: 6px; min-height: 92px; padding: 10px; border-radius: 14px; text-align: right; }
+    .rs-preset span { color: var(--text-dim); font-size: 11px; line-height: 1.45; }
+    .rs-preset[aria-pressed="true"], .rs-seg button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(201,162,39,.12); }
+    .rs-preset[aria-pressed="true"] span { color: var(--text-dim); }
+    .rs-row { display: grid; grid-template-columns: minmax(140px, .7fr) minmax(0, 1.3fr); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+    .rs-row b { display: block; font-weight: 600; }
+    .rs-row small, .rs-note { color: var(--text-dim); font-size: 12px; }
+    .rs-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rs-seg button { min-height: 36px; padding: 6px 10px; border-radius: 999px; }
+    .rs-seg button:disabled { opacity: .38; cursor: not-allowed; }
+    .rs-scale { width: 100%; accent-color: var(--gold); }
+    .rs-ticks { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; }
+    .rs-specimen { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: #121820; }
+    .rs-specimen__meta { margin: 8px 0; color: var(--text-faint); font-size: 12px; }
+    .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); }
+    .rs-badges { display: flex; gap: 6px; }
+    .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(201,162,39,.4); color: var(--gold); font-size: 11px; }
+    .rs-links { margin: 0; padding: 0 18px 0 0; color: var(--text-dim); }
+    .rs-links li { margin: 0 0 8px; }
+    .rs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .rs-actions button { padding: 8px 12px; border-radius: 999px; }
     #rsStatus { min-height: 1.4em; color: var(--gold); }
+    @media (max-width: 860px) {
+      .rs-layout, .rs-presets, .rs-row { grid-template-columns: 1fr; }
+      .rs-side { position: static; }
+      .rs-head { flex-direction: column; align-items: stretch; }
+    }
   </style>
-<link rel="stylesheet" href="mirsad-nav.css?v=202610012345">
-<script src="mirsad-nav.js?v=202610012345" defer></script>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap rs-wrap">
     <header class="top">
       <a class="brand" href="live.html"><span class="mark" aria-hidden="true">◉</span> مِرصاد</a>
       <a class="back" href="live.html">العودة إلى البث</a>
     </header>
     <p class="kicker">على هذا الجهاز فقط</p>
-    <h1>الإعدادات</h1>
-    <p class="lead">تفضيلات قراءة محلية. لا تغيّر الحساب، ولا الرصيد، ولا جلب الأخبار، ولا ترتيب المواد المحفوظ في الجلسة.</p>
-    <div id="rsApp"></div>
+    <div class="rs-head">
+      <div>
+        <h1>الإعدادات</h1>
+        <p class="lead">تفضيلات القراءة. لا تغيّر الحساب ولا الرصيد ولا جلب الأخبار ولا ترتيب الجلسة.</p>
+      </div>
+      <div class="rs-meter"><span id="rsPresetLabel">هوية مِرصاد</span><small id="rsLockCount">لا قيد نشط</small></div>
+    </div>
+    <div class="rs-layout">
+      <div class="rs-main">
+        <section class="rs-panel">
+          <h2>أنماط مربوطة</h2>
+          <div class="rs-presets">
+            <button type="button" class="rs-preset" data-key="preset" data-value="marsad"><strong>هوية مِرصاد</strong><span>100 · بليكس · لوحة كاملة</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="night"><strong>ليلي هادئ</strong><span>كوفي · ذهبي خافت · حركة أقل</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="focus"><strong>تركيز</strong><span>105 · عمود قراءة · بلا مؤشرات</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="large"><strong>خط كبير</strong><span>120 · تباين عالٍ · لمس أوسع</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="calm"><strong>قراءة بطيئة</strong><span>تباعد واسع · شارات مخفية</span></button>
+          </div>
+          <p class="rs-note" id="rsCustom">أي تعديل بعد النمط يحوّله إلى مخصص، من غير أن يمسح باقي القيم.</p>
+        </section>
+        <section class="rs-panel">
+          <h2>القراءة</h2>
+          <div class="rs-row">
+            <div><b>حجم النص</b><small id="rsScaleLabel">100</small></div>
+            <div>
+              <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
+              <div class="rs-ticks" aria-hidden="true"><span>90</span><span>100</span><span>110</span><span>120</span><span>125</span></div>
+            </div>
+          </div>
+          <div class="rs-row"><div><b>ارتفاع السطر</b><small>البطاقة والخبر المفتوح</small></div><div class="rs-seg" role="group" aria-label="ارتفاع السطر"><button type="button" data-key="leading" data-value="tight">ضيق</button><button type="button" data-key="leading" data-value="normal">عادي</button><button type="button" data-key="leading" data-value="roomy">واسع</button></div></div>
+          <div class="rs-row"><div><b>تباعد الحروف</b><small>على المتن العربي</small></div><div class="rs-seg"><button type="button" data-key="track" data-value="off">بدون</button><button type="button" data-key="track" data-value="wide">واسع</button></div></div>
+          <div class="rs-row"><div><b>أسطر العنوان</b><small>في بطاقة اللوحة فقط</small></div><div class="rs-seg"><button type="button" data-key="lines" data-value="2">سطران</button><button type="button" data-key="lines" data-value="3">ثلاثة</button><button type="button" data-key="lines" data-value="4">أربعة</button></div></div>
+          <div class="rs-row"><div><b>خط المتن</b><small>لا يغيّر خط العناوين</small></div><div class="rs-seg"><button type="button" data-key="font" data-value="plex">بليكس</button><button type="button" data-key="font" data-value="kufi">كوفي</button></div></div>
+        </section>
+        <section class="rs-panel">
+          <h2>اللوحة</h2>
+          <div class="rs-row"><div><b>الكثافة</b><small id="rsDensityNote">مسافة البطاقات</small></div><div class="rs-seg"><button type="button" data-key="density" data-value="compact">مضغوطة</button><button type="button" data-key="density" data-value="regular">عادية</button><button type="button" data-key="density" data-value="relaxed">مريحة</button></div></div>
+          <div class="rs-row"><div><b>عرض الشبكة</b><small>على البث</small></div><div class="rs-seg"><button type="button" data-key="width" data-value="board">لوحة كاملة</button><button type="button" data-key="width" data-value="narrow">عمود قراءة</button></div></div>
+          <div class="rs-row"><div><b>المؤشرات</b><small>إخفاء بصري لا حذف بيانات</small></div><div class="rs-seg"><button type="button" data-key="chrome" data-value="full">ظاهرة</button><button type="button" data-key="chrome" data-value="quiet">هادئة</button></div></div>
+          <div class="rs-row"><div><b>الحواف</b></div><div class="rs-seg"><button type="button" data-key="radius" data-value="sharp">حادة</button><button type="button" data-key="radius" data-value="soft">معتدلة</button><button type="button" data-key="radius" data-value="round">دائرية</button></div></div>
+          <div class="rs-row"><div><b>اللمس</b><small>أزرار الفرز والقائمة</small></div><div class="rs-seg"><button type="button" data-key="touch" data-value="regular">عادي</button><button type="button" data-key="touch" data-value="large">واسع</button></div></div>
+          <div class="rs-row"><div><b>الشارات</b></div><div class="rs-seg"><button type="button" data-key="badges" data-value="show">ظاهرة</button><button type="button" data-key="badges" data-value="hide">مخفية</button></div></div>
+        </section>
+        <section class="rs-panel">
+          <h2>اللون والحركة</h2>
+          <div class="rs-row"><div><b>التباين</b></div><div class="rs-seg"><button type="button" data-key="contrast" data-value="standard">هوية الموقع</button><button type="button" data-key="contrast" data-value="high">عالٍ</button></div></div>
+          <div class="rs-row"><div><b>الذهبي</b><small id="rsGoldNote">درجة الهوية</small></div><div class="rs-seg"><button type="button" data-key="gold" data-value="standard">أصلي</button><button type="button" data-key="gold" data-value="soft">هادئ</button></div></div>
+          <div class="rs-row"><div><b>الحركة</b><small>لا تعطّل فتح القائمة</small></div><div class="rs-seg"><button type="button" data-key="motion" data-value="system">حسب الجهاز</button><button type="button" data-key="motion" data-value="reduce">تقليل</button><button type="button" data-key="motion" data-value="full">كاملة</button></div></div>
+        </section>
+      </div>
+      <aside class="rs-side">
+        <section class="rs-panel">
+          <h2>عيّنة حية</h2>
+          <article class="rs-specimen">
+            <div class="rs-badges"><span class="card__update-badge">تحديث</span><span class="card__verification-badge">مراجعة</span></div>
+            <p class="rs-specimen__meta">فئة · مصدر تجريبي</p>
+            <h3 class="card__headline rs-specimen__title">عنوان تجريبي لمعاينة عدد الأسطر وارتفاعها من غير أن يكون خبراً منشوراً على اللوحة</h3>
+            <p class="card__summary">هذا سطر معاينة للمختصر، يوضح الخط والتباين فقط.</p>
+          </article>
+        </section>
+        <section class="rs-panel">
+          <h2>سلسلة القيود</h2>
+          <ul class="rs-links" id="rsLinks"></ul>
+          <div class="rs-actions">
+            <button type="button" id="rsReset">استعادة الهوية</button>
+            <button type="button" id="rsExport">تصدير</button>
+            <button type="button" id="rsImport">استيراد</button>
+          </div>
+          <p id="rsStatus" role="status"></p>
+          <input id="rsFile" type="file" accept="application/json,.json" hidden>
+        </section>
+      </aside>
+    </div>
     <nav class="nav" aria-label="الأقسام التعريفية">
       <a href="board.html">الرئيسية</a><a href="wire.html">البث المباشر</a><a href="coverage.html">أخبار الدول</a><a href="english-desk.html">الإنجليزية</a><a href="archive.html">الأرشيف</a><a href="sources.html">المصادر</a><a href="method.html">التحليل</a><a href="handbook.html">الدليل</a><a href="community.html">المجتمع</a><a href="settings.html" aria-current="page">الإعدادات</a>
     </nav>
@@ -47,148 +140,76 @@
   <script>
     (function () {
       var RS = window.MirsadReaderSettings;
-      var root = document.getElementById('rsApp');
       var state = RS.read();
-      var presetNames = [['marsad', 'هوية مِرصاد'], ['night', 'ليلي هادئ'], ['focus', 'تركيز'], ['large', 'خط كبير'], ['calm', 'قراءة بطيئة']];
-      function choice(name, value, label, pressed, disabled) {
-        return '<button type="button" data-key="' + name + '" data-value="' + value + '" aria-pressed="' + pressed + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+      var names = { marsad: 'هوية مِرصاد', night: 'ليلي هادئ', focus: 'تركيز', large: 'خط كبير', calm: 'قراءة بطيئة', custom: 'مخصص' };
+      var scale = document.getElementById('rsScale');
+      var frame = 0;
+      function paint() {
+        var view = RS.effective(state);
+        document.querySelectorAll('[data-key]').forEach(function (button) {
+          var key = button.getAttribute('data-key');
+          var value = button.getAttribute('data-value');
+          var current = key === 'preset' ? state.preset : String(view[key]);
+          button.setAttribute('aria-pressed', current === value ? 'true' : 'false');
+          button.disabled = (key === 'density' && value === 'compact' && state.scale >= 120) || (key === 'gold' && value === 'soft' && state.contrast === 'high');
+        });
+        if (document.activeElement !== scale) scale.value = String(state.scale);
+        scale.setAttribute('aria-valuenow', String(state.scale));
+        document.getElementById('rsScaleLabel').textContent = state.scale + (state.scale >= 120 ? ' · يقفل الكثافة المضغوطة' : '');
+        document.getElementById('rsPresetLabel').textContent = names[state.preset] || 'مخصص';
+        document.getElementById('rsCustom').hidden = state.preset !== 'custom';
+        document.getElementById('rsDensityNote').textContent = state.scale >= 120 && state.density === 'compact' ? 'المضغوطة محفوظة وتُعرض مريحة الآن' : 'مسافة البطاقات على البث';
+        document.getElementById('rsGoldNote').textContent = state.contrast === 'high' && state.gold === 'soft' ? 'الهادئ محفوظ ويُعرض الأصلي الآن' : 'درجة الهوية';
+        var notes = RS.links(state);
+        var active = notes.filter(function (note) { return note.indexOf('لا قيد نشط') !== 0; });
+        document.getElementById('rsLockCount').textContent = active.length ? active.length + ' قيد نشط' : 'لا قيد نشط';
+        document.getElementById('rsLinks').innerHTML = notes.map(function (note) { return '<li>' + note + '</li>'; }).join('');
       }
-      function render() {
-        var scaleLocked = state.scale >= 120;
-        var goldLocked = state.contrast === 'high';
-        root.innerHTML = ''
-          + '<section class="card"><h2>أنماط جاهزة</h2><p>كل نمط يضبط عدة قيم معاً. أي تعديل يدوي بعده يحوّل النمط إلى مخصص.</p><div class="presets">'
-          + presetNames.map(function (item) { return choice('preset', item[0], item[1], state.preset === item[0], false); }).join('')
-          + choice('preset', 'custom', 'مخصص', state.preset === 'custom', true)
-          + '</div></section>'
-          + '<section class="card"><h2>القراءة</h2>'
-          + '<label class="field"><span class="scale-label">حجم الواجهة: ' + state.scale + '</span><input data-scale type="range" min="90" max="125" step="5" value="' + state.scale + '"></label>'
-          + '<div class="field"><span>ارتفاع السطر</span><div class="choices">'
-          + choice('leading', 'tight', 'ضيق', state.leading === 'tight')
-          + choice('leading', 'normal', 'عادي', state.leading === 'normal')
-          + choice('leading', 'roomy', 'واسع', state.leading === 'roomy')
-          + '</div></div>'
-          + '<div class="field"><span>تباعد الحروف</span><div class="choices">'
-          + choice('track', 'off', 'بدون', state.track === 'off')
-          + choice('track', 'wide', 'واسع', state.track === 'wide')
-          + '</div></div>'
-          + '<div class="field"><span>أسطر العنوان</span><div class="choices">'
-          + choice('lines', '2', 'سطران', state.lines === 2)
-          + choice('lines', '3', 'ثلاثة', state.lines === 3)
-          + choice('lines', '4', 'أربعة', state.lines === 4)
-          + '</div></div>'
-          + '<div class="field"><span>خط المتن</span><div class="choices">'
-          + choice('font', 'plex', 'بليكس', state.font === 'plex')
-          + choice('font', 'kufi', 'كوفي', state.font === 'kufi')
-          + '</div></div></section>'
-          + '<section class="card"><h2>اللوحة</h2><p>هذه المجموعة تظهر على شبكة البث، لا على صفحات الشرح.</p>'
-          + '<div class="field"><span>كثافة البطاقات</span><div class="choices">'
-          + choice('density', 'compact', 'مضغوطة', state.density === 'compact', scaleLocked)
-          + choice('density', 'regular', 'عادية', state.density === 'regular', false)
-          + choice('density', 'relaxed', 'مريحة', state.density === 'relaxed', false)
-          + '</div></div>'
-          + '<div class="field"><span>عرض الشبكة</span><div class="choices">'
-          + choice('width', 'board', 'لوحة كاملة', state.width === 'board')
-          + choice('width', 'narrow', 'عمود قراءة', state.width === 'narrow')
-          + '</div></div>'
-          + '<div class="field"><span>مؤشرات اللوحة</span><div class="choices">'
-          + choice('chrome', 'full', 'ظاهرة', state.chrome === 'full')
-          + choice('chrome', 'quiet', 'هادئة', state.chrome === 'quiet')
-          + '</div></div>'
-          + '<div class="field"><span>حواف البطاقات</span><div class="choices">'
-          + choice('radius', 'sharp', 'حادة', state.radius === 'sharp')
-          + choice('radius', 'soft', 'معتدلة', state.radius === 'soft')
-          + choice('radius', 'round', 'دائرية', state.radius === 'round')
-          + '</div></div>'
-          + '<div class="field"><span>مساحة اللمس</span><div class="choices">'
-          + choice('touch', 'regular', 'عادية', state.touch === 'regular')
-          + choice('touch', 'large', 'واسعة', state.touch === 'large')
-          + '</div></div>'
-          + '<div class="field"><span>شارات البطاقة</span><div class="choices">'
-          + choice('badges', 'show', 'ظاهرة', state.badges === 'show')
-          + choice('badges', 'hide', 'مخفية', state.badges === 'hide')
-          + '</div></div></section>'
-          + '<section class="card"><h2>اللون والحركة</h2>'
-          + '<div class="field"><span>التباين</span><div class="choices">'
-          + choice('contrast', 'standard', 'هوية الموقع', state.contrast === 'standard')
-          + choice('contrast', 'high', 'عالٍ', state.contrast === 'high')
-          + '</div></div>'
-          + '<div class="field"><span>الذهبي</span><div class="choices">'
-          + choice('gold', 'standard', 'أصلي', state.gold === 'standard', false)
-          + choice('gold', 'soft', 'هادئ', state.gold === 'soft', goldLocked)
-          + '</div></div>'
-          + '<div class="field"><span>الحركة</span><div class="choices">'
-          + choice('motion', 'system', 'حسب الجهاز', state.motion === 'system')
-          + choice('motion', 'reduce', 'تقليل', state.motion === 'reduce')
-          + choice('motion', 'full', 'كاملة', state.motion === 'full')
-          + '</div></div></section>'
-          + '<section class="card"><h2>الربط بين الاختيارات</h2><ul class="links">'
-          + RS.links(state).map(function (note) { return '<li>' + note + '</li>'; }).join('')
-          + '</ul></section>'
-          + '<section class="card"><h2>معاينة الشكل</h2><div class="sample"><div class="badges"><span class="card__update-badge">تحديث</span><span class="card__verification-badge">مراجعة</span></div><h3 class="card__headline">عنوان تجريبي لمعاينة عدد الأسطر وارتفاعها دون أن يكون خبراً منشوراً على اللوحة</h3><p class="card__summary">هذا سطر معاينة للمختصر، يوضّح الخط والتباين فقط.</p></div>'
-          + '<div class="row"><button type="button" data-reset>استعادة هوية مِرصاد</button><button type="button" data-export>تصدير ملف</button><button type="button" data-import>استيراد ملف</button></div>'
-          + '<p id="rsStatus" role="status"></p><input data-file type="file" accept="application/json,.json" hidden></section>';
-        bind();
-      }
-      function setStatus(text) { var el = document.getElementById('rsStatus'); if (el) el.textContent = text; }
-      function bind() {
-        root.querySelector('[data-scale]').addEventListener('input', function (event) {
-          root.querySelector('.scale-label').textContent = 'حجم الواجهة: ' + event.target.value;
+      function commit(next) { state = RS.write(next); paint(); }
+      document.querySelector('.rs-main').addEventListener('click', function (event) {
+        var button = event.target.closest('[data-key]');
+        if (!button || button.disabled) return;
+        var key = button.getAttribute('data-key');
+        var value = button.getAttribute('data-value');
+        if (key === 'preset') { if (RS.presets[value]) commit(RS.presets[value]); return; }
+        state[key] = key === 'lines' ? Number(value) : value;
+        commit(state);
+      });
+      scale.addEventListener('input', function () {
+        state.scale = Number(scale.value);
+        document.getElementById('rsScaleLabel').textContent = String(state.scale);
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(function () { commit(state); });
+      });
+      document.getElementById('rsReset').addEventListener('click', function () {
+        commit(RS.presets.marsad);
+        document.getElementById('rsStatus').textContent = 'عادت الإعدادات إلى هوية مِرصاد.';
+      });
+      document.getElementById('rsExport').addEventListener('click', function () {
+        var blob = new Blob([JSON.stringify(RS.read(), null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = 'mirsad-reader-settings.json';
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+      document.getElementById('rsImport').addEventListener('click', function () { document.getElementById('rsFile').click(); });
+      document.getElementById('rsFile').addEventListener('change', function (event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) return;
+        file.text().then(function (text) {
+          var parsed = JSON.parse(text);
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');
+          if (!Object.keys(RS.defaults).some(function (key) { return parsed[key] != null; })) throw new Error('shape');
+          commit(parsed);
+          document.getElementById('rsStatus').textContent = 'استُورد الملف وطُبّق على هذا الجهاز.';
+        }).catch(function () {
+          document.getElementById('rsStatus').textContent = 'تعذر قراءة الملف. المطلوب ملف إعدادات مِرصاد.';
         });
-        root.querySelector('[data-scale]').addEventListener('change', function (event) {
-          state.scale = Number(event.target.value);
-          state = RS.write(state);
-          render();
-        });
-        root.querySelectorAll('[data-key]').forEach(function (button) {
-          button.addEventListener('click', function () {
-            if (button.disabled) return;
-            var key = button.getAttribute('data-key');
-            var value = button.getAttribute('data-value');
-            if (key === 'preset') {
-              if (!RS.presets[value]) return;
-              state = RS.write(RS.presets[value]);
-            } else {
-              state[key] = key === 'lines' || key === 'scale' ? Number(value) : value;
-              state = RS.write(state);
-            }
-            render();
-          });
-        });
-        root.querySelector('[data-reset]').addEventListener('click', function () {
-          state = RS.write(RS.presets.marsad);
-          setStatus('عادت الإعدادات إلى هوية مِرصاد.');
-          render();
-          setStatus('عادت الإعدادات إلى هوية مِرصاد.');
-        });
-        root.querySelector('[data-export]').addEventListener('click', function () {
-          var blob = new Blob([JSON.stringify(RS.read(), null, 2)], { type: 'application/json' });
-          var url = URL.createObjectURL(blob);
-          var link = document.createElement('a');
-          link.href = url;
-          link.download = 'mirsad-reader-settings.json';
-          link.click();
-          URL.revokeObjectURL(url);
-        });
-        root.querySelector('[data-import]').addEventListener('click', function () { root.querySelector('[data-file]').click(); });
-        root.querySelector('[data-file]').addEventListener('change', function (event) {
-          var file = event.target.files && event.target.files[0];
-          event.target.value = '';
-          if (!file) return;
-          file.text().then(function (text) {
-            var parsed = JSON.parse(text);
-            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');
-            if (!Object.keys(RS.defaults).some(function (key) { return parsed[key] != null; })) throw new Error('shape');
-            state = RS.write(parsed);
-            render();
-            setStatus('استُورد الملف وطُبّق على هذا الجهاز.');
-          }).catch(function () {
-            render();
-            setStatus('تعذر قراءة الملف. المطلوب ملف إعدادات مِرصاد.');
-          });
-        });
-      }
-      render();
+      });
+      paint();
     })();
   </script>
 </body>

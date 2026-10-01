@@ -27,8 +27,10 @@ body {
 h1 { margin: 0 0 12px; font-family: var(--font-display); font-size: clamp(28px, 5vw, 40px); line-height: 1.35; }
 .lead { margin: 0 0 22px; color: var(--text-dim); }
 .grid { display: grid; gap: 12px; }
-.card, .note { padding: 18px 18px 8px; border: 1px solid var(--line); border-radius: 16px; background: rgba(22, 29, 39, .92); }
-h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 18px; }
+.card, .note { position: relative; padding: 20px 20px 8px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, rgba(22, 29, 39, .96), rgba(14, 18, 24, .94)); }
+h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-family: var(--font-display); font-size: 18px; }
+h2::before { content: ''; width: 8px; height: 8px; flex: 0 0 8px; border: 1px solid var(--gold); border-radius: 50%; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 p { margin: 0 0 12px; }
 ul, ol { margin: 0 0 14px; padding: 0 18px 0 0; }
 li { margin: 0 0 6px; }

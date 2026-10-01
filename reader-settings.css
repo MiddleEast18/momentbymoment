@@ -61,11 +61,23 @@ html[data-rs-gold="soft"] {
   --gold: #b9a36a;
   --gold-soft: rgba(185, 163, 106, .16);
 }
-html[data-rs-motion="reduce"] *,
-html[data-rs-motion="reduce"] *::before,
-html[data-rs-motion="reduce"] *::after {
-  animation-duration: .01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: .01ms !important;
-  scroll-behavior: auto !important;
+html[data-rs-leading="tight"] .mirsad-reader__title { line-height: 1.3; }
+html[data-rs-leading="tight"] .mirsad-reader__summary,
+html[data-rs-leading="tight"] .mirsad-analysis__claim { line-height: 1.55; }
+html[data-rs-leading="roomy"] .mirsad-reader__title { line-height: 1.65; }
+html[data-rs-leading="roomy"] .mirsad-reader__summary,
+html[data-rs-leading="roomy"] .mirsad-analysis__claim { line-height: 2.05; }
+html[data-rs-font="kufi"] .mirsad-reader__summary,
+html[data-rs-font="kufi"] .mirsad-analysis__claim { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-motion="reduce"] .status-dot,
+html[data-rs-motion="reduce"] .ticker-strip,
+html[data-rs-motion="reduce"] .ticker-strip__track,
+html[data-rs-motion="reduce"] .card,
+html[data-rs-motion="reduce"] .mirsad-analysis__spinner,
+html[data-rs-motion="reduce"] .mirsad-reader-backdrop { animation: none !important; transition: none !important; }
+html[data-rs-motion="reduce"] { scroll-behavior: auto; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-rs-motion="full"] .mirsad-drawer-panel { transition: transform .22s ease; }
+  html[data-rs-motion="full"] .mirsad-drawer-backdrop { transition: opacity .22s ease; }
+  html[data-rs-motion="full"] button.mirsad-logo-btn.mirsad-logo-spin { transition: transform .6s ease-in-out; }
 }
