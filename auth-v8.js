@@ -189,7 +189,7 @@
     document.getElementById('mirsadUserMenu')?.remove();
     document.getElementById('mirsadProfileBanner')?.remove();
     document.getElementById('mirsadGuestLockToast')?.remove();
-    document.querySelectorAll('.mirsad-onboarding-backdrop,.mirsad-delete-dialog').forEach(node=>node.remove());
+    document.querySelectorAll('.mirsad-onboarding-backdrop,.mirsad-delete-dialog').forEach(node=>node.remove());document.documentElement.classList.remove('mirsad-onboarding-open');
     document.body.classList.remove('mirsad-admin-view','mirsad-reader-open','mirsad-guest-view');
     try{window.dispatchEvent(new CustomEvent('mirsad:session-end'))}catch{}
   }
@@ -204,12 +204,17 @@
   function onboardingStyles(){
     if(document.getElementById('mirsadSignupOnboardingStyles'))return;
     const style=document.createElement('style');style.id='mirsadSignupOnboardingStyles';
-    style.textContent='.mirsad-onboarding-backdrop{position:fixed;inset:0;z-index:8000;display:grid;place-items:center;padding:18px;background:rgba(5,8,12,.72)}.mirsad-onboarding{width:min(620px,100%);max-height:min(88vh,760px);overflow:auto;padding:24px;border:1px solid rgba(201,162,39,.5);border-radius:18px;background:#10151c;color:#f2eee6;box-shadow:0 20px 60px rgba(0,0,0,.45);font:500 14px/1.7 var(--font-sans,inherit)}.mirsad-onboarding h2{margin:0 0 8px;color:var(--gold,#c9a227);font:700 21px/1.4 var(--font-display,inherit)}.mirsad-onboarding p{margin:0 0 14px;color:#c9c5bc}.mirsad-onboarding table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:12px}.mirsad-onboarding th,.mirsad-onboarding td{padding:9px 8px;border:1px solid rgba(255,255,255,.12);text-align:right;vertical-align:top}.mirsad-onboarding th{color:var(--gold,#c9a227);background:rgba(201,162,39,.08)}.mirsad-onboarding__check{display:flex;gap:9px;align-items:flex-start;margin:14px 0;color:#f2eee6;font-size:13px}.mirsad-onboarding__check input{width:18px;height:18px;flex:0 0 auto;accent-color:var(--gold,#c9a227)}.mirsad-onboarding__actions{display:flex;justify-content:flex-start;gap:8px}.mirsad-onboarding button{padding:9px 18px;border:1px solid rgba(201,162,39,.55);border-radius:999px;background:transparent;color:#f2eee6;cursor:pointer;font:600 13px var(--font-sans,inherit)}.mirsad-onboarding button.primary{background:var(--gold,#c9a227);color:#10151c}.mirsad-onboarding button:disabled{opacity:.45;cursor:not-allowed}.mirsad-onboarding__reward{text-align:center;padding:18px 4px}.mirsad-onboarding__reward strong{display:block;margin:10px 0;color:var(--gold,#c9a227);font-size:34px;line-height:1.1}.mirsad-gold-burst{position:fixed;inset:0;z-index:8100;pointer-events:none;overflow:hidden}.mirsad-gold-burst__spark{position:absolute;width:5px;height:5px;margin:-2px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff6c8 0%,#c9a227 58%,#7a5c10 100%);box-shadow:0 0 6px rgba(201,162,39,.8);animation:mirsad-gold-pop .9s cubic-bezier(.16,.7,.22,1) forwards}.mirsad-gold-burst__spark.is-streak{width:2px;height:9px;border-radius:1px;background:linear-gradient(#f5d76e,rgba(201,162,39,0));box-shadow:none}.mirsad-gold-burst__flash{position:absolute;width:10px;height:10px;margin:-5px;border-radius:50%;border:1px solid rgba(201,162,39,.65);box-shadow:0 0 16px rgba(201,162,39,.4);animation:mirsad-gold-ring .72s ease-out forwards}@keyframes mirsad-gold-pop{0%{transform:translate(0,0) scale(.35);opacity:0}14%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}@keyframes mirsad-gold-ring{0%{transform:scale(.3);opacity:.65}100%{transform:scale(6.5);opacity:0}}@media (prefers-reduced-motion:reduce){.mirsad-gold-burst{display:none}}';
+    style.textContent='.mirsad-onboarding-backdrop{position:fixed;inset:0;z-index:8000;display:grid;place-items:center;padding:18px;background:rgba(5,8,12,.72)}.mirsad-onboarding{width:min(620px,100%);max-height:min(88vh,760px);overflow:auto;padding:24px;border:1px solid rgba(201,162,39,.5);border-radius:18px;background:#10151c;color:#f2eee6;box-shadow:0 20px 60px rgba(0,0,0,.45);font:500 14px/1.7 var(--font-sans,inherit)}.mirsad-onboarding h2{margin:0 0 8px;color:var(--gold,#c9a227);font:700 21px/1.4 var(--font-display,inherit)}.mirsad-onboarding p{margin:0 0 14px;color:#c9c5bc}.mirsad-onboarding table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:12px}.mirsad-onboarding th,.mirsad-onboarding td{padding:9px 8px;border:1px solid rgba(255,255,255,.12);text-align:right;vertical-align:top}.mirsad-onboarding th{color:var(--gold,#c9a227);background:rgba(201,162,39,.08)}.mirsad-onboarding__check{display:flex;gap:9px;align-items:flex-start;margin:14px 0;color:#f2eee6;font-size:13px}.mirsad-onboarding__check input{width:18px;height:18px;flex:0 0 auto;accent-color:var(--gold,#c9a227)}.mirsad-onboarding__actions{display:flex;justify-content:flex-start;gap:8px}.mirsad-onboarding button{padding:9px 18px;border:1px solid rgba(201,162,39,.55);border-radius:999px;background:transparent;color:#f2eee6;cursor:pointer;touch-action:manipulation;font:600 13px var(--font-sans,inherit)}html.mirsad-onboarding-open,html.mirsad-onboarding-open body{overflow:hidden}.mirsad-onboarding button.primary{background:var(--gold,#c9a227);color:#10151c}.mirsad-onboarding button:disabled{opacity:.45;cursor:not-allowed}.mirsad-onboarding__reward{text-align:center;padding:18px 4px}.mirsad-onboarding__reward strong{display:block;margin:10px 0;color:var(--gold,#c9a227);font-size:34px;line-height:1.1}.mirsad-gold-burst{position:fixed;inset:0;z-index:8100;pointer-events:none;overflow:hidden}.mirsad-gold-burst__spark{position:absolute;width:5px;height:5px;margin:-2px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff6c8 0%,#c9a227 58%,#7a5c10 100%);box-shadow:0 0 6px rgba(201,162,39,.8);animation:mirsad-gold-pop .9s cubic-bezier(.16,.7,.22,1) forwards}.mirsad-gold-burst__spark.is-streak{width:2px;height:9px;border-radius:1px;background:linear-gradient(#f5d76e,rgba(201,162,39,0));box-shadow:none}.mirsad-gold-burst__flash{position:absolute;width:10px;height:10px;margin:-5px;border-radius:50%;border:1px solid rgba(201,162,39,.65);box-shadow:0 0 16px rgba(201,162,39,.4);animation:mirsad-gold-ring .72s ease-out forwards}@keyframes mirsad-gold-pop{0%{transform:translate(0,0) scale(.35);opacity:0}14%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0}}@keyframes mirsad-gold-ring{0%{transform:scale(.3);opacity:.65}100%{transform:scale(6.5);opacity:0}}@media (prefers-reduced-motion:reduce){.mirsad-gold-burst{display:none}}';
     document.head.appendChild(style);
   }
   function onboardingDialog(markup){
     onboardingStyles();
+    document.documentElement.classList.add('mirsad-onboarding-open');
     const backdrop=document.createElement('div');backdrop.className='mirsad-onboarding-backdrop';backdrop.innerHTML=`<section class="mirsad-onboarding" role="dialog" aria-modal="true">${markup}</section>`;document.body.appendChild(backdrop);return backdrop;
+  }
+  function closeOnboarding(node){
+    node?.remove();
+    if(!document.querySelector('.mirsad-onboarding-backdrop'))document.documentElement.classList.remove('mirsad-onboarding-open');
   }
 
   function playGoldBurst(origin, done){
@@ -243,18 +248,19 @@
     setSignupOnboardingPending(user);
     const rules=onboardingDialog('<h2>مهم: قواعد الخصم في مِرصاد</h2><p>يرجى قراءة القواعد التالية قبل بدء التجربة المجانية. الرصيد المجاني محدود، والشحن هو المصدر الأساسي للمتابعة:</p><table><thead><tr><th>العملية</th><th>الخصم</th><th>الملاحظة</th></tr></thead><tbody><tr><td>فتح بطاقة من الأخبار الرئيسية</td><td>فتحة واحدة</td><td>مرة واحدة لكل خبر. إعادة فتح التفاصيل لاحقًا بدون خصم.</td></tr><tr><td>المصدر الأصلي للبطاقة الرئيسية</td><td>19 فتحة</td><td>مرة واحدة لكل خبر. مع فتح البطاقة يصبح الإجمالي 20 فتحة لذلك الخبر.</td></tr><tr><td>فتح شريط الشرق الأوسط بالإنجليزية</td><td>فتحة لكل خبر غير مقروء</td><td>يُخصم بعدد الأخبار غير المقروءة عند الفتح. لا خصم إن لم توجد أخبار جديدة.</td></tr><tr><td>المصدر الأصلي لأخبار الشرق الأوسط بالإنجليزية</td><td>20 فتحة</td><td>نظام مستقل عن البطاقة الرئيسية، ومرة واحدة فقط لكل خبر.</td></tr><tr><td>عرض المزيد</td><td>5 فتحات</td><td>يُخصم عند أول طلب، ثم مجددًا كلما وصلت 10 أخبار جديدة فريدة. ينطبق على الرئيسية والشريط الإنجليزي.</td></tr><tr><td>عرض الكل</td><td>100 فتحة</td><td>يفتح كل الأخبار المتاحة لمدة ساعة واحدة. إعادة الطلب خلال الساعة مجانًا. ينطبق على الرئيسية والشريط الإنجليزي.</td></tr><tr><td>إعادة فتح المصدر نفسه</td><td>بدون خصم</td><td>بعد تسجيل الفتح الأول لنفس الخبر.</td></tr></tbody></table><label class="mirsad-onboarding__check"><input type="checkbox" data-rules-accepted><span>لقد قرأت قواعد الخصم وأنا مستعد لتجربة الموقع مجانًا لفترة محدودة.</span></label><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-rules-next disabled>التالي</button></div>');
     const check=rules.querySelector('[data-rules-accepted]');const next=rules.querySelector('[data-rules-next]');check.addEventListener('change',()=>{next.disabled=!check.checked});
-    await new Promise(resolve=>next.addEventListener('click',()=>{rules.remove();resolve()}, {once:true}));
-    const {data,error}=await sb.rpc('claim_first_signup_reward');
+    await new Promise(resolve=>next.addEventListener('click',()=>{closeOnboarding(rules);resolve()}, {once:true}));
+    let hold=null;const slow=setTimeout(()=>{hold=onboardingDialog('<div class="mirsad-onboarding__reward"><h2>لحظة…</h2><p>جارٍ تجهيز الرصيد.</p></div>')},120);
+    let data,error;try{({data,error}=await sb.rpc('claim_first_signup_reward'))}finally{clearTimeout(slow);closeOnboarding(hold)}
     if(error){console.error('[mirsad onboarding] reward claim failed',error);signupOnboardingInFlight=false;return;}
     const reward=Array.isArray(data)?data[0]:data;
     if(reward?.restored){
       const restoredBalance=Math.max(0,Number(reward.remaining_unlocks)||0);
       const restoredDialog=onboardingDialog(`<div class="mirsad-onboarding__reward"><h2>مرحبًا بعودتك</h2><strong>${restoredBalance} فتحة</strong><p>تم استعادة الرصيد المتبقي من حسابك السابق بعد حذف الحساب. لن تُمنح مكافأة التسجيل الأولى مرة أخرى لهذا البريد الإلكتروني.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>متابعة</button></div></div>`);
-      await new Promise(resolve=>restoredDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{restoredDialog.remove();resolve()}, {once:true}));
+      await new Promise(resolve=>restoredDialog.querySelector('[data-reward-continue]').addEventListener('click',()=>{closeOnboarding(restoredDialog);resolve()}, {once:true}));
     }else if(reward?.claimed){
       const granted=Math.max(0,Number(reward.reward_amount)||300);
       const rewardDialog=onboardingDialog(`<div class="mirsad-onboarding__reward"><h2>تهانينا، حصلت على رصيدك المجاني</h2><strong>${granted} فتحة</strong><p>تمت إضافة ${granted} فتحة مجانية إلى حسابك لتجربة الموقع لفترة محدودة. استخدمها وفق قواعد الخصم، ثم اشحن للمتابعة.</p><div class="mirsad-onboarding__actions"><button class="primary" type="button" data-reward-continue>بدء التجربة</button></div></div>`);
-      await new Promise(resolve=>{const btn=rewardDialog.querySelector('[data-reward-continue]');btn.addEventListener('click',()=>{btn.disabled=true;playGoldBurst(btn,()=>{rewardDialog.remove();resolve()})},{once:true})});
+      await new Promise(resolve=>{const btn=rewardDialog.querySelector('[data-reward-continue]');btn.addEventListener('click',()=>{btn.disabled=true;playGoldBurst(btn,resolve);closeOnboarding(rewardDialog)},{once:true})});
     }
     clearSignupOnboardingPending();
     if(isProfilePage()){renderProfilePage(user,profile);return}
@@ -378,12 +384,17 @@
   
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
-    // Authentication success must reveal the app immediately; profile hydration is non-blocking.
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
-    let profile=null;
-    try{profile=await withAuthTimeout(ensureProfile(user),5000)}catch(error){console.error('[mirsad auth] profile setup failed',error)}
-    const unlockAccount=await ensureUnlockAccount(); const serverOnboarding=await shouldShowSignupOnboarding(); if(serverOnboarding)setSignupOnboardingPending(user); await registerPendingReferral(); showUserMenu(user,profile,unlockAccount); window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && serverOnboarding){void showSignupRules(user,profile);return;}if(isProfilePage()){renderProfilePage(user,profile||{});return;}if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    onboardingStyles();
+    const profilePromise=withAuthTimeout(ensureProfile(user),5000).catch(error=>{console.error('[mirsad auth] profile setup failed',error);return null});
+    const [profile,unlockAccount,serverOnboarding]=await Promise.all([profilePromise,ensureUnlockAccount(),shouldShowSignupOnboarding()]);
+    if(serverOnboarding)setSignupOnboardingPending(user);
+    void registerPendingReferral();
+    showUserMenu(user,profile,unlockAccount);
+    window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
+    if(profile && serverOnboarding){void showSignupRules(user,profile);return;}
+    if(isProfilePage()){renderProfilePage(user,profile||{});return;}
+    if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
   }
 
   function resetOAuthButtonAfterReturn(){
