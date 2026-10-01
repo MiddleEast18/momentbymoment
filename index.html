@@ -139,6 +139,7 @@
       var search = location.search;
       var hash = location.hash;
       var query = search.slice(1);
+      if (/(^|&)intro=1(&|$)/.test(query)) return;
       var fragment = hash.slice(1);
       var authQuery = /(^|&)(code|state|error|error_code|error_description)=/.test(query);
       var authHash = /(^|&)(access_token|refresh_token|expires_in|expires_at|token_type|type|error|error_code|error_description|provider_token|provider_refresh_token)=/.test(fragment);
