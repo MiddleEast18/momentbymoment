@@ -3,7 +3,37 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <script>try{localStorage.setItem('mirsad.introPassed.v1','1')}catch(e){}</script>
+  <script>
+    (function () {
+      var KEY = 'mirsad.introPassed.v1';
+      var armed = false;
+      var gateVisible = function () { return !!document.getElementById('mirsadAuthGate'); };
+      var sync = function () {
+        if (!document.body) return;
+        if (gateVisible()) {
+          try { localStorage.removeItem(KEY); } catch (error) {}
+          if (!armed) {
+            armed = true;
+            history.pushState({ mirsadGateBack: 1 }, '', location.href);
+          }
+          return;
+        }
+        if (!document.body.classList.contains('mirsad-auth-required')) {
+          try { localStorage.setItem(KEY, '1'); } catch (error) {}
+        }
+      };
+      window.addEventListener('popstate', function (event) {
+        if (!gateVisible() || (event.state && event.state.mirsadGateBack)) return;
+        location.replace(new URL('index.html', location.href).href);
+      });
+      var start = function () {
+        sync();
+        new MutationObserver(sync).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      };
+      if (document.body) start();
+      else document.addEventListener('DOMContentLoaded', start);
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>مِرصاد — رصد أخبار الشرق الأوسط لحظة بلحظة</title>
   <meta name="description" content="لوحة أخبار حية تعرض أهم مستجدات الشرق الأوسط فور صدورها، مصنّفة ومدقّقة آليًا.">

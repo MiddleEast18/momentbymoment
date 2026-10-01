@@ -181,14 +181,6 @@
     <h1>رصد الشرق الأوسط لحظة بلحظة</h1>
     <p class="count" id="today" hidden></p>
     <a class="enter" href="live.html">ادخل إلى البث المباشر</a>
-    <script>
-      document.querySelector('.enter').addEventListener('click', function (event) {
-        if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-        try { localStorage.setItem('mirsad.introPassed.v1', '1'); } catch (error) {}
-        event.preventDefault();
-        location.replace(this.href);
-      });
-    </script>
     <ul class="features">
       <li>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 15.5l.7 1.8L8.5 18l-1.8.7L6 20.5l-.7-1.8L3.5 18l1.8-.7L6 15.5zM17 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z" fill="currentColor"/></svg>
