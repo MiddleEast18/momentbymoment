@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="info.css?v=202610012355">
-  <link rel="stylesheet" href="reader-settings.css?v=202610012355">
-  <script src="reader-settings.js?v=202610012355"></script>
+  <link rel="stylesheet" href="reader-settings.css?v=202610020010">
+  <script src="reader-settings.js?v=202610020010"></script>
   <link rel="stylesheet" href="mirsad-nav.css?v=202610012355">
   <script src="mirsad-nav.js?v=202610012355" defer></script>
   <style>
@@ -82,8 +82,7 @@
         </section>
         <section class="rs-panel">
           <h2>القراءة</h2>
-          <div class="rs-row">
-            <div><b>حجم النص</b><small id="rsScaleLabel">100</small></div>
+          <div class="rs-row"><div><b>حجم النص</b><small id="rsScaleLabel">العنوان، العاجل، الفئات، والخبر المفتوح</small></div>
             <div>
               <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
               <div class="rs-ticks" aria-hidden="true"><span>90</span><span>100</span><span>110</span><span>120</span><span>125</span></div>
@@ -96,9 +95,9 @@
         </section>
         <section class="rs-panel">
           <h2>اللوحة</h2>
-          <div class="rs-row"><div><b>الكثافة</b><small id="rsDensityNote">مسافة البطاقات</small></div><div class="rs-seg"><button type="button" data-key="density" data-value="compact">مضغوطة</button><button type="button" data-key="density" data-value="regular">عادية</button><button type="button" data-key="density" data-value="relaxed">مريحة</button></div></div>
-          <div class="rs-row"><div><b>عرض الشبكة</b><small>على البث</small></div><div class="rs-seg"><button type="button" data-key="width" data-value="board">لوحة كاملة</button><button type="button" data-key="width" data-value="narrow">عمود قراءة</button></div></div>
-          <div class="rs-row"><div><b>المؤشرات</b><small>إخفاء بصري لا حذف بيانات</small></div><div class="rs-seg"><button type="button" data-key="chrome" data-value="full">ظاهرة</button><button type="button" data-key="chrome" data-value="quiet">هادئة</button></div></div>
+          <div class="rs-row"><div><b>الكثافة</b><small id="rsDensityNote">فراغ شبكة البث وصف الدول</small></div><div class="rs-seg"><button type="button" data-key="density" data-value="compact">مضغوطة</button><button type="button" data-key="density" data-value="regular">عادية</button><button type="button" data-key="density" data-value="relaxed">مريحة</button></div></div>
+          <div class="rs-row"><div><b>عرض الشبكة</b><small>الرأس والعاجل والبطاقات في عمود واحد</small></div><div class="rs-seg"><button type="button" data-key="width" data-value="board">لوحة كاملة</button><button type="button" data-key="width" data-value="narrow">عمود قراءة</button></div></div>
+          <div class="rs-row"><div><b>المؤشرات</b><small>شريط الأرقام وعدد الأخبار المعروضة</small></div><div class="rs-seg"><button type="button" data-key="chrome" data-value="full">ظاهرة</button><button type="button" data-key="chrome" data-value="quiet">هادئة</button></div></div>
           <div class="rs-row"><div><b>الحواف</b></div><div class="rs-seg"><button type="button" data-key="radius" data-value="sharp">حادة</button><button type="button" data-key="radius" data-value="soft">معتدلة</button><button type="button" data-key="radius" data-value="round">دائرية</button></div></div>
           <div class="rs-row"><div><b>اللمس</b><small>أزرار الفرز والقائمة</small></div><div class="rs-seg"><button type="button" data-key="touch" data-value="regular">عادي</button><button type="button" data-key="touch" data-value="large">واسع</button></div></div>
           <div class="rs-row"><div><b>الشارات</b></div><div class="rs-seg"><button type="button" data-key="badges" data-value="show">ظاهرة</button><button type="button" data-key="badges" data-value="hide">مخفية</button></div></div>
@@ -155,10 +154,10 @@
         });
         if (document.activeElement !== scale) scale.value = String(state.scale);
         scale.setAttribute('aria-valuenow', String(state.scale));
-        document.getElementById('rsScaleLabel').textContent = state.scale + (state.scale >= 120 ? ' · يقفل الكثافة المضغوطة' : '');
+        document.getElementById('rsScaleLabel').textContent = state.scale + (state.scale >= 120 ? ' · يقفل الكثافة المضغوطة' : ' · العنوان والعاجل والخبر');
         document.getElementById('rsPresetLabel').textContent = names[state.preset] || 'مخصص';
         document.getElementById('rsCustom').hidden = state.preset !== 'custom';
-        document.getElementById('rsDensityNote').textContent = state.scale >= 120 && state.density === 'compact' ? 'المضغوطة محفوظة وتُعرض مريحة الآن' : 'مسافة البطاقات على البث';
+        document.getElementById('rsDensityNote').textContent = state.scale >= 120 && state.density === 'compact' ? 'المضغوطة محفوظة وتُعرض مريحة الآن' : 'فراغ شبكة البث وصف الدول';
         document.getElementById('rsGoldNote').textContent = state.contrast === 'high' && state.gold === 'soft' ? 'الهادئ محفوظ ويُعرض الأصلي الآن' : 'درجة الهوية';
         var notes = RS.links(state);
         var active = notes.filter(function (note) { return note.indexOf('لا قيد نشط') !== 0; });

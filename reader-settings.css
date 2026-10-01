@@ -1,5 +1,4 @@
 /* Local reading preferences. Default attributes are absent, so an empty store changes nothing. */
-/* Scale text only. Zoom on the page breaks the article sheet and covers the analysis. */
 html[data-rs-scale="90"] { --rs: 0.9; }
 html[data-rs-scale="95"] { --rs: 0.95; }
 html[data-rs-scale="105"] { --rs: 1.05; }
@@ -7,6 +6,18 @@ html[data-rs-scale="110"] { --rs: 1.1; }
 html[data-rs-scale="115"] { --rs: 1.15; }
 html[data-rs-scale="120"] { --rs: 1.2; }
 html[data-rs-scale="125"] { --rs: 1.25; }
+html[data-rs-scale] .wire-header__title h1 { font-size: calc(22px * var(--rs)); }
+html[data-rs-scale] .wire-header__tagline,
+html[data-rs-scale] .ticker-strip__label,
+html[data-rs-scale] .section-heading,
+html[data-rs-scale] .chip { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .ticker-strip__track,
+html[data-rs-scale] .mirsad-ticker-rail { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .insight-pill { font-size: calc(12px * var(--rs)); }
+html[data-rs-scale] .insight-pill strong { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .rapid-news__toggle { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .country-header h1 { font-size: calc(clamp(24px, 4vw, 38px) * var(--rs)); }
+html[data-rs-scale] .country-card h2 { font-size: calc(25px * var(--rs)); }
 html[data-rs-scale] .card__headline { font-size: calc(16px * var(--rs)); }
 html[data-rs-scale] .card-medium .card__headline { font-size: calc(18px * var(--rs)); }
 html[data-rs-scale] .card-large .card__headline { font-size: calc(24px * var(--rs)); }
@@ -28,26 +39,62 @@ html[data-rs-leading="tight"] .card__headline { line-height: 1.25; }
 html[data-rs-leading="tight"] .card__summary { line-height: 1.45; }
 html[data-rs-leading="roomy"] .card__headline { line-height: 1.6; }
 html[data-rs-leading="roomy"] .card__summary { line-height: 1.9; }
-html[data-rs-track="wide"] body { letter-spacing: .02em; }
+html[data-rs-leading="tight"] .mirsad-reader__title { line-height: 1.3; }
+html[data-rs-leading="tight"] .mirsad-reader__summary,
+html[data-rs-leading="tight"] .mirsad-analysis__claim { line-height: 1.55; }
+html[data-rs-leading="roomy"] .mirsad-reader__title { line-height: 1.65; }
+html[data-rs-leading="roomy"] .mirsad-reader__summary,
+html[data-rs-leading="roomy"] .mirsad-analysis__claim { line-height: 2.05; }
+html[data-rs-track="wide"] .card__headline,
+html[data-rs-track="wide"] .card__summary,
+html[data-rs-track="wide"] .mirsad-reader__title,
+html[data-rs-track="wide"] .mirsad-reader__summary,
+html[data-rs-track="wide"] .mirsad-analysis__claim,
+html[data-rs-track="wide"] .country-card h2,
+html[data-rs-track="wide"] .country-card p { letter-spacing: .03em; }
 html[data-rs-lines="2"] .card__headline { -webkit-line-clamp: 2; }
 html[data-rs-lines="4"] .card__headline { -webkit-line-clamp: 4; }
 html[data-rs-font="kufi"] body,
 html[data-rs-font="kufi"] .card__summary,
-html[data-rs-font="kufi"] .mirsad-drawer-item { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
-html[data-rs-density="compact"] .news-grid { gap: 10px; }
+html[data-rs-font="kufi"] .mirsad-drawer-item,
+html[data-rs-font="kufi"] .mirsad-reader__summary,
+html[data-rs-font="kufi"] .mirsad-analysis__claim,
+html[data-rs-font="kufi"] .country-card p,
+html[data-rs-font="kufi"] .rapid-news__item { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-density="compact"] .news-grid { gap: 10px; grid-auto-rows: 220px; }
 html[data-rs-density="compact"] .news-grid .card { padding: 12px; }
-html[data-rs-density="relaxed"] .news-grid { gap: 26px; }
+html[data-rs-density="compact"] .featured-rail,
+html[data-rs-density="compact"] .country-grid { gap: 10px; }
+html[data-rs-density="relaxed"] .news-grid { gap: 28px; grid-auto-rows: 280px; }
 html[data-rs-density="relaxed"] .news-grid .card { padding: 24px; }
-html[data-rs-width="narrow"] .news-grid,
+html[data-rs-density="relaxed"] .featured-rail,
+html[data-rs-density="relaxed"] .country-grid { gap: 20px; }
+html[data-rs-width="narrow"] .wire-header,
+html[data-rs-width="narrow"] .ticker-strip,
+html[data-rs-width="narrow"] .control-bar,
 html[data-rs-width="narrow"] .insight-bar,
-html[data-rs-width="narrow"] .control-bar { max-width: 880px; margin-inline: auto; }
-html[data-rs-chrome="quiet"] .insight-bar { display: none; }
+html[data-rs-width="narrow"] .featured-rail-wrap,
+html[data-rs-width="narrow"] .news-grid,
+html[data-rs-width="narrow"] .rapid-news__bar,
+html[data-rs-width="narrow"] .rapid-news__panel,
+html[data-rs-width="narrow"] .wire-footer { width: min(880px, 100%); margin-inline: auto; }
+html[data-rs-chrome="quiet"] .insight-bar,
+html[data-rs-chrome="quiet"] .control-bar__count { display: none; }
 html[data-rs-radius="sharp"] { --radius: 4px; }
 html[data-rs-radius="round"] { --radius: 18px; }
+html[data-rs-radius] .card,
+html[data-rs-radius] .insight-pill,
+html[data-rs-radius] .rapid-news__bar,
+html[data-rs-radius] .rapid-news__panel,
+html[data-rs-radius] .country-card,
+html[data-rs-radius] .mirsad-reader { border-radius: var(--radius); }
 html[data-rs-touch="large"] .chip,
 html[data-rs-touch="large"] .sort-trigger,
+html[data-rs-touch="large"] .search-box,
 html[data-rs-touch="large"] .mirsad-drawer-item,
-html[data-rs-touch="large"] .mirsad-auth-button { min-height: 48px; }
+html[data-rs-touch="large"] .mirsad-auth-button,
+html[data-rs-touch="large"] .country-back,
+html[data-rs-touch="large"] .rapid-news__toggle { min-height: 48px; }
 html[data-rs-badges="hide"] .card__verification-badge,
 html[data-rs-badges="hide"] .card__update-badge { display: none; }
 html[data-rs-contrast="high"] {
@@ -60,18 +107,11 @@ html[data-rs-contrast="high"] {
 html[data-rs-gold="soft"] {
   --gold: #b9a36a;
   --gold-soft: rgba(185, 163, 106, .16);
+  --country-gold: #b9a36a;
+  --country-gold-bright: #d4c48a;
 }
-html[data-rs-leading="tight"] .mirsad-reader__title { line-height: 1.3; }
-html[data-rs-leading="tight"] .mirsad-reader__summary,
-html[data-rs-leading="tight"] .mirsad-analysis__claim { line-height: 1.55; }
-html[data-rs-leading="roomy"] .mirsad-reader__title { line-height: 1.65; }
-html[data-rs-leading="roomy"] .mirsad-reader__summary,
-html[data-rs-leading="roomy"] .mirsad-analysis__claim { line-height: 2.05; }
-html[data-rs-font="kufi"] .mirsad-reader__summary,
-html[data-rs-font="kufi"] .mirsad-analysis__claim { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
 html[data-rs-motion="reduce"] .status-dot,
-html[data-rs-motion="reduce"] .ticker-strip,
-html[data-rs-motion="reduce"] .ticker-strip__track,
+html[data-rs-motion="reduce"] .featured-loader span,
 html[data-rs-motion="reduce"] .card,
 html[data-rs-motion="reduce"] .mirsad-analysis__spinner,
 html[data-rs-motion="reduce"] .mirsad-reader-backdrop { animation: none !important; transition: none !important; }

@@ -66,6 +66,11 @@
   };
 
   const tick = (now) => {
+    if (document.documentElement.getAttribute('data-rs-motion') === 'reduce') {
+      last = now;
+      raf = requestAnimationFrame(tick);
+      return;
+    }
     const dt = Math.min(100, Math.max(0, now - last));
     last = now;
     if (cycleWidth > 0) {
