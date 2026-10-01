@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!-- Pages deployment refresh: 2026-09-13T12:46Z -->
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مِرصاد — رصد أخبار الشرق الأوسط لحظة بلحظة</title>
+  <meta name="description" content="لوحة أخبار حية تعرض أهم مستجدات الشرق الأوسط فور صدورها، مصنّفة ومدقّقة آليًا.">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9103099692068646" crossorigin="anonymous"></script>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=202609162318">
+  <link rel="stylesheet" href="logo.css?v=202609100020">
+  <link rel="stylesheet" href="controls-fix.css?v=202609100035">
+  <link rel="stylesheet" href="news-reader.css?v=202609180045">
+  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202609132045">
+  <link rel="stylesheet" href="guest-summary-shimmer.css?v=202609210748">
+  <link rel="stylesheet" href="news-revision-compat.css?v=202609101030">
+  <link rel="stylesheet" href="news-pagination.css?v=202609120012">
+  <link rel="stylesheet" href="auth.css?v=202609162110">
+  <link rel="stylesheet" href="rapid-news.css?v=202609210405">
+  <style>
+    .rapid-news__bar, .rapid-news__panel { position: relative; z-index: 10; }
+    .rapid-news__bar { min-height: 56px; }
+    .rapid-news__toggle { padding: 14px 16px; }
+    .rapid-news__status { position: absolute; inset-inline-start: auto; inset-inline-end: 16px; z-index: 2; width: auto; max-width: calc(100% - 128px); overflow: hidden; pointer-events: none; text-overflow: ellipsis; white-space: nowrap; }
+    .rapid-news__notice { position: fixed; left: 14px; right: 14px; bottom: 14px; z-index: 6000; width: max-content; max-width: calc(100% - 28px); margin: 0 auto; padding: 8px 12px; border: 1px solid rgba(201,162,39,.45); border-radius: 10px; background: rgba(16,21,28,.96); color: var(--text); font: 600 12px/1.4 var(--font-body); text-align: center; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
+    .rapid-news__notice.is-visible { opacity: 1; transform: translateY(0); }
+    @media (max-width: 700px), (pointer: coarse) {
+      .featured-rail { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: stretch; overflow-x: auto !important; overflow-y: hidden; }
+      .featured-rail > .card { flex: 0 0 86% !important; width: 86% !important; min-width: 86% !important; max-width: 86% !important; scroll-snap-align: center; }
+      .featured-rail > .card:first-of-type { border-color: rgba(201,162,39,.24); box-shadow: inset 0 0 0 1px rgba(201,162,39,.08), 0 10px 30px -18px rgba(201,162,39,.22); }
+      .featured-rail .card__headline { font-size: 22px; line-height: 1.42; }
+    }
+  </style>
+</head>
+<body class="mirsad-auth-required">
+  <header class="wire-header">
+    <div class="wire-header__brand">
+      <span class="wire-header__mark" aria-hidden="true"><svg viewBox="0 0 64 64" focusable="false"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 13v9M32 42v9M13 32h9M42 32h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.5" fill="currentColor"/></svg></span>
+      <div class="wire-header__title"><h1>مِرصاد</h1><p class="wire-header__tagline">رصد الشرق الأوسط لحظة بلحظة</p></div>
+    </div>
+    <div class="wire-header__status" id="connectionStatus" role="status" aria-live="polite">
+      <span class="status-dot" id="statusDot" data-state="connecting"></span><span class="status-text" id="statusText">جارٍ الاتصال بالبث الحي…</span><span class="status-sync" id="lastSync"></span>
+    </div>
+  </header>
+  <div class="ticker-strip" aria-label="آخر العناوين"><div class="ticker-strip__label">عاجل</div><div class="ticker-strip__track" id="tickerTrack"><span class="ticker-strip__item">بانتظار ورود الأخبار…</span></div></div>
+  <nav class="control-bar" aria-label="لوحة التصفية">
+    <div class="control-bar__left">
+      <input class="search-box" id="searchBox" type="search" placeholder="ابحث في العناوين والملخصات…">
+      <button class="sort-box sort-trigger" id="sortBox" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="ترتيب الأخبار: الأولوية" data-sort-mode="priority">الأولوية</button>
+    </div>
+    <div class="control-bar__filters" id="categoryFilters"><button class="chip is-active" data-category="all" type="button">الكل</button><button class="chip" data-category="Politics" type="button"><span class="chip__dot chip__dot--politics"></span>سياسة</button><button class="chip" data-category="Economy" type="button"><span class="chip__dot chip__dot--economy"></span>اقتصاد</button><button class="chip" data-category="Tech" type="button"><span class="chip__dot chip__dot--tech"></span>تقنية</button><button class="chip" data-category="Society" type="button"><span class="chip__dot chip__dot--society"></span>مجتمع</button><button class="chip" data-category="Sports" type="button"><span class="chip__dot chip__dot--sports"></span>رياضة</button></div>
+    <div class="control-bar__count" id="liveCount">0 خبر معروض</div>
+  </nav>
+
+  <section class="rapid-news__bar" aria-label="أخبار الشرق الأوسط بالإنجليزية">
+    <button id="rapidNewsToggle" class="rapid-news__toggle" type="button" aria-expanded="false" aria-controls="rapidNews" aria-label="فتح أخبار الشرق الأوسط بالإنجليزية">أخبار الشرق الأوسط بالإنجليزية <span id="rapidNewsBadge" class="rapid-news__badge" hidden>0</span></button>
+    <span id="rapidNewsStatus" class="rapid-news__status" role="status" aria-live="polite">جارٍ تحميل أخبار الشرق الأوسط بالإنجليزية…</span>
+  </section>
+  <section id="rapidNews" class="rapid-news__panel" hidden aria-labelledby="rapidNewsToggle">
+    <div id="rapidNewsList" class="rapid-news__list"></div>
+    <div id="rapidNewsControls" class="rapid-news__controls" role="group" aria-label="خيارات عرض أخبار الشرق الأوسط بالإنجليزية">
+      <button id="rapidNewsAll" class="rapid-news__control" type="button">عرض الكل</button>
+      <button id="rapidNewsMore" class="rapid-news__control" type="button">عرض المزيد</button>
+    </div>
+  </section>
+
+  <div class="sort-sheet" id="sortSheet" hidden>
+    <div class="sort-sheet__backdrop" data-sort-close></div>
+    <section class="sort-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="sortSheetTitle" tabindex="-1">
+      <div class="sort-sheet__grab" aria-hidden="true"></div>
+      <div class="sort-sheet__header"><h2 id="sortSheetTitle">ترتيب الأخبار</h2><button class="sort-sheet__close" type="button" data-sort-close aria-label="إغلاق">×</button></div>
+      <div class="sort-sheet__options" role="radiogroup" aria-label="ترتيب الأخبار">
+        <button class="sort-option" type="button" role="radio" aria-checked="false" data-sort-option="priority"><span>الأولوية</span><span class="sort-option__radio" aria-hidden="true"></span></button>
+        <button class="sort-option" type="button" role="radio" aria-checked="false" data-sort-option="latest"><span>الأحدث</span><span class="sort-option__radio" aria-hidden="true"></span></button>
+        <button class="sort-option" type="button" role="radio" aria-checked="false" data-sort-option="updates"><span>الأكثر تحديثًا</span><span class="sort-option__radio" aria-hidden="true"></span></button>
+      </div>
+    </section>
+  </div>
+
+  <section class="insight-bar" id="insightBar" aria-label="ملخص الحالة"><div class="insight-pill"><span>الأحداث النشطة</span><strong id="insightClusterCount">0</strong></div><div class="insight-pill"><span>قيد التحقق</span><strong id="insightPendingCount">0</strong></div><div class="insight-pill"><span>متوسط الثقة</span><strong id="insightAvgConfidence">0%</strong></div><div class="insight-pill"><span>مصادر موثوقة</span><strong id="insightTrustedSources">0</strong></div></section>
+  <main><section class="featured-rail-wrap"><div class="section-heading">الأبرز على الهاتف</div><div id="featuredRail" class="featured-rail" aria-label="الأخبار الأبرز"><div id="featuredLoader" class="featured-loader" role="status" aria-label="جارٍ تحميل الأخبار"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div></section><div class="news-grid" id="newsGrid" aria-live="polite" aria-relevant="additions"></div><p class="empty-state" id="emptyState" hidden>لا توجد أخبار في هذا التصنيف حاليًا.</p></main>
+  <footer class="wire-footer"><p>مِرصاد — واجهة عرض للرصد الإخباري. الأخبار المعلقة للتحقق لا تظهر، وتبقى حقوق المواد الأصلية لأصحابها.</p><nav aria-label="روابط معلومات الموقع"><a href="about.html">من نحن</a><span>·</span><a href="contact.html">اتصل بنا</a><span>·</span><a href="arab-countries.html">أخبار الدول العربية</a><span>·</span><a href="privacy.html">سياسة الخصوصية</a><span>·</span><a href="terms.html">شروط الاستخدام</a></nav></footer>
+  <template id="cardTemplate"><article class="card" tabindex="0" role="button" aria-label="فتح الخبر"><span class="card__update-badge" hidden></span><span class="card__verification-badge" hidden></span><div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div><h2 class="card__headline"></h2><p class="card__summary"></p><p class="card__evidence"></p><div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div></article></template>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="news-text-normalizer.js?v=202609130721"></script>
+  <script src="app.js?v=202609210850"></script>
+  <script src="ticker-fix.js?v=202609150034"></script>
+  <script src="sort-sheet.js?v=202609112240"></script>
+  <script src="source-access.js?v=202609161744"></script>
+  <script src="news-reader.js?v=202609210850"></script>
+  <script src="mirsad-card-compat.js?v=202609130724"></script>
+  <script src="view-access-public.js?v=202609202155"></script>
+  <script src="news-pagination.js?v=202609210850"></script>
+  <script src="news-revision-compat.js?v=202609130819"></script>
+  <script src="auth-v8.js?v=202609210850"></script>
+  <script src="guest-summary-shimmer.js?v=202609210748"></script>
+  <script src="rapid-news.js?v=202609210850"></script>
+  <script src="pull-refresh.js?v=202609210940"></script>
+</body>
+</html>
