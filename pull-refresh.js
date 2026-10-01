@@ -31,7 +31,7 @@
   }
 
   function isExcluded(target) {
-    return Boolean(target?.closest?.('input, textarea, select, button, a, [role="button"], [role="dialog"], .featured-rail, .control-bar__filters, .ticker-strip__track, .mirsad-reader, .mirsad-reader-backdrop, .mirsad-auth-gate, .mirsad-user-dropdown, .mirsad-onboarding-backdrop, .wheel, [data-sort-close]'));
+    return Boolean(target?.closest?.('input, textarea, select, button, a, [role="button"], [role="dialog"], .mirsad-drawer, .featured-rail, .control-bar__filters, .ticker-strip__track, .mirsad-reader, .mirsad-reader-backdrop, .mirsad-auth-gate, .mirsad-user-dropdown, .mirsad-onboarding-backdrop, .wheel, [data-sort-close]'));
   }
 
   function hasScrolledAncestor(target) {

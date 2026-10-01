@@ -8,17 +8,22 @@
       var KEY = 'mirsad.introPassed.v1';
       var armed = false;
       var gateVisible = function () { return !!document.getElementById('mirsadAuthGate'); };
+      var marked = null;
       var sync = function () {
         if (!document.body) return;
         if (gateVisible()) {
-          try { localStorage.removeItem(KEY); } catch (error) {}
+          if (marked !== false) {
+            marked = false;
+            try { localStorage.removeItem(KEY); } catch (error) {}
+          }
           if (!armed) {
             armed = true;
             history.pushState({ mirsadGateBack: 1 }, '', location.href);
           }
           return;
         }
-        if (!document.body.classList.contains('mirsad-auth-required')) {
+        if (!document.body.classList.contains('mirsad-auth-required') && marked !== true) {
+          marked = true;
           try { localStorage.setItem(KEY, '1'); } catch (error) {}
         }
       };
@@ -28,7 +33,7 @@
       });
       var start = function () {
         sync();
-        new MutationObserver(sync).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        new MutationObserver(sync).observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] });
       };
       if (document.body) start();
       else document.addEventListener('DOMContentLoaded', start);
@@ -73,12 +78,12 @@
     .mirsad-drawer.is-open .mirsad-drawer-backdrop { opacity: 1; }
     .mirsad-drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(340px, 88vw); display: flex; flex-direction: column; background: #10151c; color: var(--text, #ede9e0); border-inline-start: 1px solid rgba(237, 234, 227, .12); box-shadow: -18px 0 48px rgba(0, 0, 0, .35); transform: translateX(100%); transition: transform .22s ease; }
     .mirsad-drawer.is-open .mirsad-drawer-panel { transform: translateX(0); }
-    .mirsad-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px; }
+    .mirsad-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 16px 8px; }
     .mirsad-drawer-mark { width: 32px; height: 32px; color: var(--gold, #c9a227); }
     .mirsad-drawer-mark svg { width: 100%; height: 100%; display: block; }
     .mirsad-drawer-close { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--text-dim, #9aa4b3); font: 500 26px/1 var(--font-body, sans-serif); cursor: pointer; }
     .mirsad-drawer-close:hover { color: var(--gold, #c9a227); }
-    .mirsad-drawer-nav { padding: 6px 10px 20px; overflow: auto; }
+    .mirsad-drawer-nav { padding: 6px 10px max(20px, env(safe-area-inset-bottom)); overflow: auto; }
     .mirsad-drawer-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
     .mirsad-drawer-item { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 10px; border-radius: 10px; color: var(--text, #ede9e0); text-decoration: none; font-family: var(--font-body, 'IBM Plex Sans Arabic', sans-serif); font-size: 15px; }
     .mirsad-drawer-item svg { width: 20px; height: 20px; flex: 0 0 20px; color: var(--text-dim, #9aa4b3); }
@@ -150,7 +155,7 @@
   <script src="view-access-public.js?v=202609202155"></script>
   <script src="news-pagination.js?v=202609210850"></script>
   <script src="news-revision-compat.js?v=202609130819"></script>
-  <script src="auth-v8.js?v=202610012220"></script>
+  <script src="auth-v8.js?v=202610012255"></script>
   <script src="guest-summary-shimmer.js?v=202609210748"></script>
   <script src="rapid-news.js?v=202609210850"></script>
   <div class="mirsad-drawer" id="mirsadDrawer" hidden>
@@ -203,6 +208,6 @@
     })();
   </script>
 
-  <script src="pull-refresh.js?v=202609210940"></script>
+  <script src="pull-refresh.js?v=202610012255"></script>
 </body>
 </html>
