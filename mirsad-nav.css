@@ -1,16 +1,26 @@
-button.mirsad-logo-btn{width:40px;height:40px;display:grid;place-items:center;margin:0;padding:0;border:1px solid var(--gold,#c9a227);border-radius:50%;background:radial-gradient(circle at center,rgba(201,162,39,.07),transparent 68%);color:var(--gold,#c9a227);cursor:pointer;flex:0 0 auto}
-button.mirsad-logo-btn svg{width:24px;height:24px;display:block}
+button.mirsad-logo-btn{position:fixed;z-index:7000;top:max(14px,env(safe-area-inset-top));inset-inline-start:max(16px,env(safe-area-inset-inline-start,0px));width:42px;height:42px;display:grid;place-items:center;margin:0;padding:0;border:1px solid rgba(201,162,39,.85);border-radius:50%;background:radial-gradient(circle at center,rgba(201,162,39,.16),#0b0f14 70%);color:var(--gold,#c9a227);cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+button.mirsad-logo-btn svg{width:100%;height:100%;display:block}
 button.mirsad-logo-btn.mirsad-logo-spin{transform:rotate(360deg);transition:transform .6s ease-in-out}
-button.mirsad-logo-btn--float{position:fixed;z-index:6400;top:max(12px,env(safe-area-inset-top));inset-inline-start:max(12px,env(safe-area-inset-inline-start,0px));box-shadow:0 8px 24px rgba(0,0,0,.28)}
-body:has(.mirsad-logo-btn--float) .gate{padding-top:72px}
-body:has(.mirsad-logo-btn--float) .wheel-header,
-body:has(.mirsad-logo-btn--float) .recovery-header,
-body:has(.mirsad-logo-btn--float) .mirsad-reward-page__header,
-body:has(.mirsad-logo-btn--float) .mirsad-profile-page__header,
-body:has(.mirsad-logo-btn--float) .country-header{padding-inline-start:54px}
-header.top, .mirsad-billing-brand, .legal-brand{display:flex;align-items:center}
-header.top .mark{display:none}
-body.mirsad-auth-required > .mirsad-logo-btn--float,
+body.mirsad-has-logo .wire-header,
+body.mirsad-has-logo header.top,
+body.mirsad-has-logo .country-header,
+body.mirsad-has-logo .mirsad-billing-head,
+body.mirsad-has-logo .wheel-header,
+body.mirsad-has-logo .recovery-header,
+body.mirsad-has-logo .mirsad-reward-page__header,
+body.mirsad-has-logo .mirsad-profile-page__header{padding-inline-start:72px}
+body.mirsad-has-logo .gate{padding-top:72px}
+.mark,
+.country-brand__mark,
+.mirsad-billing-brand__mark,
+.wheel-brand-mark,
+.recovery-mark,
+.legal-brand .wire-header__mark,
+.gate .brand i,
+.mirsad-reward-page__brand > span[aria-hidden="true"],
+.mirsad-profile-page__brand > span[aria-hidden="true"],
+.mirsad-drawer-mark{display:none!important}
+body.mirsad-auth-required > .mirsad-logo-btn,
 body.mirsad-auth-required > .mirsad-drawer{visibility:visible!important}
 html.mirsad-nav-lock,body.mirsad-nav-lock{overflow:hidden}
 .mirsad-drawer[hidden]{display:none}
