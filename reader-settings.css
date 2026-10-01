@@ -1,0 +1,53 @@
+/* Local reading preferences. Default attributes are absent, so an empty store changes nothing. */
+html[data-rs-scale="90"] { zoom: .9; }
+html[data-rs-scale="95"] { zoom: .95; }
+html[data-rs-scale="105"] { zoom: 1.05; }
+html[data-rs-scale="110"] { zoom: 1.1; }
+html[data-rs-scale="115"] { zoom: 1.15; }
+html[data-rs-scale="120"] { zoom: 1.2; }
+html[data-rs-scale="125"] { zoom: 1.25; }
+html[data-rs-leading="tight"] .card__headline { line-height: 1.25; }
+html[data-rs-leading="tight"] .card__summary { line-height: 1.45; }
+html[data-rs-leading="roomy"] .card__headline { line-height: 1.6; }
+html[data-rs-leading="roomy"] .card__summary { line-height: 1.9; }
+html[data-rs-track="wide"] body { letter-spacing: .02em; }
+html[data-rs-lines="2"] .card__headline { -webkit-line-clamp: 2; }
+html[data-rs-lines="4"] .card__headline { -webkit-line-clamp: 4; }
+html[data-rs-font="kufi"] body,
+html[data-rs-font="kufi"] .card__summary,
+html[data-rs-font="kufi"] .mirsad-drawer-item { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-density="compact"] .news-grid { gap: 10px; }
+html[data-rs-density="compact"] .news-grid .card { padding: 12px; }
+html[data-rs-density="relaxed"] .news-grid { gap: 26px; }
+html[data-rs-density="relaxed"] .news-grid .card { padding: 24px; }
+html[data-rs-width="narrow"] .news-grid,
+html[data-rs-width="narrow"] .insight-bar,
+html[data-rs-width="narrow"] .control-bar { max-width: 880px; margin-inline: auto; }
+html[data-rs-chrome="quiet"] .insight-bar { display: none; }
+html[data-rs-radius="sharp"] { --radius: 4px; }
+html[data-rs-radius="round"] { --radius: 18px; }
+html[data-rs-touch="large"] .chip,
+html[data-rs-touch="large"] .sort-trigger,
+html[data-rs-touch="large"] .mirsad-drawer-item,
+html[data-rs-touch="large"] .mirsad-auth-button { min-height: 48px; }
+html[data-rs-badges="hide"] .card__verification-badge,
+html[data-rs-badges="hide"] .card__update-badge { display: none; }
+html[data-rs-contrast="high"] {
+  --text: #fff8ea;
+  --text-dim: #d7dee8;
+  --text-faint: #aeb6c2;
+  --panel-border: rgba(237, 234, 227, .22);
+  --panel-border-strong: rgba(237, 234, 227, .4);
+}
+html[data-rs-gold="soft"] {
+  --gold: #b9a36a;
+  --gold-soft: rgba(185, 163, 106, .16);
+}
+html[data-rs-motion="reduce"] *,
+html[data-rs-motion="reduce"] *::before,
+html[data-rs-motion="reduce"] *::after {
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
+  scroll-behavior: auto !important;
+}

@@ -1,0 +1,46 @@
+:root {
+  --bg: #0b0f14;
+  --text: #ede9e0;
+  --text-dim: #9aa4b3;
+  --text-faint: #5c6675;
+  --gold: #c9a227;
+  --panel: #161d27;
+  --line: rgba(237, 234, 227, .12);
+  --font-display: 'Noto Kufi Arabic', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at top left, rgba(201, 162, 39, .07), transparent 42%), var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.8;
+}
+.wrap { width: min(820px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.brand { display: flex; align-items: center; gap: 8px; color: var(--gold); font-family: var(--font-display); font-weight: 700; text-decoration: none; }
+.mark { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; }
+.back, .jump { border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; color: var(--text-dim); background: transparent; text-decoration: none; font: inherit; }
+.kicker { margin: 0 0 8px; color: var(--gold); font-size: 13px; }
+h1 { margin: 0 0 12px; font-family: var(--font-display); font-size: clamp(28px, 5vw, 40px); line-height: 1.35; }
+.lead { margin: 0 0 22px; color: var(--text-dim); }
+.grid { display: grid; gap: 12px; }
+.card, .note { padding: 18px 18px 8px; border: 1px solid var(--line); border-radius: 16px; background: rgba(22, 29, 39, .92); }
+h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 18px; }
+p { margin: 0 0 12px; }
+ul, ol { margin: 0 0 14px; padding: 0 18px 0 0; }
+li { margin: 0 0 6px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+.pills li { margin: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-dim); font-size: 13px; }
+.swatch { display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 50%; }
+.nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.nav a { color: var(--text-dim); text-decoration: none; padding: 6px 10px; border-radius: 999px; border: 1px solid transparent; }
+.nav a[aria-current="page"] { color: var(--gold); border-color: rgba(201, 162, 39, .45); }
+.nav a:hover { color: var(--gold); }
+.note { color: var(--text-dim); }
+@media (max-width: 640px) {
+  .top { align-items: flex-start; }
+  .card, .note { padding-inline: 14px; }
+}

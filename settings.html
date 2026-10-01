@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الإعدادات — مِرصاد</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="info.css?v=202610012315">
+  <link rel="stylesheet" href="reader-settings.css?v=202610012315">
+  <script src="reader-settings.js?v=202610012315"></script>
+  <style>
+    .presets, .choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+    .presets button, .choices button, .row button { border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--text); font: inherit; padding: 8px 12px; cursor: pointer; }
+    .presets button[aria-pressed="true"], .choices button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(201,162,39,.12); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .field { margin: 0 0 16px; }
+    .field span, .scale-label { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 13px; }
+    input[type="range"] { width: 100%; accent-color: var(--gold); }
+    .links { margin: 0; padding: 0 18px 0 0; color: var(--text-dim); }
+    .sample { margin-top: 8px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius, 10px); background: var(--panel); }
+    .sample .card__headline { margin: 8px 0; font-family: var(--font-display); }
+    .sample .card__summary { margin: 0; color: var(--text-dim); }
+    .badges { display: flex; gap: 6px; }
+    .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 999px; font-size: 11px; color: var(--gold); border: 1px solid rgba(201,162,39,.4); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    #rsStatus { min-height: 1.4em; color: var(--gold); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="live.html"><span class="mark" aria-hidden="true">◉</span> مِرصاد</a>
+      <a class="back" href="live.html">العودة إلى البث</a>
+    </header>
+    <p class="kicker">على هذا الجهاز فقط</p>
+    <h1>الإعدادات</h1>
+    <p class="lead">تفضيلات قراءة محلية. لا تغيّر الحساب، ولا الرصيد، ولا جلب الأخبار، ولا ترتيب المواد المحفوظ في الجلسة.</p>
+    <div id="rsApp"></div>
+    <nav class="nav" aria-label="الأقسام التعريفية">
+      <a href="board.html">الرئيسية</a><a href="wire.html">البث المباشر</a><a href="coverage.html">أخبار الدول</a><a href="english-desk.html">الإنجليزية</a><a href="archive.html">الأرشيف</a><a href="sources.html">المصادر</a><a href="method.html">التحليل</a><a href="handbook.html">الدليل</a><a href="community.html">المجتمع</a><a href="settings.html" aria-current="page">الإعدادات</a>
+    </nav>
+  </div>
+  <script>
+    (function () {
+      var RS = window.MirsadReaderSettings;
+      var root = document.getElementById('rsApp');
+      var state = RS.read();
+      var presetNames = [['marsad', 'هوية مِرصاد'], ['night', 'ليلي هادئ'], ['focus', 'تركيز'], ['large', 'خط كبير'], ['calm', 'قراءة بطيئة']];
+      function choice(name, value, label, pressed, disabled) {
+        return '<button type="button" data-key="' + name + '" data-value="' + value + '" aria-pressed="' + pressed + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+      }
+      function render() {
+        var scaleLocked = state.scale >= 120;
+        var goldLocked = state.contrast === 'high';
+        root.innerHTML = ''
+          + '<section class="card"><h2>أنماط جاهزة</h2><p>كل نمط يضبط عدة قيم معاً. أي تعديل يدوي بعده يحوّل النمط إلى مخصص.</p><div class="presets">'
+          + presetNames.map(function (item) { return choice('preset', item[0], item[1], state.preset === item[0], false); }).join('')
+          + choice('preset', 'custom', 'مخصص', state.preset === 'custom', true)
+          + '</div></section>'
+          + '<section class="card"><h2>القراءة</h2>'
+          + '<label class="field"><span class="scale-label">حجم الواجهة: ' + state.scale + '</span><input data-scale type="range" min="90" max="125" step="5" value="' + state.scale + '"></label>'
+          + '<div class="field"><span>ارتفاع السطر</span><div class="choices">'
+          + choice('leading', 'tight', 'ضيق', state.leading === 'tight')
+          + choice('leading', 'normal', 'عادي', state.leading === 'normal')
+          + choice('leading', 'roomy', 'واسع', state.leading === 'roomy')
+          + '</div></div>'
+          + '<div class="field"><span>تباعد الحروف</span><div class="choices">'
+          + choice('track', 'off', 'بدون', state.track === 'off')
+          + choice('track', 'wide', 'واسع', state.track === 'wide')
+          + '</div></div>'
+          + '<div class="field"><span>أسطر العنوان</span><div class="choices">'
+          + choice('lines', '2', 'سطران', state.lines === 2)
+          + choice('lines', '3', 'ثلاثة', state.lines === 3)
+          + choice('lines', '4', 'أربعة', state.lines === 4)
+          + '</div></div>'
+          + '<div class="field"><span>خط المتن</span><div class="choices">'
+          + choice('font', 'plex', 'بليكس', state.font === 'plex')
+          + choice('font', 'kufi', 'كوفي', state.font === 'kufi')
+          + '</div></div></section>'
+          + '<section class="card"><h2>اللوحة</h2><p>هذه المجموعة تظهر على شبكة البث، لا على صفحات الشرح.</p>'
+          + '<div class="field"><span>كثافة البطاقات</span><div class="choices">'
+          + choice('density', 'compact', 'مضغوطة', state.density === 'compact', scaleLocked)
+          + choice('density', 'regular', 'عادية', state.density === 'regular', false)
+          + choice('density', 'relaxed', 'مريحة', state.density === 'relaxed', false)
+          + '</div></div>'
+          + '<div class="field"><span>عرض الشبكة</span><div class="choices">'
+          + choice('width', 'board', 'لوحة كاملة', state.width === 'board')
+          + choice('width', 'narrow', 'عمود قراءة', state.width === 'narrow')
+          + '</div></div>'
+          + '<div class="field"><span>مؤشرات اللوحة</span><div class="choices">'
+          + choice('chrome', 'full', 'ظاهرة', state.chrome === 'full')
+          + choice('chrome', 'quiet', 'هادئة', state.chrome === 'quiet')
+          + '</div></div>'
+          + '<div class="field"><span>حواف البطاقات</span><div class="choices">'
+          + choice('radius', 'sharp', 'حادة', state.radius === 'sharp')
+          + choice('radius', 'soft', 'معتدلة', state.radius === 'soft')
+          + choice('radius', 'round', 'دائرية', state.radius === 'round')
+          + '</div></div>'
+          + '<div class="field"><span>مساحة اللمس</span><div class="choices">'
+          + choice('touch', 'regular', 'عادية', state.touch === 'regular')
+          + choice('touch', 'large', 'واسعة', state.touch === 'large')
+          + '</div></div>'
+          + '<div class="field"><span>شارات البطاقة</span><div class="choices">'
+          + choice('badges', 'show', 'ظاهرة', state.badges === 'show')
+          + choice('badges', 'hide', 'مخفية', state.badges === 'hide')
+          + '</div></div></section>'
+          + '<section class="card"><h2>اللون والحركة</h2>'
+          + '<div class="field"><span>التباين</span><div class="choices">'
+          + choice('contrast', 'standard', 'هوية الموقع', state.contrast === 'standard')
+          + choice('contrast', 'high', 'عالٍ', state.contrast === 'high')
+          + '</div></div>'
+          + '<div class="field"><span>الذهبي</span><div class="choices">'
+          + choice('gold', 'standard', 'أصلي', state.gold === 'standard', false)
+          + choice('gold', 'soft', 'هادئ', state.gold === 'soft', goldLocked)
+          + '</div></div>'
+          + '<div class="field"><span>الحركة</span><div class="choices">'
+          + choice('motion', 'system', 'حسب الجهاز', state.motion === 'system')
+          + choice('motion', 'reduce', 'تقليل', state.motion === 'reduce')
+          + choice('motion', 'full', 'كاملة', state.motion === 'full')
+          + '</div></div></section>'
+          + '<section class="card"><h2>الربط بين الاختيارات</h2><ul class="links">'
+          + RS.links(state).map(function (note) { return '<li>' + note + '</li>'; }).join('')
+          + '</ul></section>'
+          + '<section class="card"><h2>معاينة الشكل</h2><div class="sample"><div class="badges"><span class="card__update-badge">تحديث</span><span class="card__verification-badge">مراجعة</span></div><h3 class="card__headline">عنوان تجريبي لمعاينة عدد الأسطر وارتفاعها دون أن يكون خبراً منشوراً على اللوحة</h3><p class="card__summary">هذا سطر معاينة للمختصر، يوضّح الخط والتباين فقط.</p></div>'
+          + '<div class="row"><button type="button" data-reset>استعادة هوية مِرصاد</button><button type="button" data-export>تصدير ملف</button><button type="button" data-import>استيراد ملف</button></div>'
+          + '<p id="rsStatus" role="status"></p><input data-file type="file" accept="application/json,.json" hidden></section>';
+        bind();
+      }
+      function setStatus(text) { var el = document.getElementById('rsStatus'); if (el) el.textContent = text; }
+      function bind() {
+        root.querySelector('[data-scale]').addEventListener('input', function (event) {
+          root.querySelector('.scale-label').textContent = 'حجم الواجهة: ' + event.target.value;
+        });
+        root.querySelector('[data-scale]').addEventListener('change', function (event) {
+          state.scale = Number(event.target.value);
+          state = RS.write(state);
+          render();
+        });
+        root.querySelectorAll('[data-key]').forEach(function (button) {
+          button.addEventListener('click', function () {
+            if (button.disabled) return;
+            var key = button.getAttribute('data-key');
+            var value = button.getAttribute('data-value');
+            if (key === 'preset') {
+              if (!RS.presets[value]) return;
+              state = RS.write(RS.presets[value]);
+            } else {
+              state[key] = key === 'lines' || key === 'scale' ? Number(value) : value;
+              state = RS.write(state);
+            }
+            render();
+          });
+        });
+        root.querySelector('[data-reset]').addEventListener('click', function () {
+          state = RS.write(RS.presets.marsad);
+          setStatus('عادت الإعدادات إلى هوية مِرصاد.');
+          render();
+          setStatus('عادت الإعدادات إلى هوية مِرصاد.');
+        });
+        root.querySelector('[data-export]').addEventListener('click', function () {
+          var blob = new Blob([JSON.stringify(RS.read(), null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement('a');
+          link.href = url;
+          link.download = 'mirsad-reader-settings.json';
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+        root.querySelector('[data-import]').addEventListener('click', function () { root.querySelector('[data-file]').click(); });
+        root.querySelector('[data-file]').addEventListener('change', function (event) {
+          var file = event.target.files && event.target.files[0];
+          event.target.value = '';
+          if (!file) return;
+          file.text().then(function (text) {
+            var parsed = JSON.parse(text);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');
+            if (!Object.keys(RS.defaults).some(function (key) { return parsed[key] != null; })) throw new Error('shape');
+            state = RS.write(parsed);
+            render();
+            setStatus('استُورد الملف وطُبّق على هذا الجهاز.');
+          }).catch(function () {
+            render();
+            setStatus('تعذر قراءة الملف. المطلوب ملف إعدادات مِرصاد.');
+          });
+        });
+      }
+      render();
+    })();
+  </script>
+</body>
+</html>
