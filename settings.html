@@ -9,105 +9,297 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="info.css?v=202610020020">
   <link rel="stylesheet" href="reader-settings.css?v=202610020010">
-  <script src="reader-settings.js?v=202610020010"></script>
+  <script src="reader-settings.js?v=202610021820"></script>
   <link rel="stylesheet" href="mirsad-nav.css?v=202610020800">
   <script src="mirsad-nav.js?v=202610020800" defer></script>
   <style>
-    .rs-wrap { width: min(1080px, calc(100% - 28px)); }
-    .rs-head { display: flex; justify-content: space-between; gap: 18px; align-items: flex-end; margin-bottom: 18px; }
-    .rs-meter { min-width: 180px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: rgba(16, 21, 28, .9); }
-    .rs-meter strong, .rs-meter span { display: block; font-family: var(--font-display); }
-    .rs-meter small { color: var(--text-dim); }
-    .rs-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 16px; align-items: start; }
-    .rs-side { position: sticky; top: 12px; display: grid; gap: 12px; }
-    .rs-panel { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, rgba(22,29,39,.96), rgba(12,16,22,.94)); }
-    .rs-panel h2 { margin-bottom: 12px; }
-    .rs-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .rs-wrap { width: min(1180px, calc(100% - 28px)); }
+    .rs-deck { line-height: 1.55; }
+    .rs-deck h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 36px); }
+    .rs-deck h2 { margin: 0 0 10px; font-size: 15px; }
+    .rs-deck h2::before { content: none; width: 0; flex-basis: 0; }
+    .rs-dash {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr);
+      gap: 18px;
+      margin-bottom: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(var(--gold), var(--gold)) left 8px top 8px / 16px 1px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) left 8px top 8px / 1px 16px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) right 8px top 8px / 16px 1px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) right 8px top 8px / 1px 16px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) left 8px bottom 8px / 16px 1px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) left 8px bottom 8px / 1px 16px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) right 8px bottom 8px / 16px 1px no-repeat,
+        linear-gradient(var(--gold), var(--gold)) right 8px bottom 8px / 1px 16px no-repeat,
+        repeating-linear-gradient(90deg, transparent, transparent 27px, rgba(201,162,39,.05) 28px),
+        #10151c;
+    }
+    .rs-kicker { margin: 0 0 6px; color: var(--gold); font-size: 12px; letter-spacing: .08em; }
+    .rs-lead { margin: 0; max-width: 62ch; color: var(--text-dim); font-size: 14px; }
+    .rs-schematic { display: block; width: min(280px, 100%); height: auto; margin-top: 12px; color: var(--gold); }
+    .rs-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rs-gauge { min-height: 74px; padding: 8px 10px; border: 1px solid var(--line); background: rgba(8, 11, 15, .45); }
+    .rs-gauge span { display: block; color: var(--text-faint); font-size: 11px; letter-spacing: .06em; }
+    .rs-gauge strong { display: block; margin-top: 4px; color: var(--gold); font-family: var(--font-display); font-size: 18px; font-weight: 600; line-height: 1.35; }
+    .rs-gauge small { display: block; margin-top: 2px; color: var(--text-dim); font-size: 12px; }
+    .rs-delta { grid-column: 1 / -1; margin: 0; color: var(--gold); font-size: 12px; }
+    .rs-console { display: grid; grid-template-columns: 168px minmax(0, 1fr) minmax(250px, 320px); gap: 12px; align-items: start; }
+    .rs-index, .rs-side { position: sticky; top: 64px; }
+    .rs-side { max-height: calc(100dvh - 80px); overflow: auto; }
+    .rs-index { display: grid; align-content: start; gap: 2px; padding: 10px; border: 1px solid var(--line); background: #10151c; }
+    .rs-index a { display: block; padding: 4px 8px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
+    .rs-index a:hover { color: var(--gold); }
+    .rs-index span { display: grid; margin: 0 0 4px; margin-inline-start: 12px; border-inline-start: 1px solid rgba(201, 162, 39, .5); }
+    .rs-branch { margin: 0 0 10px; border: 1px solid var(--line); background: #10151c; scroll-margin-top: 72px; }
+    .rs-branch summary { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; cursor: pointer; list-style: none; }
+    .rs-branch summary::-webkit-details-marker { display: none; }
+    .rs-code { flex: 0 0 auto; color: var(--gold); font-size: 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+    .rs-branch__name { font-family: var(--font-display); font-weight: 600; }
+    .rs-branch__bus { color: var(--text-faint); font-size: 11px; }
+    .rs-caret { position: relative; width: 12px; height: 12px; margin-inline-start: auto; flex: 0 0 12px; }
+    .rs-caret::before, .rs-caret::after { content: ""; position: absolute; background: var(--gold); }
+    .rs-caret::before { left: 0; right: 0; top: 5px; height: 1px; }
+    .rs-caret::after { top: 0; bottom: 0; left: 5px; width: 1px; }
+    .rs-branch[open] .rs-caret::after { content: none; }
+    .rs-branch__body { margin: 0 12px 12px; border-inline-start: 1px solid rgba(201, 162, 39, .45); }
+    .rs-node { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; padding: 12px 0 12px 12px; border-bottom: 1px solid var(--line); scroll-margin-top: 72px; }
+    .rs-node:last-child { border-bottom: 0; }
+    .rs-node__rail span { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); color: var(--gold); font-size: 11px; }
+    .rs-node b { display: block; font-weight: 600; }
+    .rs-node small, .rs-note { color: var(--text-dim); font-size: 12px; }
+    .rs-presets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 12px; }
     .rs-preset, .rs-seg button, .rs-actions button { font: inherit; color: var(--text); background: transparent; border: 1px solid var(--line); cursor: pointer; }
-    .rs-preset { display: grid; gap: 6px; min-height: 92px; padding: 10px; border-radius: 14px; text-align: right; }
+    .rs-preset { display: grid; align-content: end; gap: 6px; min-height: 108px; padding: 10px; text-align: right; }
     .rs-preset span { color: var(--text-dim); font-size: 11px; line-height: 1.45; }
-    .rs-preset[aria-pressed="true"], .rs-seg button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(201,162,39,.12); }
-    .rs-preset[aria-pressed="true"] span { color: var(--text-dim); }
-    .rs-row { display: grid; grid-template-columns: minmax(140px, .7fr) minmax(0, 1.3fr); gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
-    .rs-row b { display: block; font-weight: 600; }
-    .rs-row small, .rs-note { color: var(--text-dim); font-size: 12px; }
-    .rs-seg { display: flex; flex-wrap: wrap; gap: 6px; }
-    .rs-seg button { min-height: 36px; padding: 6px 10px; border-radius: 999px; }
+    .rs-preset[aria-pressed="true"], .rs-seg button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: rgba(201, 162, 39, .1); box-shadow: inset 0 -2px 0 var(--gold); }
+    .rs-sig { display: grid; grid-template-columns: repeat(4, 8px); gap: 3px; align-items: end; height: 28px; }
+    .rs-sig i { display: block; background: rgba(201, 162, 39, .45); }
+    .rs-preset[aria-pressed="true"] .rs-sig i { background: var(--gold); }
+    .rs-sig i:nth-child(1) { height: 40%; }
+    .rs-sig i:nth-child(2) { height: 70%; }
+    .rs-sig i:nth-child(3) { height: 55%; }
+    .rs-sig i:nth-child(4) { height: 90%; }
+    .rs-preset[data-value="night"] .rs-sig i { height: 28%; }
+    .rs-preset[data-value="focus"] .rs-sig i:nth-child(3) { height: 100%; }
+    .rs-preset[data-value="large"] .rs-sig i { height: 100%; }
+    .rs-preset[data-value="calm"] .rs-sig i:nth-child(odd) { height: 22%; }
+    #rsCustom { margin: 0 12px 12px; }
+    .rs-seg { display: flex; flex-wrap: wrap; }
+    .rs-seg button { min-height: 38px; padding: 6px 10px; border-radius: 0; margin-top: -1px; margin-inline-start: -1px; }
     .rs-seg button:disabled { opacity: .38; cursor: not-allowed; }
-    .rs-scale { width: 100%; accent-color: var(--gold); }
-    .rs-ticks { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; }
-    .rs-specimen { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: #121820; }
+    .rs-scale { width: 100%; height: 28px; margin-top: 8px; accent-color: var(--gold); }
+    .rs-ticks { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .rs-panel { margin: 0 0 10px; padding: 12px; border: 1px solid var(--line); background: #10151c; }
+    .rs-specimen { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: #121820; }
     .rs-specimen__meta { margin: 8px 0; color: var(--text-faint); font-size: 12px; }
     .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); }
     .rs-badges { display: flex; gap: 6px; }
-    .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(201,162,39,.4); color: var(--gold); font-size: 11px; }
-    .rs-links { margin: 0; padding: 0 18px 0 0; color: var(--text-dim); }
-    .rs-links li { margin: 0 0 8px; }
-    .rs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .rs-actions button { padding: 8px 12px; border-radius: 999px; }
-    #rsStatus { min-height: 1.4em; color: var(--gold); }
-    @media (max-width: 860px) {
-      .rs-layout, .rs-presets, .rs-row { grid-template-columns: 1fr; }
-      .rs-side { position: static; }
-      .rs-head { flex-direction: column; align-items: stretch; }
+    .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 0; border: 1px solid rgba(201, 162, 39, .4); color: var(--gold); font-size: 11px; }
+    .rs-links, .rs-map { margin: 0; padding: 0; color: var(--text-dim); list-style: none; }
+    .rs-links li, .rs-map li { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .rs-map b { display: block; color: var(--text); font-weight: 600; }
+    .rs-map a { color: var(--gold); text-decoration: none; }
+    .rs-bus { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+    .rs-bus th, .rs-bus td { padding: 4px 4px; border-bottom: 1px solid var(--line); text-align: right; font-weight: 500; overflow-wrap: anywhere; }
+    .rs-bus th { color: var(--text-faint); }
+    .rs-bus .is-drift td { color: var(--gold); }
+    .rs-actions { display: flex; flex-wrap: wrap; }
+    .rs-actions button { padding: 8px 12px; border-radius: 0; margin-top: -1px; margin-inline-start: -1px; }
+    .rs-actions button:hover { color: var(--gold); }
+    #rsStatus { min-height: 1.4em; margin: 8px 0 0; color: var(--gold); font-size: 12px; }
+    .rs-key { margin: 8px 0 0; color: var(--text-faint); font-size: 11px; }
+    @media (max-width: 980px) {
+      .rs-dash, .rs-console { grid-template-columns: 1fr; }
+      .rs-index, .rs-side { position: static; max-height: none; overflow: visible; }
+      .rs-index { display: flex; gap: 0; overflow: auto; }
+      .rs-index span { display: contents; margin: 0; border: 0; }
+      .rs-index a { flex: 0 0 auto; border-inline-start: 1px solid var(--line); }
+    }
+    @media (max-width: 720px) {
+      .rs-presets { grid-template-columns: 1fr 1fr; }
+      .rs-node { grid-template-columns: 1fr; }
+      .rs-branch__bus { display: none; }
+      .rs-schematic { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rs-preset, .rs-seg button, .rs-actions button { transition: none; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap rs-wrap">
+  <div class="wrap rs-wrap rs-deck">
     <header class="top">
       <a class="brand" href="live.html"><span class="mark" aria-hidden="true">◉</span> مِرصاد</a>
       <a class="back" href="live.html">العودة إلى البث</a>
     </header>
-    <p class="kicker">على هذا الجهاز فقط</p>
-    <div class="rs-head">
+    <section class="rs-dash" aria-label="لوحة الإعدادات">
       <div>
-        <h1>الإعدادات</h1>
-        <p class="lead">تفضيلات القراءة. لا تغيّر الحساب ولا الرصيد ولا جلب الأخبار ولا ترتيب الجلسة.</p>
+        <p class="rs-kicker">وحدة الإعدادات · RS</p>
+        <h1>لوحة التحكم</h1>
+        <p class="rs-lead">تفضيلات القراءة على هذا الجهاز فقط. القيم القديمة تبقى في مفتاحها، والتعديل هنا لا يغيّر الأخبار ولا الفلاتر ولا البحث ولا تسجيل الدخول ولا نوافذ المستخدم الجديد.</p>
+        <svg class="rs-schematic" viewBox="0 0 280 72" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1">
+            <path d="M8 36h36"/>
+            <circle cx="8" cy="36" r="2.5" fill="currentColor" stroke="none"/>
+            <path d="M44 36V16h28M44 36h28M44 36v20h28"/>
+            <rect x="72" y="10" width="48" height="12"/>
+            <rect x="72" y="30" width="48" height="12"/>
+            <rect x="72" y="50" width="48" height="12"/>
+            <path d="M120 16h16M120 36h16M120 56h16"/>
+            <rect x="136" y="12" width="14" height="8"/><rect x="154" y="12" width="14" height="8"/><rect x="172" y="12" width="14" height="8"/>
+            <rect x="136" y="32" width="14" height="8"/><rect x="154" y="32" width="14" height="8"/><rect x="172" y="32" width="14" height="8"/>
+            <rect x="136" y="52" width="14" height="8"/><rect x="154" y="52" width="14" height="8"/><rect x="172" y="52" width="14" height="8"/>
+          </g>
+        </svg>
       </div>
-      <div class="rs-meter"><span id="rsPresetLabel">هوية مِرصاد</span><small id="rsLockCount">لا قيد نشط</small></div>
-    </div>
-    <div class="rs-layout">
+      <div class="rs-gauges">
+        <div class="rs-gauge"><span>00 النمط</span><strong id="rsPresetLabel">هوية مِرصاد</strong></div>
+        <div class="rs-gauge"><span>11 المقياس</span><strong id="rsGaugeScale">100</strong><small>من 90 إلى 125</small></div>
+        <div class="rs-gauge"><span>القيود</span><strong id="rsLockCount">لا قيد نشط</strong></div>
+        <div class="rs-gauge"><span>المخزن</span><strong>هذا الجهاز</strong><small>localStorage · بلا Supabase</small></div>
+        <p class="rs-delta" id="rsDelta" hidden></p>
+      </div>
+    </section>
+    <div class="rs-console">
+      <nav class="rs-index" aria-label="فهرس وحدة الإعدادات">
+        <a href="#rs-b-00">00 الأنماط</a>
+        <a href="#rs-b-10">10 القراءة</a>
+        <span>
+          <a href="#rs-n-11">11 الحجم</a>
+          <a href="#rs-n-12">12 السطر</a>
+          <a href="#rs-n-13">13 التباعد</a>
+          <a href="#rs-n-14">14 الأسطر</a>
+          <a href="#rs-n-15">15 الخط</a>
+        </span>
+        <a href="#rs-b-20">20 اللوحة</a>
+        <span>
+          <a href="#rs-n-21">21 الكثافة</a>
+          <a href="#rs-n-22">22 العرض</a>
+          <a href="#rs-n-23">23 المؤشرات</a>
+          <a href="#rs-n-24">24 الحواف</a>
+          <a href="#rs-n-25">25 اللمس</a>
+          <a href="#rs-n-26">26 الشارات</a>
+        </span>
+        <a href="#rs-b-30">30 اللون والحركة</a>
+        <span>
+          <a href="#rs-n-31">31 التباين</a>
+          <a href="#rs-n-32">32 الذهبي</a>
+          <a href="#rs-n-33">33 الحركة</a>
+        </span>
+        <a href="#rs-b-40">40 النقل</a>
+      </nav>
       <div class="rs-main">
-        <section class="rs-panel">
-          <h2>أنماط مربوطة</h2>
+        <details class="rs-branch" id="rs-b-00" open>
+          <summary><span class="rs-code">00</span><span class="rs-branch__name">أنماط مربوطة</span><span class="rs-branch__bus">حزمة كاملة</span><i class="rs-caret" aria-hidden="true"></i></summary>
           <div class="rs-presets">
-            <button type="button" class="rs-preset" data-key="preset" data-value="marsad"><strong>هوية مِرصاد</strong><span>100 · بليكس · لوحة كاملة</span></button>
-            <button type="button" class="rs-preset" data-key="preset" data-value="night"><strong>ليلي هادئ</strong><span>كوفي · ذهبي خافت · حركة أقل</span></button>
-            <button type="button" class="rs-preset" data-key="preset" data-value="focus"><strong>تركيز</strong><span>105 · عمود قراءة · بلا مؤشرات</span></button>
-            <button type="button" class="rs-preset" data-key="preset" data-value="large"><strong>خط كبير</strong><span>120 · تباين عالٍ · لمس أوسع</span></button>
-            <button type="button" class="rs-preset" data-key="preset" data-value="calm"><strong>قراءة بطيئة</strong><span>تباعد واسع · شارات مخفية</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="marsad"><i class="rs-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></i><strong>هوية مِرصاد</strong><span>100 · بليكس · لوحة كاملة</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="night"><i class="rs-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></i><strong>ليلي هادئ</strong><span>كوفي · ذهبي خافت · حركة أقل</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="focus"><i class="rs-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></i><strong>تركيز</strong><span>105 · عمود قراءة · بلا مؤشرات</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="large"><i class="rs-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></i><strong>خط كبير</strong><span>120 · تباين عالٍ · لمس أوسع</span></button>
+            <button type="button" class="rs-preset" data-key="preset" data-value="calm"><i class="rs-sig" aria-hidden="true"><i></i><i></i><i></i><i></i></i><strong>قراءة بطيئة</strong><span>تباعد واسع · شارات مخفية</span></button>
           </div>
-          <p class="rs-note" id="rsCustom">أي تعديل بعد النمط يحوّله إلى مخصص، من غير أن يمسح باقي القيم.</p>
-        </section>
-        <section class="rs-panel">
-          <h2>القراءة</h2>
-          <div class="rs-row"><div><b>حجم النص</b><small id="rsScaleLabel">العنوان، العاجل، الفئات، والخبر المفتوح</small></div>
-            <div>
-              <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
-              <div class="rs-ticks" aria-hidden="true"><span>90</span><span>100</span><span>110</span><span>120</span><span>125</span></div>
+          <p class="rs-note" id="rsCustom" hidden>أي تعديل بعد النمط يحوّله إلى مخصص، من غير أن يمسح باقي القيم.</p>
+        </details>
+        <details class="rs-branch" id="rs-b-10" open>
+          <summary><span class="rs-code">10</span><span class="rs-branch__name">القراءة</span><span class="rs-branch__bus">البطاقات · الخبر · الدول</span><i class="rs-caret" aria-hidden="true"></i></summary>
+          <div class="rs-branch__body">
+            <div class="rs-node" id="rs-n-11">
+              <div class="rs-node__rail"><span>11</span></div>
+              <div>
+                <b>حجم النص</b>
+                <small id="rsScaleLabel">العنوان، العاجل، الفئات، والخبر المفتوح</small>
+                <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
+                <div class="rs-ticks" aria-hidden="true"><span>90</span><span>100</span><span>110</span><span>120</span><span>125</span></div>
+              </div>
+            </div>
+            <div class="rs-node" id="rs-n-12">
+              <div class="rs-node__rail"><span>12</span></div>
+              <div><b>ارتفاع السطر</b><small>البطاقة والخبر المفتوح</small><div class="rs-seg" role="group" aria-label="ارتفاع السطر"><button type="button" data-key="leading" data-value="tight">ضيق</button><button type="button" data-key="leading" data-value="normal">عادي</button><button type="button" data-key="leading" data-value="roomy">واسع</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-13">
+              <div class="rs-node__rail"><span>13</span></div>
+              <div><b>تباعد الحروف</b><small>على المتن العربي</small><div class="rs-seg"><button type="button" data-key="track" data-value="off">بدون</button><button type="button" data-key="track" data-value="wide">واسع</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-14">
+              <div class="rs-node__rail"><span>14</span></div>
+              <div><b>أسطر العنوان</b><small>في بطاقة اللوحة فقط</small><div class="rs-seg"><button type="button" data-key="lines" data-value="2">سطران</button><button type="button" data-key="lines" data-value="3">ثلاثة</button><button type="button" data-key="lines" data-value="4">أربعة</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-15">
+              <div class="rs-node__rail"><span>15</span></div>
+              <div><b>خط المتن</b><small>لا يغيّر خط العناوين</small><div class="rs-seg"><button type="button" data-key="font" data-value="plex">بليكس</button><button type="button" data-key="font" data-value="kufi">كوفي</button></div></div>
             </div>
           </div>
-          <div class="rs-row"><div><b>ارتفاع السطر</b><small>البطاقة والخبر المفتوح</small></div><div class="rs-seg" role="group" aria-label="ارتفاع السطر"><button type="button" data-key="leading" data-value="tight">ضيق</button><button type="button" data-key="leading" data-value="normal">عادي</button><button type="button" data-key="leading" data-value="roomy">واسع</button></div></div>
-          <div class="rs-row"><div><b>تباعد الحروف</b><small>على المتن العربي</small></div><div class="rs-seg"><button type="button" data-key="track" data-value="off">بدون</button><button type="button" data-key="track" data-value="wide">واسع</button></div></div>
-          <div class="rs-row"><div><b>أسطر العنوان</b><small>في بطاقة اللوحة فقط</small></div><div class="rs-seg"><button type="button" data-key="lines" data-value="2">سطران</button><button type="button" data-key="lines" data-value="3">ثلاثة</button><button type="button" data-key="lines" data-value="4">أربعة</button></div></div>
-          <div class="rs-row"><div><b>خط المتن</b><small>لا يغيّر خط العناوين</small></div><div class="rs-seg"><button type="button" data-key="font" data-value="plex">بليكس</button><button type="button" data-key="font" data-value="kufi">كوفي</button></div></div>
-        </section>
-        <section class="rs-panel">
-          <h2>اللوحة</h2>
-          <div class="rs-row"><div><b>الكثافة</b><small id="rsDensityNote">فراغ شبكة البث وصف الدول</small></div><div class="rs-seg"><button type="button" data-key="density" data-value="compact">مضغوطة</button><button type="button" data-key="density" data-value="regular">عادية</button><button type="button" data-key="density" data-value="relaxed">مريحة</button></div></div>
-          <div class="rs-row"><div><b>عرض الشبكة</b><small>الرأس والعاجل والبطاقات في عمود واحد</small></div><div class="rs-seg"><button type="button" data-key="width" data-value="board">لوحة كاملة</button><button type="button" data-key="width" data-value="narrow">عمود قراءة</button></div></div>
-          <div class="rs-row"><div><b>المؤشرات</b><small>شريط الأرقام وعدد الأخبار المعروضة</small></div><div class="rs-seg"><button type="button" data-key="chrome" data-value="full">ظاهرة</button><button type="button" data-key="chrome" data-value="quiet">هادئة</button></div></div>
-          <div class="rs-row"><div><b>الحواف</b></div><div class="rs-seg"><button type="button" data-key="radius" data-value="sharp">حادة</button><button type="button" data-key="radius" data-value="soft">معتدلة</button><button type="button" data-key="radius" data-value="round">دائرية</button></div></div>
-          <div class="rs-row"><div><b>اللمس</b><small>أزرار الفرز والقائمة</small></div><div class="rs-seg"><button type="button" data-key="touch" data-value="regular">عادي</button><button type="button" data-key="touch" data-value="large">واسع</button></div></div>
-          <div class="rs-row"><div><b>الشارات</b></div><div class="rs-seg"><button type="button" data-key="badges" data-value="show">ظاهرة</button><button type="button" data-key="badges" data-value="hide">مخفية</button></div></div>
-        </section>
-        <section class="rs-panel">
-          <h2>اللون والحركة</h2>
-          <div class="rs-row"><div><b>التباين</b></div><div class="rs-seg"><button type="button" data-key="contrast" data-value="standard">هوية الموقع</button><button type="button" data-key="contrast" data-value="high">عالٍ</button></div></div>
-          <div class="rs-row"><div><b>الذهبي</b><small id="rsGoldNote">درجة الهوية</small></div><div class="rs-seg"><button type="button" data-key="gold" data-value="standard">أصلي</button><button type="button" data-key="gold" data-value="soft">هادئ</button></div></div>
-          <div class="rs-row"><div><b>الحركة</b><small>لا تعطّل فتح القائمة</small></div><div class="rs-seg"><button type="button" data-key="motion" data-value="system">حسب الجهاز</button><button type="button" data-key="motion" data-value="reduce">تقليل</button><button type="button" data-key="motion" data-value="full">كاملة</button></div></div>
-        </section>
+        </details>
+        <details class="rs-branch" id="rs-b-20">
+          <summary><span class="rs-code">20</span><span class="rs-branch__name">اللوحة</span><span class="rs-branch__bus">الشبكة · الدول · الأزرار</span><i class="rs-caret" aria-hidden="true"></i></summary>
+          <div class="rs-branch__body">
+            <div class="rs-node" id="rs-n-21">
+              <div class="rs-node__rail"><span>21</span></div>
+              <div><b>الكثافة</b><small id="rsDensityNote">فراغ شبكة البث وصف الدول</small><div class="rs-seg"><button type="button" data-key="density" data-value="compact">مضغوطة</button><button type="button" data-key="density" data-value="regular">عادية</button><button type="button" data-key="density" data-value="relaxed">مريحة</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-22">
+              <div class="rs-node__rail"><span>22</span></div>
+              <div><b>عرض الشبكة</b><small>الرأس والعاجل والبطاقات في عمود واحد</small><div class="rs-seg"><button type="button" data-key="width" data-value="board">لوحة كاملة</button><button type="button" data-key="width" data-value="narrow">عمود قراءة</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-23">
+              <div class="rs-node__rail"><span>23</span></div>
+              <div><b>المؤشرات</b><small>شريط الأرقام وعدد الأخبار المعروضة</small><div class="rs-seg"><button type="button" data-key="chrome" data-value="full">ظاهرة</button><button type="button" data-key="chrome" data-value="quiet">هادئة</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-24">
+              <div class="rs-node__rail"><span>24</span></div>
+              <div><b>الحواف</b><small>البطاقات والشريط العاجل وصف الدول</small><div class="rs-seg"><button type="button" data-key="radius" data-value="sharp">حادة</button><button type="button" data-key="radius" data-value="soft">معتدلة</button><button type="button" data-key="radius" data-value="round">دائرية</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-25">
+              <div class="rs-node__rail"><span>25</span></div>
+              <div><b>اللمس</b><small>أزرار الفرز والبحث والقائمة</small><div class="rs-seg"><button type="button" data-key="touch" data-value="regular">عادي</button><button type="button" data-key="touch" data-value="large">واسع</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-26">
+              <div class="rs-node__rail"><span>26</span></div>
+              <div><b>الشارات</b><small>مظهر فقط. بيانات التحديث لا تتغير</small><div class="rs-seg"><button type="button" data-key="badges" data-value="show">ظاهرة</button><button type="button" data-key="badges" data-value="hide">مخفية</button></div></div>
+            </div>
+          </div>
+        </details>
+        <details class="rs-branch" id="rs-b-30">
+          <summary><span class="rs-code">30</span><span class="rs-branch__name">اللون والحركة</span><span class="rs-branch__bus">الهوية · الشعار · الشريط</span><i class="rs-caret" aria-hidden="true"></i></summary>
+          <div class="rs-branch__body">
+            <div class="rs-node" id="rs-n-31">
+              <div class="rs-node__rail"><span>31</span></div>
+              <div><b>التباين</b><small>درجات النص على كل الصفحات</small><div class="rs-seg"><button type="button" data-key="contrast" data-value="standard">هوية الموقع</button><button type="button" data-key="contrast" data-value="high">عالٍ</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-32">
+              <div class="rs-node__rail"><span>32</span></div>
+              <div><b>الذهبي</b><small id="rsGoldNote">درجة الهوية</small><div class="rs-seg"><button type="button" data-key="gold" data-value="standard">أصلي</button><button type="button" data-key="gold" data-value="soft">هادئ</button></div></div>
+            </div>
+            <div class="rs-node" id="rs-n-33">
+              <div class="rs-node__rail"><span>33</span></div>
+              <div><b>الحركة</b><small>لا تعطّل فتح القائمة</small><div class="rs-seg"><button type="button" data-key="motion" data-value="system">حسب الجهاز</button><button type="button" data-key="motion" data-value="reduce">تقليل</button><button type="button" data-key="motion" data-value="full">كاملة</button></div></div>
+            </div>
+          </div>
+        </details>
+        <details class="rs-branch" id="rs-b-40">
+          <summary><span class="rs-code">40</span><span class="rs-branch__name">النقل المحلي</span><span class="rs-branch__bus">لا يغادر المتصفح</span><i class="rs-caret" aria-hidden="true"></i></summary>
+          <div class="rs-branch__body">
+            <div class="rs-node" id="rs-n-40">
+              <div class="rs-node__rail"><span>40</span></div>
+              <div>
+                <b>حفظ واستعادة</b>
+                <small>الاستيراد يدمج الملف فوق القيم المعروفة ولا يمس مفاتيح الحساب.</small>
+                <div class="rs-actions">
+                  <button type="button" id="rsReset">استعادة الهوية</button>
+                  <button type="button" id="rsExport">تصدير</button>
+                  <button type="button" id="rsImport">استيراد</button>
+                </div>
+                <p id="rsStatus" role="status"></p>
+                <p class="rs-key">mirsad.readerSettings.v1</p>
+                <input id="rsFile" type="file" accept="application/json,.json" hidden>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
       <aside class="rs-side">
         <section class="rs-panel">
@@ -120,15 +312,24 @@
           </article>
         </section>
         <section class="rs-panel">
+          <h2>المخزن والمعروض</h2>
+          <table class="rs-bus">
+            <thead><tr><th>رمز</th><th>البند</th><th>مخزّن</th><th>معروض</th></tr></thead>
+            <tbody id="rsBus"></tbody>
+          </table>
+        </section>
+        <section class="rs-panel">
           <h2>سلسلة القيود</h2>
           <ul class="rs-links" id="rsLinks"></ul>
-          <div class="rs-actions">
-            <button type="button" id="rsReset">استعادة الهوية</button>
-            <button type="button" id="rsExport">تصدير</button>
-            <button type="button" id="rsImport">استيراد</button>
-          </div>
-          <p id="rsStatus" role="status"></p>
-          <input id="rsFile" type="file" accept="application/json,.json" hidden>
+        </section>
+        <section class="rs-panel">
+          <h2>أثرها في الموقع</h2>
+          <ul class="rs-map">
+            <li><b>10 القراءة</b><span>عناوين البطاقات والمختصر والخبر المفتوح وصفوف الدول والشريط العاجل.</span><a href="live.html">البث</a> · <a href="arab-countries.html">الدول</a></li>
+            <li><b>20 اللوحة</b><span>فراغ الشبكة، عرض العمود، أرقام اللوحة، حواف البطاقات، أهداف اللمس، وإخفاء الشارات شكلياً.</span><a href="live.html">لوحة البث</a></li>
+            <li><b>30 الحركة</b><span>دوران الشعار من القائمة، ومرور الشريط العاجل. فتح القائمة يبقى متاحاً.</span><a href="wire.html">السلك</a></li>
+            <li><b>خارج الوحدة</b><span>فلتر الأخبار وترتيبها وبحث الجلسة مفتاح آخر، ولا يُقرأ هنا ولا يُكتب منه.</span></li>
+          </ul>
         </section>
       </aside>
     </div>
@@ -139,8 +340,34 @@
       var RS = window.MirsadReaderSettings;
       var state = RS.read();
       var names = { marsad: 'هوية مِرصاد', night: 'ليلي هادئ', focus: 'تركيز', large: 'خط كبير', calm: 'قراءة بطيئة', custom: 'مخصص' };
+      var fields = [
+        ['scale', '11', 'الحجم'], ['leading', '12', 'السطر'], ['track', '13', 'التباعد'], ['lines', '14', 'الأسطر'],
+        ['font', '15', 'الخط'], ['density', '21', 'الكثافة'], ['width', '22', 'العرض'], ['chrome', '23', 'المؤشرات'],
+        ['radius', '24', 'الحواف'], ['touch', '25', 'اللمس'], ['badges', '26', 'الشارات'], ['contrast', '31', 'التباين'],
+        ['gold', '32', 'الذهبي'], ['motion', '33', 'الحركة']
+      ];
+      var words = {
+        leading: { tight: 'ضيق', normal: 'عادي', roomy: 'واسع' },
+        track: { off: 'بدون', wide: 'واسع' },
+        lines: { 2: 'سطران', 3: 'ثلاثة', 4: 'أربعة' },
+        font: { plex: 'بليكس', kufi: 'كوفي' },
+        density: { compact: 'مضغوطة', regular: 'عادية', relaxed: 'مريحة' },
+        width: { board: 'كاملة', narrow: 'عمود' },
+        chrome: { full: 'ظاهرة', quiet: 'هادئة' },
+        radius: { sharp: 'حادة', soft: 'معتدلة', round: 'دائرية' },
+        touch: { regular: 'عادي', large: 'واسع' },
+        badges: { show: 'ظاهرة', hide: 'مخفية' },
+        contrast: { standard: 'الهوية', high: 'عالٍ' },
+        gold: { standard: 'أصلي', soft: 'هادئ' },
+        motion: { system: 'الجهاز', reduce: 'تقليل', full: 'كاملة' }
+      };
       var scale = document.getElementById('rsScale');
       var frame = 0;
+      function word(key, value) {
+        if (key === 'scale') return String(value);
+        var table = words[key] || {};
+        return Object.prototype.hasOwnProperty.call(table, value) ? table[value] : String(value);
+      }
       function paint() {
         var view = RS.effective(state);
         document.querySelectorAll('[data-key]').forEach(function (button) {
@@ -153,6 +380,7 @@
         if (document.activeElement !== scale) scale.value = String(state.scale);
         scale.setAttribute('aria-valuenow', String(state.scale));
         document.getElementById('rsScaleLabel').textContent = state.scale + (state.scale >= 120 ? ' · يقفل الكثافة المضغوطة' : ' · العنوان والعاجل والخبر');
+        document.getElementById('rsGaugeScale').textContent = String(state.scale);
         document.getElementById('rsPresetLabel').textContent = names[state.preset] || 'مخصص';
         document.getElementById('rsCustom').hidden = state.preset !== 'custom';
         document.getElementById('rsDensityNote').textContent = state.scale >= 120 && state.density === 'compact' ? 'المضغوطة محفوظة وتُعرض مريحة الآن' : 'فراغ شبكة البث وصف الدول';
@@ -161,8 +389,23 @@
         var active = notes.filter(function (note) { return note.indexOf('لا قيد نشط') !== 0; });
         document.getElementById('rsLockCount').textContent = active.length ? active.length + ' قيد نشط' : 'لا قيد نشط';
         document.getElementById('rsLinks').innerHTML = notes.map(function (note) { return '<li>' + note + '</li>'; }).join('');
+        var drifts = [];
+        document.getElementById('rsBus').innerHTML = fields.map(function (field) {
+          var key = field[0];
+          var drift = String(state[key]) !== String(view[key]);
+          if (drift) drifts.push(field[2]);
+          return '<tr' + (drift ? ' class="is-drift"' : '') + '><td>' + field[1] + '</td><td>' + field[2] + '</td><td>' + word(key, state[key]) + '</td><td>' + word(key, view[key]) + '</td></tr>';
+        }).join('');
+        var delta = document.getElementById('rsDelta');
+        delta.hidden = !drifts.length;
+        delta.textContent = drifts.length ? 'المعروض يختلف عن المخزّن في: ' + drifts.join('، ') + '. القيمة الأصلية محفوظة وتعود عند زوال القيد.' : '';
       }
-      function commit(next) { state = RS.write(next); paint(); }
+      function commit(next) {
+        state = RS.write(next);
+        paint();
+        var status = document.getElementById('rsStatus');
+        if (status && status.textContent.indexOf('تبويب آخر') !== -1) status.textContent = '';
+      }
       document.querySelector('.rs-main').addEventListener('click', function (event) {
         var button = event.target.closest('[data-key]');
         if (!button || button.disabled) return;
@@ -177,6 +420,16 @@
         document.getElementById('rsScaleLabel').textContent = String(state.scale);
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(function () { commit(state); });
+      });
+      document.querySelector('.rs-index').addEventListener('click', function (event) {
+        var link = event.target.closest('a[href^="#"]');
+        if (!link) return;
+        var node = document.getElementById(link.getAttribute('href').slice(1));
+        if (!node) return;
+        event.preventDefault();
+        var branch = node.tagName === 'DETAILS' ? node : node.closest('details');
+        if (branch) branch.open = true;
+        node.scrollIntoView({ block: 'nearest' });
       });
       document.getElementById('rsReset').addEventListener('click', function () {
         commit(RS.presets.marsad);
@@ -205,6 +458,12 @@
         }).catch(function () {
           document.getElementById('rsStatus').textContent = 'تعذر قراءة الملف. المطلوب ملف إعدادات مِرصاد.';
         });
+      });
+      window.addEventListener('mirsad-reader-settings-sync', function () {
+        cancelAnimationFrame(frame);
+        state = RS.read();
+        paint();
+        document.getElementById('rsStatus').textContent = 'وصلت القيمة من تبويب آخر. لم تُحفظ مرة ثانية.';
       });
       paint();
     })();

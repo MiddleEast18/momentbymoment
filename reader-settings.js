@@ -79,7 +79,10 @@
   }
   function write(raw) {
     var next = matchPreset(normalize(raw));
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch (error) {}
+    var serialized = JSON.stringify(next);
+    try {
+      if (localStorage.getItem(KEY) !== serialized) localStorage.setItem(KEY, serialized);
+    } catch (error) {}
     apply(next);
     return next;
   }
@@ -121,5 +124,18 @@
     return notes;
   }
   apply(read());
+  window.addEventListener('storage', function (event) {
+    if (event.key !== KEY) return;
+    if (event.storageArea && event.storageArea !== localStorage) return;
+    var next;
+    try {
+      next = matchPreset(normalize(event.newValue ? JSON.parse(event.newValue) : defaults));
+    } catch (error) {
+      return;
+    }
+    apply(next);
+    // Apply only. A write here would fire storage again and loop between tabs.
+    try { window.dispatchEvent(new CustomEvent('mirsad-reader-settings-sync', { detail: next })); } catch (error) {}
+  });
   window.MirsadReaderSettings = { KEY: KEY, defaults: defaults, presets: presets, scales: scales, read: read, write: write, normalize: normalize, effective: effective, apply: apply, links: links };
 })();
