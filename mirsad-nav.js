@@ -17,13 +17,13 @@
     }
     btn.className = 'mirsad-logo-btn mirsad-logo-btn--fixed';
     btn.id = 'mirsadLogo';
-    btn.style.removeProperty('top');
-    btn.style.removeProperty('left');
-    btn.style.removeProperty('right');
-    btn.style.removeProperty('bottom');
-    btn.style.removeProperty('position');
-    btn.style.removeProperty('transform');
-    if (btn.parentElement !== document.documentElement) document.documentElement.appendChild(btn);
+    if (btn.parentElement !== document.body) document.body.appendChild(btn);
+    btn.style.setProperty('position', 'fixed', 'important');
+    btn.style.setProperty('top', 'max(10px, env(safe-area-inset-top))', 'important');
+    btn.style.setProperty('bottom', 'auto', 'important');
+    btn.style.setProperty('inset-inline-start', 'max(12px, env(safe-area-inset-inline-start, 0px))', 'important');
+    btn.style.setProperty('inset-inline-end', 'auto', 'important');
+    btn.style.setProperty('margin', '0', 'important');
     document.body.classList.add('mirsad-has-logo');
     return btn;
   }

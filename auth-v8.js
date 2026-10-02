@@ -40,7 +40,7 @@
   function injectStyles(){
     if(document.getElementById('mirsadAuthStyles'))return;
     const s=document.createElement('style');s.id='mirsadAuthStyles';s.textContent=`
-      body.mirsad-auth-required > :not(#mirsadAuthGate){visibility:hidden!important}
+      body.mirsad-auth-required > :not(#mirsadAuthGate):not(#mirsadLogo){visibility:hidden!important}
       .mirsad-auth-gate{position:fixed;inset:0;z-index:5000;display:grid;overflow:auto;overscroll-behavior:contain;padding:max(20px,env(safe-area-inset-top)) 20px max(20px,env(safe-area-inset-bottom));background:radial-gradient(ellipse at top left,rgba(201,162,39,.06),transparent 45%),var(--bg);color:var(--text)}
       .mirsad-auth-card{width:min(420px,100%);margin:auto;text-align:center;padding:24px}.mirsad-auth-logo{width:68px;height:68px;margin:0 auto 18px;color:var(--gold)}.mirsad-auth-logo svg{width:100%;height:100%}
       .mirsad-auth-title{margin:0;font-family:var(--font-display);font-size:28px}.mirsad-auth-subtitle{margin:8px 0 24px;color:var(--text-dim);font-size:13px}.mirsad-auth-actions{display:grid;gap:10px}
