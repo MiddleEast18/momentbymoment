@@ -1,13 +1,15 @@
 /* Local reading preferences. Default attributes are absent, so an empty store changes nothing. */
+html { --rs: 1; }
 html[data-rs-scale="90"] { --rs: 0.9; }
 html[data-rs-scale="95"] { --rs: 0.95; }
+html[data-rs-scale="100"] { --rs: 1; }
 html[data-rs-scale="105"] { --rs: 1.05; }
 html[data-rs-scale="110"] { --rs: 1.1; }
 html[data-rs-scale="115"] { --rs: 1.15; }
 html[data-rs-scale="120"] { --rs: 1.2; }
 html[data-rs-scale="125"] { --rs: 1.25; }
 html[data-rs-scale] .wire-header__title h1 { font-size: calc(22px * var(--rs)); }
-html[data-rs-scale] .wire-header__tagline,
+html[data-rs-scale] .wire-header__tagline { font-size: calc(12.5px * var(--rs)); }
 html[data-rs-scale] .ticker-strip__label,
 html[data-rs-scale] .section-heading,
 html[data-rs-scale] .chip { font-size: calc(13px * var(--rs)); }
@@ -18,10 +20,10 @@ html[data-rs-scale] .insight-pill strong { font-size: calc(14px * var(--rs)); }
 html[data-rs-scale] .rapid-news__toggle { font-size: calc(14px * var(--rs)); }
 html[data-rs-scale] .country-header h1 { font-size: calc(clamp(24px, 4vw, 38px) * var(--rs)); }
 html[data-rs-scale] .country-card h2 { font-size: calc(25px * var(--rs)); }
-html[data-rs-scale] .card__headline { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .card__headline { font-size: calc(24px * var(--rs)); }
 html[data-rs-scale] .card-medium .card__headline { font-size: calc(18px * var(--rs)); }
 html[data-rs-scale] .card-large .card__headline { font-size: calc(24px * var(--rs)); }
-html[data-rs-scale] .featured-rail .card__headline { font-size: calc(22px * var(--rs)); }
+html[data-rs-scale] .featured-rail .card__headline { font-size: calc(24px * var(--rs)); }
 html[data-rs-scale] .card__summary { font-size: calc(13.5px * var(--rs)); }
 html[data-rs-scale] .mirsad-reader__title { font-size: calc(clamp(24px, 4vw, 34px) * var(--rs)); line-height: 1.45; }
 html[data-rs-scale] .mirsad-reader__summary { font-size: calc(16px * var(--rs)); line-height: 1.9; }

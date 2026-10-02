@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="info.css?v=202610020020">
-  <link rel="stylesheet" href="reader-settings.css?v=202610020010">
+  <link rel="stylesheet" href="reader-settings.css?v=202610022230">
   <script src="reader-settings.js?v=202610021820"></script>
   <link rel="stylesheet" href="mirsad-nav.css?v=202610020800">
   <script src="mirsad-nav.js?v=202610020800" defer></script>
@@ -92,11 +92,13 @@
     .rs-seg button { min-height: 38px; padding: 6px 10px; border-radius: 0; margin-top: -1px; margin-inline-start: -1px; }
     .rs-seg button:disabled { opacity: .38; cursor: not-allowed; }
     .rs-scale { width: 100%; height: 28px; margin-top: 8px; accent-color: var(--gold); }
-    .rs-ticks { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .rs-ticks { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .rs-ticks span { text-align: center; }
+    .rs-scale-value { color: var(--gold); font-variant-numeric: tabular-nums; }
     .rs-panel { margin: 0 0 10px; padding: 12px; border: 1px solid var(--line); background: #10151c; }
     .rs-specimen { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: #121820; }
     .rs-specimen__meta { margin: 8px 0; color: var(--text-faint); font-size: 12px; }
-    .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); }
+    .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); font-size: 24px; }
     .rs-badges { display: flex; gap: 6px; }
     .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 0; border: 1px solid rgba(201, 162, 39, .4); color: var(--gold); font-size: 11px; }
     .rs-links, .rs-map { margin: 0; padding: 0; color: var(--text-dim); list-style: none; }
@@ -210,10 +212,10 @@
             <div class="rs-node" id="rs-n-11">
               <div class="rs-node__rail"><span>11</span></div>
               <div>
-                <b>حجم النص</b>
+                <b>حجم النص <span class="rs-scale-value" id="rsScaleValue">100</span></b>
                 <small id="rsScaleLabel">العنوان، العاجل، الفئات، والخبر المفتوح</small>
                 <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
-                <div class="rs-ticks" aria-hidden="true"><span>90</span><span>100</span><span>110</span><span>120</span><span>125</span></div>
+                <div class="rs-ticks" aria-hidden="true"><span>90</span><span>95</span><span>100</span><span>105</span><span>110</span><span>115</span><span>120</span><span>125</span></div>
               </div>
             </div>
             <div class="rs-node" id="rs-n-12">
@@ -379,7 +381,8 @@
         });
         if (document.activeElement !== scale) scale.value = String(state.scale);
         scale.setAttribute('aria-valuenow', String(state.scale));
-        document.getElementById('rsScaleLabel').textContent = state.scale + (state.scale >= 120 ? ' · يقفل الكثافة المضغوطة' : ' · العنوان والعاجل والخبر');
+        document.getElementById('rsScaleValue').textContent = String(state.scale);
+        document.getElementById('rsScaleLabel').textContent = state.scale >= 120 ? 'يقفل الكثافة المضغوطة حتى لا يُقص العنوان في البطاقة' : 'العنوان، العاجل، الفئات، والخبر المفتوح';
         document.getElementById('rsGaugeScale').textContent = String(state.scale);
         document.getElementById('rsPresetLabel').textContent = names[state.preset] || 'مخصص';
         document.getElementById('rsCustom').hidden = state.preset !== 'custom';
@@ -416,8 +419,11 @@
         commit(state);
       });
       scale.addEventListener('input', function () {
-        state.scale = Number(scale.value);
-        document.getElementById('rsScaleLabel').textContent = String(state.scale);
+        var next = Number(scale.value);
+        if (RS.scales.indexOf(next) < 0) next = state.scale;
+        state.scale = next;
+        document.getElementById('rsScaleValue').textContent = String(state.scale);
+        document.getElementById('rsGaugeScale').textContent = String(state.scale);
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(function () { commit(state); });
       });
