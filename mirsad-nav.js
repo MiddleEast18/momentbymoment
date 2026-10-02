@@ -16,70 +16,16 @@
       btn.innerHTML = '<svg viewBox="0 0 64 64" focusable="false" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="32" r="7" fill="none" stroke="currentColor" stroke-width="3"/><path d="M32 13v9M32 42v9M13 32h9M42 32h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="2.5" fill="currentColor"/></svg>';
     }
     btn.className = 'mirsad-logo-btn mirsad-logo-btn--fixed';
+    btn.id = 'mirsadLogo';
+    btn.style.removeProperty('top');
+    btn.style.removeProperty('left');
+    btn.style.removeProperty('right');
+    btn.style.removeProperty('bottom');
+    btn.style.removeProperty('position');
+    btn.style.removeProperty('transform');
     if (btn.parentElement !== document.documentElement) document.documentElement.appendChild(btn);
     document.body.classList.add('mirsad-has-logo');
-    pinLogo(btn);
     return btn;
-  }
-  function pinLogo(btn) {
-    if (btn.dataset.mirsadPinned) return;
-    btn.dataset.mirsadPinned = '1';
-    var resting = null;
-    var correction = 0;
-    var mode = 'fixed';
-    var frame = 0;
-    var y = function () {
-      var top = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      return top > 0 ? top : 0;
-    };
-    var lockFixed = function () {
-      mode = 'fixed';
-      correction = 0;
-      btn.style.setProperty('position', 'fixed', 'important');
-      btn.style.removeProperty('top');
-      btn.style.removeProperty('left');
-      btn.style.removeProperty('right');
-      btn.style.removeProperty('bottom');
-    };
-    var holdStill = function () {
-      var seen = btn.getBoundingClientRect().top - correction;
-      if (resting == null) resting = seen;
-      var drift = seen - resting;
-      var next = Math.abs(drift) > 3 ? -drift : 0;
-      if (Math.abs(next - correction) < 0.5) return;
-      correction = next;
-      if (correction) btn.style.setProperty('top', 'calc(max(14px, env(safe-area-inset-top)) + ' + correction.toFixed(2) + 'px)', 'important');
-      else btn.style.removeProperty('top');
-    };
-    var place = function () {
-      frame = 0;
-      var scroll = y();
-      if (scroll <= 0) {
-        if (mode !== 'fixed') lockFixed();
-        holdStill();
-        return;
-      }
-      var topNow = btn.getBoundingClientRect().top;
-      if (resting == null) resting = topNow;
-      if (mode === 'fixed') {
-        if (Math.abs(topNow - resting) < 12) return;
-        mode = 'abs';
-        correction = 0;
-        btn.style.setProperty('position', 'absolute', 'important');
-      }
-      btn.style.setProperty('top', (scroll + resting) + 'px', 'important');
-    };
-    var schedule = function () { if (!frame) frame = requestAnimationFrame(place); };
-    document.addEventListener('scroll', schedule, { passive: true, capture: true });
-    window.addEventListener('resize', schedule);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('scroll', schedule);
-      window.visualViewport.addEventListener('resize', schedule);
-    }
-    document.addEventListener('touchmove', schedule, { passive: true, capture: true });
-    document.addEventListener('touchend', schedule, { passive: true, capture: true });
-    lockFixed();
-    place();
   }
   function boot() {
     if (!document.body) return;
