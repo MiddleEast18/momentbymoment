@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 type FeedItem = { title: string; link: string; guid: string; summary: string; published: string };
 type Source = { id: string; country_id: string; source_key: string; source_name: string; feed_url: string; source_type: string; scope_keywords: string[]; priority: number };
-type ExistingArticle = { id: string; source_id: string; source_url: string; headline: string; summary: string; cluster_id: string | null; update_count: number; published_at: string | null };
+type ExistingArticle = { id: string; country_id: string; source_id: string; source_url: string; headline: string; cluster_id: string | null; update_count: number; published_at: string | null };
 
 const stripHtml = (value: string) => value.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 const decode = (value: string) => value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&#x([0-9a-f]+);|&#([0-9]+);|&(?:amp|quot|apos|lt|gt|rsquo|lsquo|rdquo|ldquo|ndash|mdash|hellip);/gi, (match, hex, decimal) => { if (hex) return String.fromCodePoint(parseInt(hex, 16)); if (decimal) return String.fromCodePoint(parseInt(decimal, 10)); return ({ '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>', '&rsquo;': '’', '&lsquo;': '‘', '&rdquo;': '”', '&ldquo;': '“', '&ndash;': '–', '&mdash;': '—', '&hellip;': '…' } as Record<string, string>)[match.toLowerCase()] || match; });
@@ -26,26 +26,41 @@ Deno.serve(async (request) => {
   if (!url || !key) return json({ error: 'Missing Supabase runtime configuration' }, 500);
   const db = createClient(url, key); const started = Date.now();
   const result = { ok: true, sources: 0, seen: 0, written: 0, updated: 0, duplicates: 0, skipped: 0, cleaned: 0, errors: [] as string[] };
-  const { data: sources, error: sourceError } = await db.from('country_news_sources').select('id,country_id,source_key,source_name,feed_url,source_type,scope_keywords,priority').eq('is_active', true).order('priority').limit(30);
+  const { data: sources, error: sourceError } = await db.from('country_news_sources').select('id,country_id,source_key,source_name,feed_url,source_type,scope_keywords,priority').eq('is_active', true).order('last_success_at', { ascending: true, nullsFirst: true }).limit(90);
   if (sourceError) return json({ ok: false, error: sourceError.message }, 500); result.sources = sources?.length || 0;
-  const { data: existing } = await db.from('country_news_articles').select('id,source_id,source_url,headline,summary,cluster_id,update_count,published_at').gte('fetched_at', new Date(Date.now() - 45 * 86_400_000).toISOString()).limit(1000);
-  const byKey = new Map<string, ExistingArticle>(); for (const article of (existing || []) as ExistingArticle[]) byKey.set(`${article.source_id}|${article.source_url}`, article);
-  for (const source of (sources || []) as Source[]) {
+  const { data: existing } = await db.from('country_news_articles').select('id,country_id,source_id,source_url,headline,cluster_id,update_count,published_at').gte('fetched_at', new Date(Date.now() - 45 * 86_400_000).toISOString()).limit(1000);
+  const byKey = new Map<string, ExistingArticle>();
+  const byCountry = new Map<string, ExistingArticle[]>();
+  for (const article of (existing || []) as ExistingArticle[]) {
+    byKey.set(`${article.source_id}|${article.source_url}`, article);
+    const peers = byCountry.get(article.country_id) || [];
+    peers.push(article);
+    byCountry.set(article.country_id, peers);
+  }
+  const ingestSource = async (source: Source) => {
     try {
-      const response = await fetch(source.feed_url, { headers: { 'user-agent': 'MirsadCountryNews/2.0', accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1' }, signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`); const items = parseItems(await response.text()).slice(0, 50);
+      const response = await fetch(source.feed_url, { headers: { 'user-agent': 'MirsadCountryNews/2.0', accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.1' }, signal: AbortSignal.timeout(12_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const xml = await response.text();
+      if (!/<(rss|feed|item|entry)\b/i.test(xml.slice(0, 2500))) throw new Error('Feed was not XML');
+      const items = parseItems(xml).slice(0, 25);
+      const scoped = source.source_type !== 'local' && source.source_type !== 'official';
       for (const item of items) {
         result.seen += 1; const title = stripHtml(item.title).slice(0, 500); const summary = stripHtml(item.summary).slice(0, 2_000); const haystack = `${title} ${summary}`.toLocaleLowerCase('ar');
-        if (!(source.scope_keywords || []).some((keyword) => haystack.includes(String(keyword).toLocaleLowerCase('ar')))) { result.skipped += 1; continue; }
+        if (scoped && !(source.scope_keywords || []).some((keyword) => haystack.includes(String(keyword).toLocaleLowerCase('ar')))) { result.skipped += 1; continue; }
         const published = parseDate(item.published); const sourceItemKey = await hash(`${source.source_key}|${item.guid || item.link}`); const existingArticle = byKey.get(`${source.id}|${item.link}`); let clusterId = existingArticle?.cluster_id || null; let updateCount = existingArticle?.update_count || 0;
-        if (!clusterId) { const similar = [...byKey.values()].find((candidate) => candidate.source_id !== source.id && sameCluster(normalize(candidate.headline), normalize(title))); clusterId = similar?.cluster_id || crypto.randomUUID(); updateCount = similar ? (similar.update_count || 0) + 1 : 0; }
+        if (!clusterId) { const similar = (byCountry.get(source.country_id) || []).find((candidate) => candidate.source_id !== source.id && sameCluster(normalize(candidate.headline), normalize(title))); clusterId = similar?.cluster_id || crypto.randomUUID(); updateCount = similar ? (similar.update_count || 0) + 1 : 0; }
         const row = { country_id: source.country_id, source_id: source.id, source_item_key: sourceItemKey, source_url: item.link, headline: title, summary, category: 'Politics', language: 'ar', published_at: published, fetched_at: new Date().toISOString(), importance_score: importance(title, published), confidence_score: confidence(source), cluster_id: clusterId, update_count: updateCount, is_published: true, updated_at: new Date().toISOString() };
         const { error } = await db.from('country_news_articles').upsert(row, { onConflict: 'source_id,source_item_key' }); if (error) throw new Error(error.message);
-        if (existingArticle) result.updated += 1; else result.written += 1; byKey.set(`${source.id}|${item.link}`, { id: existingArticle?.id || '', source_id: source.id, source_url: item.link, headline: title, summary, cluster_id: clusterId, update_count: updateCount, published_at: published });
+        const stored: ExistingArticle = { id: existingArticle?.id || '', country_id: source.country_id, source_id: source.id, source_url: item.link, headline: title, cluster_id: clusterId, update_count: updateCount, published_at: published };
+        if (existingArticle) result.updated += 1; else { result.written += 1; const peers = byCountry.get(source.country_id) || []; peers.push(stored); byCountry.set(source.country_id, peers); }
+        byKey.set(`${source.id}|${item.link}`, stored);
       }
       await db.from('country_news_sources').update({ last_success_at: new Date().toISOString(), last_error_at: null, last_error_message: null, updated_at: new Date().toISOString() }).eq('id', source.id);
     } catch (error) { result.errors.push(`${source.source_key}: ${String(error)}`); await db.from('country_news_sources').update({ last_error_at: new Date().toISOString(), last_error_message: String(error).slice(0, 500), updated_at: new Date().toISOString() }).eq('id', source.id); }
-  }
+  };
+  const queue = [...((sources || []) as Source[])];
+  await Promise.all(Array.from({ length: 2 }, async () => { while (queue.length) { const source = queue.shift(); if (source) await ingestSource(source); } }));
   const { count: deleted } = await db.from('country_news_articles').delete({ count: 'exact' }).lt('fetched_at', new Date(Date.now() - 45 * 86_400_000).toISOString()); result.cleaned = deleted || 0;
   const countryIds = [...new Set((sources || []).map((source) => source.country_id))];
   for (const countryId of countryIds) {
