@@ -24,26 +24,50 @@
   function pinLogo(btn) {
     if (btn.dataset.mirsadPinned) return;
     btn.dataset.mirsadPinned = '1';
+    var resting = null;
+    var correction = 0;
     var mode = 'fixed';
     var frame = 0;
-    var y = function () { return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0; };
-    var want = function () { return 14 + (window.visualViewport ? window.visualViewport.offsetTop : 0); };
+    var y = function () {
+      var top = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      return top > 0 ? top : 0;
+    };
+    var lockFixed = function () {
+      mode = 'fixed';
+      correction = 0;
+      btn.style.setProperty('position', 'fixed', 'important');
+      btn.style.removeProperty('top');
+      btn.style.removeProperty('left');
+      btn.style.removeProperty('right');
+      btn.style.removeProperty('bottom');
+    };
+    var holdStill = function () {
+      var seen = btn.getBoundingClientRect().top - correction;
+      if (resting == null) resting = seen;
+      var drift = seen - resting;
+      var next = Math.abs(drift) > 3 ? -drift : 0;
+      if (Math.abs(next - correction) < 0.5) return;
+      correction = next;
+      if (correction) btn.style.setProperty('top', 'calc(max(14px, env(safe-area-inset-top)) + ' + correction.toFixed(2) + 'px)', 'important');
+      else btn.style.removeProperty('top');
+    };
     var place = function () {
       frame = 0;
-      var target = want();
+      var scroll = y();
+      if (scroll <= 0) {
+        if (mode !== 'fixed') lockFixed();
+        holdStill();
+        return;
+      }
+      var topNow = btn.getBoundingClientRect().top;
+      if (resting == null) resting = topNow;
       if (mode === 'fixed') {
-        var drift = Math.abs(btn.getBoundingClientRect().top - target);
-        if (drift <= 1.5) {
-          if (y() > 24) {
-            document.removeEventListener('scroll', schedule, true);
-            window.removeEventListener('resize', schedule);
-          }
-          return;
-        }
+        if (Math.abs(topNow - resting) < 12) return;
         mode = 'abs';
+        correction = 0;
         btn.style.setProperty('position', 'absolute', 'important');
       }
-      btn.style.setProperty('top', (y() + target) + 'px', 'important');
+      btn.style.setProperty('top', (scroll + resting) + 'px', 'important');
     };
     var schedule = function () { if (!frame) frame = requestAnimationFrame(place); };
     document.addEventListener('scroll', schedule, { passive: true, capture: true });
@@ -52,6 +76,9 @@
       window.visualViewport.addEventListener('scroll', schedule);
       window.visualViewport.addEventListener('resize', schedule);
     }
+    document.addEventListener('touchmove', schedule, { passive: true, capture: true });
+    document.addEventListener('touchend', schedule, { passive: true, capture: true });
+    lockFixed();
     place();
   }
   function boot() {
