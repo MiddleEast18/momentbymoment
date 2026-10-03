@@ -6,10 +6,10 @@
   <title>الإعدادات — مِرصاد</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Noto+Kufi+Arabic:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="info.css?v=202610020020">
-  <link rel="stylesheet" href="reader-settings.css?v=202610030800">
-  <script src="reader-settings.js?v=202610030800"></script>
+  <link rel="stylesheet" href="reader-settings.css?v=202610031945">
+  <script src="reader-settings.js?v=202610031945"></script>
   <link rel="stylesheet" href="mirsad-nav.css?v=202610020800">
   <script src="mirsad-nav.js?v=202610020800" defer></script>
   <style>
@@ -213,7 +213,7 @@
               <div class="rs-node__rail"><span>11</span></div>
               <div>
                 <b>حجم النص <span class="rs-scale-value" id="rsScaleValue">100</span></b>
-                <small id="rsScaleLabel">العنوان، العاجل، الفئات، والخبر المفتوح</small>
+                <small id="rsScaleLabel">البطاقات، العاجل، الملف الشخصي، بريد النظام، والصفحات المستقلة</small>
                 <input class="rs-scale" id="rsScale" type="range" min="90" max="125" step="5" value="100" aria-valuemin="90" aria-valuemax="125" aria-label="حجم النص">
                 <div class="rs-ticks" aria-hidden="true"><span>90</span><span>95</span><span>100</span><span>105</span><span>110</span><span>115</span><span>120</span><span>125</span></div>
               </div>
@@ -232,7 +232,7 @@
             </div>
             <div class="rs-node" id="rs-n-15">
               <div class="rs-node__rail"><span>15</span></div>
-              <div><b>خط المتن</b><small>لا يغيّر خط العناوين</small><div class="rs-seg"><button type="button" data-key="font" data-value="plex">بليكس</button><button type="button" data-key="font" data-value="kufi">كوفي</button></div></div>
+              <div><b>خط المتن</b><small>يسري على البريد والملف وكل الصفحات. لا يغيّر خط العناوين</small><div class="rs-seg"><button type="button" data-key="font" data-value="plex">بليكس</button><button type="button" data-key="font" data-value="kufi">كوفي</button></div></div>
             </div>
           </div>
         </details>
@@ -327,8 +327,9 @@
         <section class="rs-panel">
           <h2>أثرها في الموقع</h2>
           <ul class="rs-map">
-            <li><b>10 القراءة</b><span>عناوين البطاقات والمختصر والخبر المفتوح وصفوف الدول والشريط العاجل.</span><a href="live.html">البث</a> · <a href="arab-countries.html">الدول</a></li>
-            <li><b>20 اللوحة</b><span>فراغ الشبكة، عرض العمود، أرقام اللوحة، حواف البطاقات، أهداف اللمس، وإخفاء الشارات شكلياً.</span><a href="live.html">لوحة البث</a></li>
+            <li><b>10 القراءة</b><span>عناوين البطاقات والمختصر والخبر المفتوح وصفوف الدول والشريط العاجل، وحقول الملف الشخصي وبريد النظام.</span><a href="live.html">البث</a> · <a href="arab-countries.html">الدول</a> · <a href="profile.html">الملف</a> · <a href="system-mail.html">البريد</a></li>
+            <li><b>20 اللوحة</b><span>فراغ الشبكة، عرض العمود، أرقام اللوحة، حواف البطاقات، أهداف اللمس، وإخفاء الشارات شكلياً. الكثافة والحواف تصل أيضاً لبطاقات الملف والبريد.</span><a href="live.html">لوحة البث</a></li>
+            <li><b>15 الخط</b><span>خط المتن عبر متغيّر واحد على كل الصفحات. صفحة البريد مرجع التوحيد: بليكس للنص وكوفي للعناوين، أو كوفي لكليهما إذا اختير.</span><a href="system-mail.html">بريد النظام</a></li>
             <li><b>30 الحركة</b><span>دوران الشعار من القائمة، ومرور الشريط العاجل. فتح القائمة يبقى متاحاً.</span><a href="wire.html">السلك</a></li>
             <li><b>خارج الوحدة</b><span>فلتر الأخبار وترتيبها وبحث الجلسة مفتاح آخر، ولا يُقرأ هنا ولا يُكتب منه.</span></li>
           </ul>
@@ -382,7 +383,7 @@
         if (document.activeElement !== scale) scale.value = String(state.scale);
         scale.setAttribute('aria-valuenow', String(state.scale));
         document.getElementById('rsScaleValue').textContent = String(state.scale);
-        document.getElementById('rsScaleLabel').textContent = state.scale >= 120 ? 'يقفل الكثافة المضغوطة حتى لا يُقص العنوان في البطاقة' : 'العنوان، العاجل، الفئات، والخبر المفتوح';
+        document.getElementById('rsScaleLabel').textContent = state.scale >= 120 ? 'يقفل الكثافة المضغوطة حتى لا يُقص العنوان، ويوسّع حقول الملف والبريد بدل تداخل النص' : 'البطاقات، العاجل، الملف الشخصي، بريد النظام، والصفحات المستقلة';
         document.getElementById('rsGaugeScale').textContent = String(state.scale);
         document.getElementById('rsPresetLabel').textContent = names[state.preset] || 'مخصص';
         document.getElementById('rsCustom').hidden = state.preset !== 'custom';

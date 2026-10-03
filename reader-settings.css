@@ -74,17 +74,10 @@ html[data-rs-track="wide"] .country-card h2,
 html[data-rs-track="wide"] .country-card p { letter-spacing: .03em; }
 html[data-rs-lines="2"] .card__headline { -webkit-line-clamp: 2; }
 html[data-rs-lines="4"] .card__headline { -webkit-line-clamp: 4; }
-html[data-rs-font="kufi"] body,
-html[data-rs-font="kufi"] .card__summary,
-html[data-rs-font="kufi"] .mirsad-drawer-item,
-html[data-rs-font="kufi"] .mirsad-reader__summary,
-html[data-rs-font="kufi"] .mirsad-analysis__claim,
-html[data-rs-font="kufi"] .country-card p,
-html[data-rs-font="kufi"] .rapid-news__item,
-html[data-rs-font="kufi"] .mirsad-profile-page,
-html[data-rs-font="kufi"] .mirsad-reward-page,
-html[data-rs-font="kufi"] .system-mail,
-html[data-rs-font="kufi"] .developer-panel { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-font="kufi"] {
+  --font-body: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif;
+}
+html textarea { font: inherit; }
 /* The account, reward, and system-mail pages share the reader controls too. */
 html[data-rs-scale] .mirsad-profile-page__brand,
 html[data-rs-scale] .mirsad-reward-page__brand { font-size: calc(20px * var(--rs)); }
@@ -120,13 +113,13 @@ html[data-rs-scale] .system-message,
 html[data-rs-scale] .developer-panel { min-width: 0; }
 html[data-rs-scale] .system-message__meta { flex-wrap: wrap; }
 html[data-rs-scale] .mirsad-profile-field-card__content { min-width: 0; }
-html[data-rs-scale] .mirsad-profile-field-card__content strong { overflow-wrap: anywhere; }
+html[data-rs-scale] .mirsad-profile-field-card__content strong { overflow-wrap: anywhere; white-space: normal; overflow: visible; text-overflow: unset; }
 /* Shared treatment for the standalone account, utility, and information pages. */
 html[data-rs-font="kufi"] .wheel-page,
 html[data-rs-font="kufi"] .recovery-page,
 html[data-rs-font="kufi"] .mirsad-billing-page,
 html[data-rs-font="kufi"] .legal-page,
-html[data-rs-font="kufi"] .wrap { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-font="kufi"] .wrap { font-family: var(--font-body); }
 html[data-rs-scale] .wheel-brand,
 html[data-rs-scale] .recovery-brand,
 html[data-rs-scale] .mirsad-billing-brand { font-size: calc(19px * var(--rs)); }
@@ -350,4 +343,113 @@ html[data-rs-motion="reduce"] { scroll-behavior: auto; }
   html[data-rs-scale][data-rs-density="relaxed"] .news-grid {
     grid-auto-rows: auto;
   }
+}
+
+/* Account, mail, and settings pages: grow with type instead of overlapping. */
+html[data-rs-font="kufi"] body,
+html[data-rs-font="kufi"] .system-mail,
+html[data-rs-font="kufi"] .mirsad-profile-page,
+html[data-rs-font="kufi"] .mirsad-reward-page,
+html[data-rs-font="kufi"] .developer-panel,
+html[data-rs-font="kufi"] .rs-deck {
+  font-family: var(--font-body);
+}
+html[data-rs-scale] .mirsad-profile-field-card {
+  min-height: calc(52px * var(--rs));
+  align-items: flex-start;
+  gap: calc(10px * var(--rs));
+  padding: calc(10px * var(--rs)) calc(12px * var(--rs));
+}
+html[data-rs-scale] .mirsad-profile-field-card__icon {
+  width: calc(30px * var(--rs));
+  height: calc(30px * var(--rs));
+  flex: 0 0 auto;
+  font-size: calc(13px * var(--rs));
+}
+html[data-rs-scale] .mirsad-profile-field-card button {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+  padding: 4px 0;
+}
+html[data-rs-scale] .mirsad-profile-grid label { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-grid input {
+  min-height: calc(44px * var(--rs));
+  font-size: calc(14px * var(--rs));
+}
+html[data-rs-scale] .mirsad-profile-page__actions button,
+html[data-rs-scale] .mirsad-auth-button {
+  min-height: max(44px, calc(44px * var(--rs)));
+}
+html[data-rs-scale] .system-mail__title,
+html[data-rs-scale] .system-message__title,
+html[data-rs-scale] .system-message__body,
+html[data-rs-scale] .mirsad-profile-page__title,
+html[data-rs-scale] .mirsad-profile-page__intro { overflow-wrap: anywhere; }
+html[data-rs-scale] .mirsad-select__trigger {
+  min-height: calc(46px * var(--rs));
+  font-size: calc(14px * var(--rs));
+}
+html[data-rs-scale] .mirsad-select__trigger [data-mirsad-select-label] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+html[data-rs-scale] .mirsad-select__menu button {
+  min-height: calc(44px * var(--rs));
+  font-size: calc(14px * var(--rs));
+  overflow-wrap: anywhere;
+}
+html[data-rs-scale] .developer-grid input,
+html[data-rs-scale] .developer-grid textarea,
+html[data-rs-scale] .developer-grid select {
+  font-size: calc(14px * var(--rs));
+  min-height: calc(44px * var(--rs));
+}
+html[data-rs-width="narrow"] .mirsad-profile-page__shell,
+html[data-rs-width="narrow"] .system-mail__shell { width: min(720px, 100%); }
+html[data-rs-density="compact"] .mirsad-profile-page__card,
+html[data-rs-density="compact"] .system-message,
+html[data-rs-density="compact"] .developer-panel { padding: 16px; }
+html[data-rs-density="compact"] .mirsad-profile-grid,
+html[data-rs-density="compact"] .system-mail__list { gap: 8px; }
+html[data-rs-density="relaxed"] .mirsad-profile-page__card,
+html[data-rs-density="relaxed"] .system-message,
+html[data-rs-density="relaxed"] .developer-panel { padding: 28px; }
+html[data-rs-density="relaxed"] .mirsad-profile-grid,
+html[data-rs-density="relaxed"] .system-mail__list { gap: 16px; }
+html[data-rs-radius] .mirsad-profile-page__card,
+html[data-rs-radius] .mirsad-profile-field-card,
+html[data-rs-radius] .system-message,
+html[data-rs-radius] .developer-panel,
+html[data-rs-radius] .mirsad-reward-card { border-radius: var(--radius); }
+html[data-rs-touch="large"] .mirsad-select__trigger,
+html[data-rs-touch="large"] .mirsad-select__menu button,
+html[data-rs-touch="large"] .rs-seg button,
+html[data-rs-touch="large"] .rs-actions button,
+html[data-rs-touch="large"] .rs-preset { min-height: 48px; }
+html[data-rs-scale] .rs-gauge strong,
+html[data-rs-scale] .rs-preset strong,
+html[data-rs-scale] .rs-lead,
+html[data-rs-scale] .rs-node b { overflow-wrap: anywhere; }
+html[data-rs-scale="120"] .rs-presets,
+html[data-rs-scale="125"] .rs-presets { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+html[data-rs-scale] .rs-seg button { min-height: max(38px, calc(36px * var(--rs))); }
+html[data-rs-contrast="high"] .mirsad-profile-field-card,
+html[data-rs-contrast="high"] .system-message,
+html[data-rs-contrast="high"] .mirsad-select__trigger {
+  border-color: rgba(237, 234, 227, .4);
+}
+@media (max-width: 700px) {
+  html[data-rs-scale] .mirsad-profile-page__header,
+  html[data-rs-scale] .system-mail__head {
+    align-items: stretch;
+  }
+  html[data-rs-scale] .mirsad-profile-page__back,
+  html[data-rs-scale] .system-mail__back {
+    white-space: normal;
+    text-align: center;
+  }
+  html[data-rs-scale="115"] .developer-grid,
+  html[data-rs-scale="120"] .developer-grid,
+  html[data-rs-scale="125"] .developer-grid { grid-template-columns: 1fr; }
 }
