@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=202610020110">
+  <link rel="stylesheet" href="styles.css?v=202610031935">
   <link rel="stylesheet" href="logo.css?v=202609100020">
   <link rel="stylesheet" href="auth.css?v=202610020800">
   <link rel="stylesheet" href="reader-settings.css?v=202610030800">
@@ -29,13 +29,13 @@
     <section id="systemMessages" class="system-mail__list" aria-live="polite"></section>
     <section id="developerPanel" class="developer-panel" aria-labelledby="developerTitle">
       <h2 id="developerTitle">لوحة المطور</h2><p class="developer-panel__intro">تظهر هذه الأدوات للحسابين المطورين المصرح لهما فقط. إرسال المكافأة عملية مستقلة ومسجلة ولا تتكرر عند إعادة الطلب نفسه.</p>
-      <div class="developer-grid"><label>الحساب المستهدف<select id="rewardRecipient"></select></label><label>نوع المكافأة<select id="rewardType"><option value="unlock">فتحات قراءة</option><option value="points">نقاط</option><option value="premium_days">أيام مميزة</option></select></label><label>القيمة<input id="rewardAmount" type="number" min="1" max="100000" step="1" placeholder="57"></label><label>بداية الفترة<input id="periodStart" type="date"></label><label>نهاية الفترة<input id="periodEnd" type="date"></label><label class="wide">سبب المكافأة<textarea id="rewardReason" maxlength="1000" placeholder="نشاط أسبوعي مميز"></textarea></label></div>
+      <div class="developer-grid"><label>الحساب المستهدف<div class="mirsad-select" data-mirsad-select><select id="rewardRecipient" class="mirsad-select__native" tabindex="-1" aria-hidden="true"></select><button class="mirsad-select__trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span data-mirsad-select-label>اختر الحساب</span><span class="mirsad-select__chevron" aria-hidden="true">⌄</span></button><div class="mirsad-select__menu" role="listbox" hidden></div></div></label><label>نوع المكافأة<div class="mirsad-select" data-mirsad-select><select id="rewardType" class="mirsad-select__native" tabindex="-1" aria-hidden="true"><option value="unlock">فتحات قراءة</option><option value="points">نقاط</option><option value="premium_days">أيام مميزة</option></select><button class="mirsad-select__trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span data-mirsad-select-label>فتحات قراءة</span><span class="mirsad-select__chevron" aria-hidden="true">⌄</span></button><div class="mirsad-select__menu" role="listbox" hidden></div></div></label><label>القيمة<input id="rewardAmount" type="number" min="1" max="100000" step="1" placeholder="57"></label><label>بداية الفترة<input id="periodStart" type="date"></label><label>نهاية الفترة<input id="periodEnd" type="date"></label><label class="wide">سبب المكافأة<textarea id="rewardReason" maxlength="1000" placeholder="نشاط أسبوعي مميز"></textarea></label></div>
       <div class="developer-actions"><button id="sendReward" type="button">مراجعة وإرسال المكافأة</button><span id="developerResult" class="developer-result" role="status"></span></div>
       <div class="developer-history"><h3>آخر عمليات المكافآت</h3><div id="rewardHistory"></div></div>
     </section>
   </div></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth-v8.js?v=202610030900"></script>
-  <script src="system-mail.js?v=202610031330"></script>
+  <script src="system-mail.js?v=202610031935"></script>
 </body>
 </html>

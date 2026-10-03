@@ -8,6 +8,37 @@
   const formatDate = (value) => value ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
   const setStatus = (text) => { if ($('systemMailStatus')) $('systemMailStatus').textContent = text; };
   const setDeveloperResult = (text, error = false) => { if ($('developerResult')) { $('developerResult').textContent = text; $('developerResult').style.color = error ? '#e5a28e' : ''; } };
+  const selectRoots = () => [...document.querySelectorAll('[data-mirsad-select]')];
+  const closeMirsadSelect = (root) => { if (!root) return; root.classList.remove('is-open'); const menu = root.querySelector('.mirsad-select__menu'); const trigger = root.querySelector('.mirsad-select__trigger'); if (menu) menu.hidden = true; if (trigger) trigger.setAttribute('aria-expanded', 'false'); };
+  const renderMirsadSelect = (root) => {
+    const select = root?.querySelector('.mirsad-select__native');
+    const menu = root?.querySelector('.mirsad-select__menu');
+    const label = root?.querySelector('[data-mirsad-select-label]');
+    if (!select || !menu || !label) return;
+    menu.replaceChildren();
+    [...select.options].forEach((option) => {
+      const item = document.createElement('button');
+      item.type = 'button'; item.setAttribute('role', 'option'); item.dataset.value = option.value;
+      item.setAttribute('aria-selected', option.selected ? 'true' : 'false'); item.textContent = option.textContent;
+      item.addEventListener('click', () => { select.value = option.value; select.dispatchEvent(new Event('change', { bubbles: true })); closeMirsadSelect(root); renderMirsadSelect(root); });
+      menu.appendChild(item);
+    });
+    label.textContent = select.selectedOptions[0]?.textContent || 'اختر الحساب';
+  };
+  const initMirsadSelect = (root) => {
+    if (!root || root.dataset.mirsadSelectReady === 'true') return;
+    const trigger = root.querySelector('.mirsad-select__trigger');
+    const select = root.querySelector('.mirsad-select__native');
+    const menu = root.querySelector('.mirsad-select__menu');
+    if (!trigger || !select || !menu) return;
+    root.dataset.mirsadSelectReady = 'true';
+    trigger.addEventListener('click', () => { const open = !root.classList.contains('is-open'); selectRoots().forEach(closeMirsadSelect); if (open) { root.classList.add('is-open'); menu.hidden = false; trigger.setAttribute('aria-expanded', 'true'); menu.querySelector('button[aria-selected="true"]')?.focus(); } });
+    trigger.addEventListener('keydown', (event) => { if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') { event.preventDefault(); trigger.click(); } if (event.key === 'Escape') closeMirsadSelect(root); });
+    select.addEventListener('change', () => renderMirsadSelect(root));
+    renderMirsadSelect(root);
+  };
+  document.querySelectorAll('[data-mirsad-select]').forEach(initMirsadSelect);
+  document.addEventListener('click', (event) => { if (!event.target.closest('[data-mirsad-select]')) selectRoots().forEach(closeMirsadSelect); });
   let booted = false;
   let bootInFlight = null;
 
@@ -33,6 +64,7 @@
     const { data: recipients, error: recipientError } = await client.rpc('list_system_reward_recipients');
     if (recipientError) { setDeveloperResult('تعذر تحميل الحسابات.', true); return; }
     $('rewardRecipient').innerHTML = (recipients || []).map((recipient) => `<option value="${escapeHtml(recipient.user_id)}">${escapeHtml(recipient.email || recipient.user_id)}</option>`).join('');
+    renderMirsadSelect($('rewardRecipient').closest('[data-mirsad-select]'));
     const { data: history, error: historyError } = await client.from('system_reward_operations').select('id,recipient_user_id,amount,reward_type,reason,created_at').order('created_at', { ascending: false }).limit(20);
     if (!historyError) $('rewardHistory').innerHTML = history?.length ? history.map((row) => `<div class="reward-row"><span>${escapeHtml(row.reason)}</span><strong>${escapeHtml(row.amount)} ${row.reward_type === 'unlock' ? 'فتحة' : row.reward_type === 'points' ? 'نقطة' : 'يوم'}</strong><time>${escapeHtml(formatDate(row.created_at))}</time></div>`).join('') : '<div class="empty-state">لا توجد عمليات مكافأة بعد.</div>';
     $('sendReward').addEventListener('click', () => sendReward(user));
