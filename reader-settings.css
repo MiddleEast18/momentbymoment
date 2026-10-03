@@ -80,7 +80,47 @@ html[data-rs-font="kufi"] .mirsad-drawer-item,
 html[data-rs-font="kufi"] .mirsad-reader__summary,
 html[data-rs-font="kufi"] .mirsad-analysis__claim,
 html[data-rs-font="kufi"] .country-card p,
-html[data-rs-font="kufi"] .rapid-news__item { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-font="kufi"] .rapid-news__item,
+html[data-rs-font="kufi"] .mirsad-profile-page,
+html[data-rs-font="kufi"] .mirsad-reward-page,
+html[data-rs-font="kufi"] .system-mail,
+html[data-rs-font="kufi"] .developer-panel { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+/* The account, reward, and system-mail pages share the reader controls too. */
+html[data-rs-scale] .mirsad-profile-page__brand,
+html[data-rs-scale] .mirsad-reward-page__brand { font-size: calc(20px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-page__back,
+html[data-rs-scale] .mirsad-reward-page__back,
+html[data-rs-scale] .system-mail__back { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-page__title,
+html[data-rs-scale] .mirsad-reward-card h1 { font-size: calc(26px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-page__intro,
+html[data-rs-scale] .mirsad-reward-intro,
+html[data-rs-scale] .system-mail__intro { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-page__avatar { font-size: calc(25px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-field-card__content small { font-size: calc(10px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-field-card__content strong { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-field-card button { font-size: calc(12px * var(--rs)); }
+html[data-rs-scale] .system-mail__title { font-size: calc(clamp(24px, 4vw, 34px) * var(--rs)); }
+html[data-rs-scale] .system-mail__status,
+html[data-rs-scale] .system-message__meta,
+html[data-rs-scale] .developer-panel__intro,
+html[data-rs-scale] .developer-grid label,
+html[data-rs-scale] .developer-result,
+html[data-rs-scale] .reward-row { font-size: calc(12px * var(--rs)); }
+html[data-rs-scale] .system-message__title { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .system-message__body { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .system-message__action { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .developer-panel h2 { font-size: calc(20px * var(--rs)); }
+html[data-rs-scale] .developer-history h3 { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .empty-state { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .mirsad-profile-page__header,
+html[data-rs-scale] .system-mail__head { min-width: 0; flex-wrap: wrap; }
+html[data-rs-scale] .mirsad-profile-page__card,
+html[data-rs-scale] .system-message,
+html[data-rs-scale] .developer-panel { min-width: 0; }
+html[data-rs-scale] .system-message__meta { flex-wrap: wrap; }
+html[data-rs-scale] .mirsad-profile-field-card__content { min-width: 0; }
+html[data-rs-scale] .mirsad-profile-field-card__content strong { overflow-wrap: anywhere; }
 html[data-rs-density="compact"] .news-grid { gap: 10px; grid-auto-rows: minmax(220px, auto); }
 html[data-rs-density="compact"] .news-grid .card { padding: 12px; }
 html[data-rs-density="compact"] .featured-rail,

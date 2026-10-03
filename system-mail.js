@@ -8,6 +8,8 @@
   const formatDate = (value) => value ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
   const setStatus = (text) => { if ($('systemMailStatus')) $('systemMailStatus').textContent = text; };
   const setDeveloperResult = (text, error = false) => { if ($('developerResult')) { $('developerResult').textContent = text; $('developerResult').style.color = error ? '#e5a28e' : ''; } };
+  let booted = false;
+  let bootInFlight = null;
 
   async function loadMessages() {
     const { data, error } = await client.rpc('list_system_messages', { p_limit: 100, p_offset: 0 });
@@ -57,11 +59,23 @@
   }
 
   async function boot() {
-    if (!client) { setStatus('تعذر الاتصال بخدمة النظام.'); return; }
-    const { data: sessionData } = await client.auth.getSession();
-    if (!sessionData?.session?.user) return;
-    try { await loadMessages(); await loadDeveloperPanel(sessionData.session.user); } catch (error) { console.error('[mirsad system mail]', error); setStatus('تعذر تحميل بريد النظام حاليًا.'); }
+    if (booted) return;
+    if (bootInFlight) return bootInFlight;
+    bootInFlight = (async () => {
+      if (!client) { setStatus('تعذر الاتصال بخدمة النظام.'); return; }
+      const { data: sessionData } = await client.auth.getSession();
+      if (!sessionData?.session?.user) return;
+      try {
+        await loadMessages();
+        await loadDeveloperPanel(sessionData.session.user);
+        booted = true;
+      } catch (error) {
+        console.error('[mirsad system mail]', error);
+        setStatus('تعذر تحميل بريد النظام حاليًا.');
+      }
+    })();
+    try { await bootInFlight; } finally { bootInFlight = null; }
   }
-  window.addEventListener('mirsad:authenticated', boot, { once: true });
+  window.addEventListener('mirsad:authenticated', boot);
   window.setTimeout(boot, 1200);
 })();
