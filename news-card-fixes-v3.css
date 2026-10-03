@@ -2,6 +2,7 @@
   overflow: visible;
   min-width: 0;
   width: 100%;
+  height: auto;
   box-sizing: border-box;
 }
 .card__eyebrow,
@@ -43,4 +44,41 @@
 }
 .card__verification-badge {
   padding: 4px 10px;
+}
+
+/* Grow with large type instead of clipping the headline or gold line. */
+.news-grid {
+  grid-auto-rows: minmax(240px, auto);
+}
+.card__headline,
+.card__evidence {
+  overflow-wrap: anywhere;
+}
+.card__headline {
+  padding-block: 0.1em;
+}
+.card__evidence,
+.card__meta {
+  flex: 0 0 auto;
+}
+.card__meta {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.featured-rail {
+  align-items: stretch;
+}
+.featured-rail > .card {
+  overflow: visible !important;
+  height: auto;
+  min-height: min-content;
+  align-self: stretch;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  .news-grid {
+    grid-auto-rows: auto;
+  }
+  .featured-rail > .card {
+    min-height: 230px;
+  }
 }
