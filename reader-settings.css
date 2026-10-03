@@ -121,6 +121,166 @@ html[data-rs-scale] .developer-panel { min-width: 0; }
 html[data-rs-scale] .system-message__meta { flex-wrap: wrap; }
 html[data-rs-scale] .mirsad-profile-field-card__content { min-width: 0; }
 html[data-rs-scale] .mirsad-profile-field-card__content strong { overflow-wrap: anywhere; }
+/* Shared treatment for the standalone account, utility, and information pages. */
+html[data-rs-font="kufi"] .wheel-page,
+html[data-rs-font="kufi"] .recovery-page,
+html[data-rs-font="kufi"] .mirsad-billing-page,
+html[data-rs-font="kufi"] .legal-page,
+html[data-rs-font="kufi"] .wrap { font-family: 'Noto Kufi Arabic', 'IBM Plex Sans Arabic', sans-serif; }
+html[data-rs-scale] .wheel-brand,
+html[data-rs-scale] .recovery-brand,
+html[data-rs-scale] .mirsad-billing-brand { font-size: calc(19px * var(--rs)); }
+html[data-rs-scale] .wheel-back,
+html[data-rs-scale] .recovery-back,
+html[data-rs-scale] .mirsad-billing-back,
+html[data-rs-scale] .back { font-size: calc(16px * var(--rs)); }
+html[data-rs-scale] .wheel-kicker,
+html[data-rs-scale] .recovery-kicker,
+html[data-rs-scale] .mirsad-billing-kicker,
+html[data-rs-scale] .legal-kicker,
+html[data-rs-scale] .kicker { font-size: calc(11px * var(--rs)); }
+html[data-rs-scale] .wheel-card h1,
+html[data-rs-scale] .recovery-card h1,
+html[data-rs-scale] .legal-page h1,
+html[data-rs-scale] .wrap h1 { font-size: calc(clamp(24px, 5vw, 38px) * var(--rs)); }
+html[data-rs-scale] .wheel-subtitle,
+html[data-rs-scale] .recovery-subtitle,
+html[data-rs-scale] .legal-lead,
+html[data-rs-scale] .lead { font-size: calc(13px * var(--rs)); }
+html[data-rs-scale] .wheel-stat,
+html[data-rs-scale] .wheel-bar-label,
+html[data-rs-scale] .recovery-stat,
+html[data-rs-scale] .recovery-value span,
+html[data-rs-scale] .recovery-note,
+html[data-rs-scale] .mirsad-billing-rule,
+html[data-rs-scale] .mirsad-billing-section-head span,
+html[data-rs-scale] .mirsad-billing-package__label,
+html[data-rs-scale] .mirsad-billing-foot__item span,
+html[data-rs-scale] .mirsad-billing-note { font-size: calc(11px * var(--rs)); }
+html[data-rs-scale] .wheel-card h1,
+html[data-rs-scale] .recovery-card h1,
+html[data-rs-scale] .mirsad-billing-hero h1 { line-height: 1.4; }
+html[data-rs-scale] .recovery-subtitle,
+html[data-rs-scale] .recovery-offer p,
+html[data-rs-scale] .legal-page p,
+html[data-rs-scale] .legal-page li,
+html[data-rs-scale] .wrap p,
+html[data-rs-scale] .wrap li { line-height: 1.9; }
+html[data-rs-scale] .mirsad-billing-hero h1 { font-size: calc(clamp(27px, 5vw, 44px) * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-hero p { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-section-head h2 { font-size: calc(20px * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-package h3 { font-size: calc(15px * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-package__amount { font-size: calc(clamp(23px, 3vw, 30px) * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-package__price { font-size: calc(14px * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-package__price strong { font-size: calc(18px * var(--rs)); }
+html[data-rs-scale] .mirsad-billing-package button,
+html[data-rs-scale] .legal-button { font-size: calc(12px * var(--rs)); }
+html[data-rs-scale] .wheel-status,
+html[data-rs-scale] .recovery-value,
+html[data-rs-scale] .recovery-offer p,
+html[data-rs-scale] .mirsad-billing-status,
+html[data-rs-scale] .legal-status,
+html[data-rs-scale] .legal-note { font-size: calc(12px * var(--rs)); }
+html[data-rs-scale] .wheel-action,
+html[data-rs-scale] .recovery-action,
+html[data-rs-scale] .mirsad-billing-package button,
+html[data-rs-scale] .legal-button { min-height: max(44px, calc(44px * var(--rs))); }
+html[data-rs-scale] .wheel-header,
+html[data-rs-scale] .recovery-header,
+html[data-rs-scale] .mirsad-billing-head,
+html[data-rs-scale] .legal-header,
+html[data-rs-scale] .top { min-width: 0; flex-wrap: wrap; }
+html[data-rs-scale] .wheel-card,
+html[data-rs-scale] .recovery-card,
+html[data-rs-scale] .mirsad-billing-hero,
+html[data-rs-scale] .mirsad-billing-package,
+html[data-rs-scale] .legal-section,
+html[data-rs-scale] .wrap .card { min-width: 0; }
+html[data-rs-scale] .mirsad-billing-package h3,
+html[data-rs-scale] .mirsad-billing-package__label,
+html[data-rs-scale] .mirsad-billing-package__price,
+html[data-rs-scale] .legal-page p,
+html[data-rs-scale] .legal-page li,
+html[data-rs-scale] .wrap p,
+html[data-rs-scale] .wrap li { overflow-wrap: anywhere; }
+html[data-rs-leading="tight"] .wheel-card h1,
+html[data-rs-leading="tight"] .recovery-card h1,
+html[data-rs-leading="tight"] .legal-page h1,
+html[data-rs-leading="tight"] .wrap h1 { line-height: 1.3; }
+html[data-rs-leading="roomy"] .wheel-card h1,
+html[data-rs-leading="roomy"] .recovery-card h1,
+html[data-rs-leading="roomy"] .legal-page h1,
+html[data-rs-leading="roomy"] .wrap h1 { line-height: 1.6; }
+html[data-rs-leading="roomy"] .wheel-subtitle,
+html[data-rs-leading="roomy"] .recovery-subtitle,
+html[data-rs-leading="roomy"] .legal-page p,
+html[data-rs-leading="roomy"] .legal-page li,
+html[data-rs-leading="roomy"] .wrap p,
+html[data-rs-leading="roomy"] .wrap li { line-height: 2.05; }
+html[data-rs-track="wide"] .wheel-card,
+html[data-rs-track="wide"] .recovery-card,
+html[data-rs-track="wide"] .mirsad-billing-page,
+html[data-rs-track="wide"] .legal-page,
+html[data-rs-track="wide"] .wrap { letter-spacing: .01em; }
+html[data-rs-track="wide"] .wheel-card h1,
+html[data-rs-track="wide"] .recovery-card h1,
+html[data-rs-track="wide"] .mirsad-billing-hero h1,
+html[data-rs-track="wide"] .legal-page h1,
+html[data-rs-track="wide"] .wrap h1 { letter-spacing: .02em; }
+html[data-rs-width="narrow"] .wheel-shell,
+html[data-rs-width="narrow"] .recovery-shell,
+html[data-rs-width="narrow"] .mirsad-billing-shell,
+html[data-rs-width="narrow"] .legal-page,
+html[data-rs-width="narrow"] .wrap { width: min(880px, 100%); margin-inline: auto; }
+html[data-rs-density="compact"] .wheel-card,
+html[data-rs-density="compact"] .recovery-card,
+html[data-rs-density="compact"] .mirsad-billing-hero,
+html[data-rs-density="compact"] .mirsad-billing-package,
+html[data-rs-density="compact"] .legal-section,
+html[data-rs-density="compact"] .wrap .card { padding: 16px; }
+html[data-rs-density="compact"] .wheel-meta,
+html[data-rs-density="compact"] .recovery-stats,
+html[data-rs-density="compact"] .mirsad-billing-grid { gap: 7px; }
+html[data-rs-density="relaxed"] .wheel-card,
+html[data-rs-density="relaxed"] .recovery-card,
+html[data-rs-density="relaxed"] .mirsad-billing-hero,
+html[data-rs-density="relaxed"] .mirsad-billing-package,
+html[data-rs-density="relaxed"] .legal-section,
+html[data-rs-density="relaxed"] .wrap .card { padding: 28px; }
+html[data-rs-density="relaxed"] .wheel-meta,
+html[data-rs-density="relaxed"] .recovery-stats,
+html[data-rs-density="relaxed"] .mirsad-billing-grid { gap: 16px; }
+html[data-rs-radius="sharp"] .wheel-card,
+html[data-rs-radius="sharp"] .recovery-card,
+html[data-rs-radius="sharp"] .mirsad-billing-hero,
+html[data-rs-radius="sharp"] .mirsad-billing-package,
+html[data-rs-radius="sharp"] .legal-section,
+html[data-rs-radius="sharp"] .wrap .card { border-radius: 4px; }
+html[data-rs-radius="round"] .wheel-card,
+html[data-rs-radius="round"] .recovery-card,
+html[data-rs-radius="round"] .mirsad-billing-hero,
+html[data-rs-radius="round"] .mirsad-billing-package,
+html[data-rs-radius="round"] .legal-section,
+html[data-rs-radius="round"] .wrap .card { border-radius: 18px; }
+html[data-rs-touch="large"] .wheel-back,
+html[data-rs-touch="large"] .recovery-back,
+html[data-rs-touch="large"] .mirsad-billing-back,
+html[data-rs-touch="large"] .wheel-action,
+html[data-rs-touch="large"] .recovery-action,
+html[data-rs-touch="large"] .mirsad-billing-package button,
+html[data-rs-touch="large"] .legal-button,
+html[data-rs-touch="large"] .back,
+html[data-rs-touch="large"] .mirsad-profile-field-card button,
+html[data-rs-touch="large"] .system-message__action,
+html[data-rs-touch="large"] .developer-actions button,
+html[data-rs-touch="large"] .legal-form input,
+html[data-rs-touch="large"] .legal-form textarea,
+html[data-rs-touch="large"] .legal-form select { min-height: 48px; }
+html[data-rs-motion="reduce"] .wheel,
+html[data-rs-motion="reduce"] .wheel-bar i,
+html[data-rs-motion="reduce"] .mirsad-billing-package,
+html[data-rs-motion="reduce"] .mirsad-billing-foot__item,
+html[data-rs-motion="reduce"] .recovery-track i { animation: none !important; transition: none !important; }
 html[data-rs-density="compact"] .news-grid { gap: 10px; grid-auto-rows: minmax(220px, auto); }
 html[data-rs-density="compact"] .news-grid .card { padding: 12px; }
 html[data-rs-density="compact"] .featured-rail,
