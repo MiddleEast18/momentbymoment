@@ -184,6 +184,7 @@
   const setProfileLater=(user)=>{try{localStorage.setItem(PROFILE_LATER_KEY,user.id)}catch{}};
   const clearProfileLater=()=>{try{localStorage.removeItem(PROFILE_LATER_KEY)}catch{}};
   let clientSessionEnding=false;
+  const isLivePage=()=>/\/live\.html?$/.test(window.location.pathname);
   const sessionHomeUrl=()=>new URL('index.html',window.location.href).href;
   function discardTransientUi(){
     document.getElementById('mirsadUserMenu')?.remove();
@@ -199,6 +200,12 @@
     try{localStorage.removeItem(CONFIG.GUEST_KEY)}catch{}
     clearSignupOnboardingPending();
     discardTransientUi();
+    if(isLivePage()){
+      clientSessionEnding=false;
+      document.body.classList.add('mirsad-auth-required');
+      showGate();
+      return;
+    }
     window.location.replace(sessionHomeUrl());
   }
   function onboardingStyles(){
@@ -408,7 +415,7 @@
     if(status && status.textContent==='جارٍ فتح Google…')status.textContent='';
   }
 
-  window.addEventListener('pageshow',(event)=>{resetOAuthButtonAfterReturn();if(event.persisted && !isGuest()){void (async()=>{const session=await withAuthTimeout(recoverSession(),AUTH_RECOVERY_TIMEOUT_MS);if(!session?.user)endClientSession()})()}});
+  window.addEventListener('pageshow',(event)=>{resetOAuthButtonAfterReturn();if(event.persisted && !isGuest()){void (async()=>{const session=await withAuthTimeout(recoverSession(),AUTH_RECOVERY_TIMEOUT_MS);if(!session?.user){if(isLivePage()){document.body.classList.add('mirsad-auth-required');showGate();return;}endClientSession()}})()}});
   window.addEventListener('popstate',()=>resetOAuthButtonAfterReturn());
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resetOAuthButtonAfterReturn()});
 

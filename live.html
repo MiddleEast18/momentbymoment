@@ -5,38 +5,7 @@
   <meta charset="UTF-8">
   <script>
     (function () {
-      var KEY = 'mirsad.introPassed.v1';
-      var armed = false;
-      var gateVisible = function () { return !!document.getElementById('mirsadAuthGate'); };
-      var marked = null;
-      var sync = function () {
-        if (!document.body) return;
-        if (gateVisible()) {
-          if (marked !== false) {
-            marked = false;
-            try { localStorage.removeItem(KEY); } catch (error) {}
-          }
-          if (!armed) {
-            armed = true;
-            history.pushState({ mirsadGateBack: 1 }, '', location.href);
-          }
-          return;
-        }
-        if (!document.body.classList.contains('mirsad-auth-required') && marked !== true) {
-          marked = true;
-          try { localStorage.setItem(KEY, '1'); } catch (error) {}
-        }
-      };
-      window.addEventListener('popstate', function (event) {
-        if (!gateVisible() || (event.state && event.state.mirsadGateBack)) return;
-        location.replace(new URL('index.html', location.href).href);
-      });
-      var start = function () {
-        sync();
-        new MutationObserver(sync).observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] });
-      };
-      if (document.body) start();
-      else document.addEventListener('DOMContentLoaded', start);
+      try { localStorage.setItem('mirsad.introPassed.v1', '1'); } catch (error) {}
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -159,7 +128,7 @@
   <script src="view-access-public.js?v=202609202155"></script>
   <script src="news-pagination.js?v=202609210850"></script>
   <script src="news-revision-compat.js?v=202609130819"></script>
-  <script src="auth-v8.js?v=202610041545"></script>
+  <script src="auth-v8.js?v=202610041650"></script>
   <script src="guest-summary-shimmer.js?v=202609210748"></script>
   <script src="rapid-news.js?v=202609210850"></script>
   <div class="mirsad-drawer" id="mirsadDrawer" hidden>

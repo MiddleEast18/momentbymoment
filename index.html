@@ -138,6 +138,9 @@
   <script>
     (function () {
       var KEY = 'mirsad.introPassed.v1';
+      function markPassed() {
+        try { localStorage.setItem(KEY, '1'); } catch (error) {}
+      }
       function passed() {
         try {
           if (localStorage.getItem(KEY) === '1' || localStorage.getItem('mirsad.guest.v1') === '1') return true;
@@ -160,7 +163,7 @@
           if (ref && /^[A-Za-z0-9_-]{4,64}$/.test(ref.trim())) localStorage.setItem('mirsad.pendingReferral.v1', ref.trim().toUpperCase());
         } catch (error) {}
         if (authQuery || authHash) {
-          try { localStorage.setItem(KEY, '1'); } catch (error) {}
+          markPassed();
           document.documentElement.classList.add('mirsad-intro-hold');
           location.replace('live.html' + search + hash);
           return;
@@ -172,6 +175,10 @@
       }
       leave();
       window.addEventListener('pageshow', leave);
+      document.addEventListener('click', function (event) {
+        var link = event.target && event.target.closest ? event.target.closest('a.enter') : null;
+        if (link) markPassed();
+      });
     })();
   </script>
 <link rel="stylesheet" href="reader-settings.css?v=202610031945">
