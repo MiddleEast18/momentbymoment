@@ -135,7 +135,7 @@
     });
     const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
     gate.querySelector('#mirsadEmailContinue').addEventListener('click',sendOtp);email.addEventListener('keydown',e=>{if(e.key==='Enter')sendOtp()});
-    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');discardTransientUi();gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();});
+    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');discardTransientUi();gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();if(isLivePage())returnToIntroAfterEntry();});
   }
 
   function showOtp(email){
@@ -184,6 +184,14 @@
   const setProfileLater=(user)=>{try{localStorage.setItem(PROFILE_LATER_KEY,user.id)}catch{}};
   const clearProfileLater=()=>{try{localStorage.removeItem(PROFILE_LATER_KEY)}catch{}};
   let clientSessionEnding=false;
+  const isLivePage=()=>window.location.pathname.endsWith('/live.html');
+  const introReturnUrl=()=>new URL('index.html?intro=1',window.location.href).href;
+  let introReturnInFlight=false;
+  function returnToIntroAfterEntry(){
+    if(!isLivePage()||introReturnInFlight)return;
+    introReturnInFlight=true;
+    window.location.replace(introReturnUrl());
+  }
   const sessionHomeUrl=()=>new URL('index.html',window.location.href).href;
   function discardTransientUi(){
     document.getElementById('mirsadUserMenu')?.remove();
@@ -264,7 +272,7 @@
     }
     clearSignupOnboardingPending();
     if(isProfilePage()){renderProfilePage(user,profile);return}
-    if(!profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),250);
+    if(!profile.onboarding_completed&&!isLivePage())setTimeout(()=>showProfileBanner(user),250);
   }
 
   const isProfilePage=()=>window.location.pathname.endsWith('/profile.html');
@@ -393,9 +401,10 @@
     void registerPendingReferral();
     showUserMenu(user,profile,unlockAccount);
     window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && serverOnboarding){void showSignupRules(user,profile);return;}
+    if(profile && serverOnboarding){void showSignupRules(user,profile).then(()=>returnToIntroAfterEntry());return;}
     if(isProfilePage()){renderProfilePage(user,profile||{});return;}
-    if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(profile && !profile.onboarding_completed&&!isLivePage())setTimeout(()=>showProfileBanner(user),350);
+    returnToIntroAfterEntry();
   }
 
   function resetOAuthButtonAfterReturn(){
