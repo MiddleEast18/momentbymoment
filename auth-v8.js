@@ -146,7 +146,7 @@
     inputs.forEach((input,i)=>{input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(-1);if(input.value&&inputs[i+1])inputs[i+1].focus()});input.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!input.value&&inputs[i-1])inputs[i-1].focus()});input.addEventListener('paste',e=>{const v=(e.clipboardData?.getData('text')||'').replace(/\D/g,'').slice(0,8-i);if(!v)return;e.preventDefault();[...v].forEach((n,j)=>{if(inputs[i+j])inputs[i+j].value=n});inputs[Math.min(i+v.length,8)-1]?.focus()})});
     gate.querySelector('#mirsadOtpBack').addEventListener('click',showGate);
     resend.addEventListener('click',async()=>{resend.disabled=true;statusText(status,'جارٍ إرسال رمز جديد…');const{error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});if(error){statusText(status,'تعذر إعادة إرسال الرمز. حاول لاحقًا.');resend.disabled=false;return;}remaining=30;statusText(status,'تم إرسال رمز جديد.');const tick=setInterval(()=>{remaining-=1;resend.textContent=remaining>0?`إعادة إرسال الرمز (${remaining})`:'إعادة إرسال الرمز';if(remaining<=0){clearInterval(tick);resend.disabled=false}},1000)});
-    gate.querySelector('#mirsadOtpVerify').addEventListener('click',async()=>{const token=inputs.map(x=>x.value).join('');if(!/^\d{8}$/.test(token)){statusText(status,'أدخل رمز التحقق المكوّن من 8 أرقام.');return;}const btn=gate.querySelector('#mirsadOtpVerify');btn.disabled=true;statusText(status,'جارٍ التحقق…');const{data,error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error||!data?.session?.user){btn.disabled=false;statusText(status,'رمز التحقق غير صحيح أو منتهي.');return;}await finishAuthenticated(data.session.user)});
+    gate.querySelector('#mirsadOtpVerify').addEventListener('click',async()=>{const token=inputs.map(x=>x.value).join('');if(!/^\d{8}$/.test(token)){statusText(status,'أدخل رمز التحقق المكوّن من 8 أرقام.');return;}const btn=gate.querySelector('#mirsadOtpVerify');btn.disabled=true;statusText(status,'جارٍ التحقق…');const{data,error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error||!data?.session?.user){btn.disabled=false;statusText(status,'رمز التحقق غير صحيح أو منتهي.');return;}authJustCompleted=true;await finishAuthenticated(data.session.user)});
     inputs[0]?.focus();
   }
 
@@ -184,8 +184,16 @@
   const setProfileLater=(user)=>{try{localStorage.setItem(PROFILE_LATER_KEY,user.id)}catch{}};
   const clearProfileLater=()=>{try{localStorage.removeItem(PROFILE_LATER_KEY)}catch{}};
   let clientSessionEnding=false;
+  let authJustCompleted=false;
+  let introReturnInFlight=false;
   const isLivePage=()=>/\/live\.html?$/.test(window.location.pathname);
   const sessionHomeUrl=()=>new URL('index.html',window.location.href).href;
+  function returnToIntroAfterAuth(){
+    if(!isLivePage()||introReturnInFlight)return;
+    introReturnInFlight=true;
+    try{localStorage.removeItem('mirsad.introPassed.v1')}catch{}
+    window.location.replace(sessionHomeUrl());
+  }
   function discardTransientUi(){
     document.getElementById('mirsadUserMenu')?.remove();
     document.getElementById('mirsadProfileBanner')?.remove();
@@ -198,6 +206,7 @@
     if(clientSessionEnding)return;
     clientSessionEnding=true;
     try{localStorage.removeItem(CONFIG.GUEST_KEY)}catch{}
+    try{localStorage.removeItem('mirsad.introPassed.v1')}catch{}
     clearSignupOnboardingPending();
     discardTransientUi();
     if(isLivePage()){
@@ -400,9 +409,10 @@
     void registerPendingReferral();
     showUserMenu(user,profile,unlockAccount);
     window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && serverOnboarding){void showSignupRules(user,profile);return;}
+    if(profile && serverOnboarding){void showSignupRules(user,profile).then(()=>{if(authJustCompleted)returnToIntroAfterAuth()});return;}
     if(isProfilePage()){renderProfilePage(user,profile||{});return;}
     if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
+    if(authJustCompleted)returnToIntroAfterAuth();
   }
 
   function resetOAuthButtonAfterReturn(){
@@ -429,7 +439,7 @@
       if(code){
         const{data,error}=await sb.auth.exchangeCodeForSession(code);
         if(error)console.error('[mirsad auth] oauth exchange failed',error);
-        if(data?.session?.user)return data.session;
+        if(data?.session?.user){authJustCompleted=true;return data.session;}
       }
       let {data,error}=await sb.auth.getSession();
       if(error)console.error('[mirsad auth] session lookup failed',error);
@@ -439,6 +449,7 @@
           await new Promise(resolve=>setTimeout(resolve,150));
           ({data}=await sb.auth.getSession());
         }
+        if(data?.session?.user)authJustCompleted=true;
       }
       return data?.session||null;
     }catch(error){
