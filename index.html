@@ -138,6 +138,7 @@
   <script>
     (function () {
       var KEY = 'mirsad.introPassed.v1';
+      var introShown = false;
       function passed() {
         try {
           if (localStorage.getItem(KEY) === '1' || localStorage.getItem('mirsad.guest.v1') === '1') return true;
@@ -157,6 +158,7 @@
         var authQuery = /(^|&)(code|state|error|error_code|error_description)=/.test(query);
         var authHash = /(^|&)(access_token|refresh_token|expires_in|expires_at|token_type|type|error|error_code|error_description|provider_token|provider_refresh_token)=/.test(fragment);
         try { introRequested = new URLSearchParams(search).get('intro') === '1'; } catch (error) {}
+        if (introShown) return;
         try {
           var ref = new URLSearchParams(search).get('ref');
           if (ref && /^[A-Za-z0-9_-]{4,64}$/.test(ref.trim())) localStorage.setItem('mirsad.pendingReferral.v1', ref.trim().toUpperCase());
@@ -168,6 +170,7 @@
           return;
         }
         if (introRequested) {
+          introShown = true;
           try { history.replaceState({}, document.title, location.pathname); } catch (error) {}
           return;
         }
