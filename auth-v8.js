@@ -192,6 +192,7 @@
     if(!isLivePage()||introReturnInFlight)return;
     introReturnInFlight=true;
     try{localStorage.removeItem('mirsad.introPassed.v1')}catch{}
+    document.documentElement.style.setProperty('visibility','hidden','important');
     window.location.replace(sessionHomeUrl());
   }
   function discardTransientUi(){

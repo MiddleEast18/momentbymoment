@@ -9,7 +9,6 @@ body.mirsad-has-logo .wheel-header,
 body.mirsad-has-logo .recovery-header,
 body.mirsad-has-logo .mirsad-reward-page__header,
 body.mirsad-has-logo .mirsad-profile-page__header{padding-inline-start:72px}
-body.mirsad-has-logo .gate{padding-top:72px}
 .mark,
 .country-brand__mark,
 .mirsad-billing-brand__mark,
@@ -18,8 +17,7 @@ body.mirsad-has-logo .gate{padding-top:72px}
 .legal-brand .wire-header__mark,
 .gate .brand i,
 .mirsad-reward-page__brand > span[aria-hidden="true"],
-.mirsad-profile-page__brand > span[aria-hidden="true"],
-.mirsad-drawer-mark{display:none!important}
+.mirsad-profile-page__brand > span[aria-hidden="true"]{display:none!important}
 body.mirsad-auth-required > #mirsadLogo,
 body.mirsad-auth-required > #mirsadDrawer{visibility:visible!important}
 html.mirsad-nav-lock,body.mirsad-nav-lock{overflow:hidden}
@@ -29,9 +27,11 @@ html.mirsad-nav-lock,body.mirsad-nav-lock{overflow:hidden}
 .mirsad-drawer.is-open .mirsad-drawer-backdrop{opacity:1}
 .mirsad-drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(340px,88vw);display:flex;flex-direction:column;background:#10151c;color:var(--text,#ede9e0);border-inline-start:1px solid rgba(237,234,227,.12);box-shadow:-18px 0 48px rgba(0,0,0,.35);transform:translateX(100%);transition:transform .22s ease}
 .mirsad-drawer.is-open .mirsad-drawer-panel{transform:translateX(0)}
-.mirsad-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px 8px}
-.mirsad-drawer-mark{width:32px;height:32px;color:var(--gold,#c9a227)}
+.mirsad-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:max(16px,env(safe-area-inset-top)) 16px 8px}
+.mirsad-drawer-mark{display:grid;place-items:center;width:36px;height:36px;flex:0 0 36px;color:var(--gold,#c9a227);border-radius:50%;text-decoration:none}
 .mirsad-drawer-mark svg{width:100%;height:100%;display:block}
+.mirsad-drawer-mark:hover,.mirsad-drawer-mark:focus-visible{background:rgba(201,162,39,.12);outline:none}
+.mirsad-drawer-mark[aria-current="page"]{box-shadow:inset 0 0 0 1px rgba(201,162,39,.55)}
 .mirsad-drawer-close{width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--text-dim,#9aa4b3);font:500 26px/1 var(--font-body,sans-serif);cursor:pointer}
 .mirsad-drawer-close:hover{color:var(--gold,#c9a227)}
 .mirsad-drawer-nav{padding:6px 10px max(20px,env(safe-area-inset-bottom));overflow:auto}
