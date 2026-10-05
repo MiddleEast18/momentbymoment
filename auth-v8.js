@@ -481,7 +481,7 @@
     if(session?.user){
       await finishAuthenticated(session.user);return;
     }
-    if(isGuest()){if(isProfilePage()){localStorage.removeItem(CONFIG.GUEST_KEY);showGate();return;}document.body.classList.remove('mirsad-auth-required');showGuestExit();return;}
+    if(isGuest()){if(isProfilePage()){localStorage.removeItem(CONFIG.GUEST_KEY);showGate();return;}document.body.classList.remove('mirsad-auth-required');showGuestExit();window.dispatchEvent(new CustomEvent('mirsad:auth-ready'));return;}
     showGate();
     if(oauthError)statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
   }

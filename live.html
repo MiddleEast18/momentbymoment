@@ -5,6 +5,13 @@
   <meta charset="UTF-8">
   <script>
     (function () {
+      document.documentElement.classList.add('mirsad-entry-pending');
+      var holdStyle = document.createElement('style');
+      holdStyle.textContent = 'html.mirsad-entry-pending body > :not(#mirsadAuthGate):not(#mirsadLogo){visibility:hidden!important}';
+      document.head.appendChild(holdStyle);
+      window.addEventListener('mirsad:auth-ready', function () {
+        document.documentElement.classList.remove('mirsad-entry-pending');
+      }, { once: true });
       try { localStorage.setItem('mirsad.introPassed.v1', '1'); } catch (error) {}
     })();
   </script>
