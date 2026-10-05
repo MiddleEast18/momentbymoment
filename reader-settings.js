@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  document.addEventListener('touchstart', function () {}, { passive: true });
   var KEY = 'mirsad.readerSettings.v1';
   var defaults = {
     preset: 'marsad',
