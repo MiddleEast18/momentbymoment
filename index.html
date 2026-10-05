@@ -25,7 +25,7 @@
       --font-body: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
       --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
     }
-    *, *::before, *::after { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; min-height: 100%; }
     body {
       background:
@@ -104,7 +104,7 @@
       text-decoration: none;
       cursor: pointer;
     }
-    .enter:hover { filter: brightness(1.06); }
+    .enter:hover, .enter:active { filter: brightness(1.06); }
     .enter:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
     .features {
       display: grid;
@@ -178,9 +178,9 @@
       });
     })();
   </script>
-<link rel="stylesheet" href="reader-settings.css?v=202610031945">
+<link rel="stylesheet" href="reader-settings.css?v=202610050820">
 <script src="reader-settings.js?v=202610031945"></script>
-<link rel="stylesheet" href="mirsad-nav.css?v=202610042205">
+<link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
 <script src="mirsad-nav.js?v=202610042205" defer></script>
 </head>
 <body>

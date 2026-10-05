@@ -453,3 +453,45 @@ html[data-rs-contrast="high"] .mirsad-select__trigger {
   html[data-rs-scale="120"] .developer-grid,
   html[data-rs-scale="125"] .developer-grid { grid-template-columns: 1fr; }
 }
+
+/* Unified touch press: drop the browser's rectangular tap overlay and use the
+   same gold-soft fill already used by chips, sort options, and nav items. */
+html, body, a, button, [role="button"], input, select, textarea, summary, label, .card, .chip {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (pointer: coarse) {
+  a:active:not(.enter),
+  button:active:not(:disabled):not(.mirsad-logo-btn),
+  [role="button"]:active,
+  .chip:active,
+  .card:active,
+  .sort-option:active,
+  .sort-trigger:active,
+  .mirsad-drawer-item:active,
+  .mirsad-drawer-close:active,
+  .mirsad-drawer-mark:active,
+  .mirsad-select__trigger:active,
+  .mirsad-select__menu button:active,
+  .rapid-news__toggle:active,
+  .rapid-news__control:active,
+  .rapid-news__item:active,
+  .mirsad-revision-tab:active,
+  .mirsad-reader__related button:active,
+  .mirsad-reader__close:active,
+  .legal-nav a:active,
+  .rs-seg button:active,
+  .rs-preset:active,
+  .rs-actions button:active,
+  .mirsad-auth-button:active,
+  .wire-footer nav a:active {
+    background-image: linear-gradient(var(--gold-soft, rgba(201, 162, 39, 0.16)), var(--gold-soft, rgba(201, 162, 39, 0.16)));
+  }
+  button.mirsad-logo-btn:active,
+  .enter:active {
+    filter: brightness(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  button.mirsad-logo-btn:active,
+  .enter:active { filter: none; }
+}
