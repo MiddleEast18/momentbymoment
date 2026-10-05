@@ -27,6 +27,10 @@
     .system-mail__list{display:grid;gap:12px}
     .system-message{padding:17px;border:1px solid var(--panel-border-strong);border-radius:16px;background:linear-gradient(180deg,rgba(22,29,39,.98),rgba(11,15,20,.98));box-shadow:0 10px 28px rgba(0,0,0,.12)}
     .system-message.is-unread{border-color:rgba(201,162,39,.65);box-shadow:0 0 0 1px rgba(201,162,39,.12),0 12px 32px rgba(0,0,0,.18)}
+    .system-message__dot{display:inline-block;width:8px;height:8px;margin-inline-end:7px;border-radius:50%;background:#e23d3d;box-shadow:0 0 0 3px rgba(226,61,61,.16);vertical-align:middle}
+    .inbox-toolbar{display:flex;justify-content:flex-end;margin:0 0 10px}
+    .inbox-toolbar button{min-height:36px;border:1px solid var(--panel-border-strong);border-radius:999px;padding:7px 13px;background:rgba(255,255,255,.03);color:var(--gold);font:inherit;cursor:pointer}
+    .inbox-toolbar button:hover{border-color:var(--gold)}
     .system-message__meta{display:flex;justify-content:space-between;gap:10px;color:var(--text-faint);font-size:11px}
     .system-message__title{margin:9px 0 6px;font:700 16px/1.6 var(--font-display)}
     .system-message__body{margin:0;color:var(--text-dim);font-size:13px;line-height:1.9;white-space:pre-wrap}
@@ -81,6 +85,9 @@
     </header>
     <p id="systemMailStatus" class="system-mail__status" role="status" aria-live="polite">جارٍ التحميل…</p>
     <section id="inboxBlock" class="inbox-block">
+      <div id="inboxToolbar" class="inbox-toolbar" hidden>
+        <button type="button" id="markAllRead">تحديد الكل كمقروء</button>
+      </div>
       <section id="systemMessages" class="system-mail__list" aria-live="polite"></section>
     </section>
     <section id="developerPanel" class="developer-panel" aria-labelledby="developerTitle">
@@ -116,7 +123,7 @@
     </section>
   </div></main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="auth-v8.js?v=202610051900"></script>
-  <script src="system-mail.js?v=202610051900"></script>
+  <script src="auth-v8.js?v=202610051945"></script>
+  <script src="system-mail.js?v=202610051945"></script>
 </body>
 </html>

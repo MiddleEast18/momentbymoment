@@ -57,8 +57,14 @@
       .mirsad-user-menu{position:fixed;top:10px;left:10px;z-index:5400}
       .mirsad-user-button{width:34px;height:34px;padding:0;border-radius:50%;border:1px solid var(--gold);background:rgba(16,21,28,.88);color:var(--gold);display:grid;place-items:center;overflow:hidden;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
       .mirsad-user-button img{width:100%;height:100%;object-fit:cover}.mirsad-user-initial{font-size:12px;font-weight:700}
+      .mirsad-mail-dot{position:absolute;top:-1px;left:-1px;width:10px;height:10px;border-radius:50%;background:#e23d3d;border:1.5px solid #0b0f14;box-shadow:0 0 0 1px rgba(226,61,61,.4),0 0 8px rgba(226,61,61,.45);pointer-events:none}
+      .mirsad-mail-dot[hidden],.mirsad-mail-item-dot[hidden]{display:none!important}
       .mirsad-user-dropdown{position:absolute;top:42px;left:0;width:min(218px,calc(100vw - 20px));padding:6px;border:1px solid var(--panel-border-strong);border-radius:12px;background:rgba(16,21,28,.98);box-shadow:0 10px 30px rgba(0,0,0,.28)}
       .mirsad-user-balance{display:flex;align-items:center;justify-content:space-between;gap:9px;min-width:0;padding:8px 10px;margin-bottom:4px;border-bottom:1px solid var(--panel-border);color:var(--gold);font:600 11px/1.5 var(--font-mono);text-align:right}.mirsad-user-balance [data-balance-label]{min-width:0;overflow-wrap:anywhere}.mirsad-balance-recharge{flex:0 0 22px;width:22px;height:22px;padding:0;border:1px solid var(--gold);border-radius:50%;background:rgba(201,162,39,.12);color:var(--gold);font:700 17px/19px var(--font-mono);cursor:pointer}.mirsad-balance-recharge:hover{background:rgba(201,162,39,.24);transform:scale(1.06)}.mirsad-user-item{display:block;width:100%;padding:9px 10px;border:0;border-radius:8px;background:none;color:var(--text);text-align:right;font:inherit;cursor:pointer}.mirsad-user-item:hover{background:rgba(255,255,255,.06)}
+      .mirsad-user-item[data-system-mail]{display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .mirsad-mail-item-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#e23d3d;box-shadow:0 0 0 3px rgba(226,61,61,.16);opacity:0;transform:scale(.45);transition:opacity .16s ease,transform .16s ease}
+      .mirsad-user-item.is-mail-alert .mirsad-mail-item-dot{opacity:1;transform:scale(1)}
+      @media(prefers-reduced-motion:reduce){.mirsad-mail-item-dot{transition:none}}
       .mirsad-guest-lock-toast{position:fixed;left:16px;right:16px;bottom:18px;z-index:5500;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid var(--panel-border-strong);border-radius:14px;background:rgba(16,21,28,.97);color:var(--text);box-shadow:0 10px 35px rgba(0,0,0,.3);opacity:0;transform:translateY(12px);transition:opacity .2s ease,transform .2s ease}
       .mirsad-guest-lock-toast.is-visible{opacity:1;transform:translateY(0)}.mirsad-guest-lock-toast__text{font-size:13px}.mirsad-guest-lock-toast__text small{display:block;color:var(--text-dim);margin-top:3px}.mirsad-guest-lock-toast__button{border:1px solid var(--gold);background:var(--gold-soft);color:var(--gold);border-radius:999px;padding:8px 13px;font:inherit;cursor:pointer;white-space:nowrap}
       @media(max-width:700px){.mirsad-profile-banner{align-items:flex-start;flex-direction:column}.mirsad-profile-banner__actions{width:100%}.mirsad-profile-banner__actions button{flex:1}.mirsad-guest-exit{top:8px;left:8px;min-width:32px;height:26px;padding:0 8px;font-size:9px}.mirsad-guest-lock-toast{bottom:12px;left:10px;right:10px}}
@@ -385,6 +391,35 @@
     window.setTimeout(()=>{layer.remove();logoutAnimationInFlight=false},90);
   }
 
+  async function unreadSystemMailCount(user){
+    if(!sb||!user?.id)return 0;
+    try{
+      const{data,error}=await sb.rpc('unread_system_message_count');
+      if(!error&&data!=null)return Math.max(0,Number(Array.isArray(data)?data[0]:data)||0);
+    }catch{}
+    try{
+      const{count,error}=await sb.from('system_messages').select('id',{count:'exact',head:true}).eq('recipient_user_id',user.id).is('read_at',null);
+      if(error)return 0;
+      return Math.max(0,Number(count)||0);
+    }catch{return 0}
+  }
+  function applyMailBadges(wrap,count){
+    if(!wrap)return;
+    const unread=Math.max(0,Number(count)||0);
+    const profileDot=wrap.querySelector('[data-profile-mail-dot]');
+    const mailItem=wrap.querySelector('[data-system-mail]');
+    const itemDot=wrap.querySelector('[data-mail-item-dot]');
+    const btn=wrap.querySelector('.mirsad-user-button');
+    wrap.dataset.mailUnread=String(unread);
+    if(profileDot)profileDot.hidden=unread<1;
+    if(itemDot)itemDot.hidden=unread<1;
+    if(mailItem&&unread<1)mailItem.classList.remove('is-mail-alert');
+    if(btn){
+      if(unread>0)btn.setAttribute('aria-label',unread===1?'الملف الشخصي · رسالة نظام غير مقروءة':`الملف الشخصي · ${unread} رسائل غير مقروءة`);
+      else btn.setAttribute('aria-label','الملف الشخصي');
+    }
+  }
+
   function showUserMenu(user,profile=null,unlockAccount=null){
     document.getElementById('mirsadUserMenu')?.remove();
     const isOwnerView=Boolean(unlockAccount?.unlimited_unlocks);
@@ -395,10 +430,18 @@
     const mailLabel=isOwnerView?'مالك النظام':'بريد النظام';
     const recharge=isOwnerView?'':`<button class="mirsad-balance-recharge" type="button" data-recharge aria-label="شحن الرصيد" title="شحن الرصيد">+</button>`;
     const extraItems=isOwnerView?'':`<button class="mirsad-user-item" type="button" data-daily-reward>مكافأة يومية</button><button class="mirsad-user-item" type="button" data-wheel-reward>سحب المكافأة</button>`;
-    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'"')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${isOwnerView?'حساب المالك · فتحات غير محدودة':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span>${recharge}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>${mailLabel}</button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button>${extraItems}<button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'"')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><span class="mirsad-mail-dot" data-profile-mail-dot hidden></span><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${isOwnerView?'حساب المالك · فتحات غير محدودة':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span>${recharge}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>${mailLabel}<span class="mirsad-mail-item-dot" data-mail-item-dot hidden></span></button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button>${extraItems}<button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
-    const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
-    btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
+    const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown'),mailItem=wrap.querySelector('[data-system-mail]');
+    const revealMailAlert=()=>{
+      if(Number(wrap.dataset.mailUnread||0)<1||isOwnerView)return;
+      window.setTimeout(()=>mailItem?.classList.add('is-mail-alert'),80);
+    };
+    btn.addEventListener('click',()=>{
+      menu.hidden=!menu.hidden;
+      if(menu.hidden)mailItem?.classList.remove('is-mail-alert');
+      else revealMailAlert();
+    });
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
     wrap.querySelector('[data-system-mail]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('system-mail.html',window.location.href).href});
     wrap.querySelector('[data-consumption-recovery]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('consumption-recovery.html',window.location.href).href});
@@ -406,9 +449,20 @@
     wrap.querySelector('[data-wheel-reward]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('wheel-reward.html',window.location.href).href});
     wrap.querySelector('[data-recharge]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('billing.html',window.location.href).href});
     wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const button=wrap.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');menu.hidden=true;const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');console.error('[mirsad auth] signout failed',error);return;}completeLogoutAnimation(animation);endClientSession()});
-    document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
+    document.addEventListener('click',e=>{if(!wrap.contains(e.target)){menu.hidden=true;mailItem?.classList.remove('is-mail-alert')}},{once:false});
+    if(!isOwnerView){
+      void unreadSystemMailCount(user).then((count)=>{
+        applyMailBadges(wrap,count);
+        if(!menu.hidden)revealMailAlert();
+      });
+    }
   }
   window.addEventListener('mirsad:unlock-balance',event=>{const el=document.querySelector('#mirsadUserMenu [data-balance-label]');if(!el)return;const detail=event.detail||{};el.textContent=detail.unlimited?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Math.max(0,Number(detail.remaining)||0)}`;});
+  window.addEventListener('mirsad:system-mail-unread',event=>{
+    const wrap=document.getElementById('mirsadUserMenu');
+    if(!wrap)return;
+    applyMailBadges(wrap,event.detail?.count);
+  });
   
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();

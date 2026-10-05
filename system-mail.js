@@ -52,19 +52,54 @@
   let recipients = [];
   let namesById = {};
 
+  const notifyUnread = (count) => {
+    try { window.dispatchEvent(new CustomEvent('mirsad:system-mail-unread', { detail: { count: Math.max(0, Number(count) || 0) } })); } catch {}
+  };
+
   async function loadMessages() {
     const { data, error } = await client.rpc('list_system_messages', { p_limit: 100, p_offset: 0 });
     if (error) throw error;
     const list = $('systemMessages');
+    const toolbar = $('inboxToolbar');
+    const unread = (data || []).filter((message) => !message.read_at).length;
+    notifyUnread(unread);
+    if (toolbar) toolbar.hidden = unread < 1;
     if (!data?.length) { list.innerHTML = '<div class="empty-state">لا توجد رسائل نظام حاليًا.</div>'; setStatus('لا توجد رسائل جديدة.'); return; }
-    list.innerHTML = data.map((message) => `<article class="system-message ${message.read_at ? '' : 'is-unread'}" data-message-id="${escapeHtml(message.id)}"><div class="system-message__meta"><span>${escapeHtml(message.message_type === 'reward' ? 'مكافأة' : 'إشعار نظام')}</span><time>${escapeHtml(formatDate(message.created_at))}</time></div><h2 class="system-message__title">${escapeHtml(message.title)}</h2><p class="system-message__body">${escapeHtml(message.body)}</p>${message.read_at ? '' : '<button class="system-message__action" type="button" data-read>تحديد كمقروء</button>'}</article>`).join('');
+    list.innerHTML = data.map((message) => `<article class="system-message ${message.read_at ? '' : 'is-unread'}" data-message-id="${escapeHtml(message.id)}"><div class="system-message__meta"><span>${message.read_at ? '' : '<i class="system-message__dot" aria-hidden="true"></i>'}${escapeHtml(message.message_type === 'reward' ? 'مكافأة' : 'إشعار نظام')}</span><time>${escapeHtml(formatDate(message.created_at))}</time></div><h2 class="system-message__title">${escapeHtml(message.title)}</h2><p class="system-message__body">${escapeHtml(message.body)}</p>${message.read_at ? '' : '<button class="system-message__action" type="button" data-read>تحديد كمقروء</button>'}</article>`).join('');
+    const remainingUnread = () => list.querySelectorAll('.system-message.is-unread').length;
+    const afterReadChange = () => {
+      const left = remainingUnread();
+      notifyUnread(left);
+      if (toolbar) toolbar.hidden = left < 1;
+      setStatus(left ? `${left} رسالة غير مقروءة.` : `${data.length} رسالة في بريد النظام.`);
+    };
     list.querySelectorAll('[data-read]').forEach((button) => button.addEventListener('click', async () => {
       const card = button.closest('[data-message-id]'); button.disabled = true;
       const { error: readError } = await client.rpc('mark_system_message_read', { p_message_id: card.dataset.messageId });
-      if (!readError) { card.classList.remove('is-unread'); button.remove(); }
-      else button.disabled = false;
+      if (!readError) {
+        card.classList.remove('is-unread');
+        card.querySelector('.system-message__dot')?.remove();
+        button.remove();
+        afterReadChange();
+      } else button.disabled = false;
     }));
-    setStatus(`${data.length} رسالة في بريد النظام.`);
+    const markAll = $('markAllRead');
+    if (markAll && markAll.dataset.bound !== 'true') {
+      markAll.dataset.bound = 'true';
+      markAll.addEventListener('click', async () => {
+        markAll.disabled = true;
+        const { error: allError } = await client.rpc('mark_all_system_messages_read');
+        markAll.disabled = false;
+        if (allError) { setStatus('تعذر تعليم الرسائل كمقروءة.'); return; }
+        list.querySelectorAll('.system-message.is-unread').forEach((card) => {
+          card.classList.remove('is-unread');
+          card.querySelector('.system-message__dot')?.remove();
+          card.querySelector('[data-read]')?.remove();
+        });
+        afterReadChange();
+      });
+    }
+    setStatus(unread ? `${unread} رسالة غير مقروءة.` : `${data.length} رسالة في بريد النظام.`);
   }
 
   function renderRecipientOptions(filter = '') {
