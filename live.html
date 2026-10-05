@@ -9,9 +9,15 @@
       var holdStyle = document.createElement('style');
       holdStyle.textContent = 'html.mirsad-entry-pending body > :not(#mirsadAuthGate):not(#mirsadLogo){visibility:hidden!important}';
       document.head.appendChild(holdStyle);
-      window.addEventListener('mirsad:auth-ready', function () {
+      var released = false;
+      function releaseHold() {
+        if (released) return;
+        released = true;
         document.documentElement.classList.remove('mirsad-entry-pending');
-      }, { once: true });
+      }
+      window.addEventListener('mirsad:auth-ready', releaseHold, { once: true });
+      window.addEventListener('mirsad:authenticated', releaseHold, { once: true });
+      window.setTimeout(releaseHold, 8000);
       try { localStorage.setItem('mirsad.introPassed.v1', '1'); } catch (error) {}
     })();
   </script>
@@ -135,7 +141,7 @@
   <script src="view-access-public.js?v=202609202155"></script>
   <script src="news-pagination.js?v=202609210850"></script>
   <script src="news-revision-compat.js?v=202609130819"></script>
-  <script src="auth-v8.js?v=202610051900"></script>
+  <script src="auth-v8.js?v=202610051930"></script>
   <script src="guest-summary-shimmer.js?v=202609210748"></script>
   <script src="rapid-news.js?v=202609210850"></script>
   <script src="pull-refresh.js?v=202610012255"></script>

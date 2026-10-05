@@ -120,6 +120,7 @@
   function gateMarkup(){return `<main class="mirsad-auth-card" aria-labelledby="mirsadAuthTitle"><div class="mirsad-auth-logo">${logo()}</div><h1 id="mirsadAuthTitle" class="mirsad-auth-title">مِرصاد</h1><p class="mirsad-auth-subtitle">رصد الشرق الأوسط لحظة بلحظة</p><div class="mirsad-auth-actions"><button id="mirsadGoogle" class="mirsad-auth-button primary" type="button">متابعة باستخدام Google</button><div class="mirsad-auth-divider">أو</div><input id="mirsadEmail" class="mirsad-auth-input" type="email" autocomplete="email" inputmode="email" placeholder="أدخل بريدك الإلكتروني" aria-label="البريد الإلكتروني"><button id="mirsadEmailContinue" class="mirsad-auth-button" type="button">متابعة</button></div><button id="mirsadGuest" class="mirsad-auth-secondary" type="button">متابعة كزائر</button><div id="mirsadAuthStatus" class="mirsad-auth-status" role="status" aria-live="polite"></div></main>`;}
   function showGate(){
     injectStyles();let gate=document.getElementById('mirsadAuthGate');if(!gate){gate=document.createElement('div');gate.id='mirsadAuthGate';gate.className='mirsad-auth-gate';document.body.appendChild(gate);}gate.innerHTML=gateMarkup();removeGuestExit();
+    signalAuthSettled();
     const status=gate.querySelector('#mirsadAuthStatus'),email=gate.querySelector('#mirsadEmail');
     gate.querySelector('#mirsadGoogle').addEventListener('click',async()=>{
       const btn=gate.querySelector('#mirsadGoogle');
@@ -135,7 +136,7 @@
     });
     const sendOtp=async()=>{const value=email.value.trim();if(!/^\S+@\S+\.\S+$/.test(value)){statusText(status,'أدخل بريدًا إلكترونيًا صحيحًا.');return;}const button=gate.querySelector('#mirsadEmailContinue');button.disabled=true;statusText(status,'جارٍ إرسال رمز التحقق…');const{error}=await sb.auth.signInWithOtp({email:value,options:{shouldCreateUser:true}});button.disabled=false;if(error){statusText(status,'تعذر إرسال الرمز. '+(error.message||'حاول لاحقًا.'));return;}showOtp(value);};
     gate.querySelector('#mirsadEmailContinue').addEventListener('click',sendOtp);email.addEventListener('keydown',e=>{if(e.key==='Enter')sendOtp()});
-    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');discardTransientUi();gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();window.dispatchEvent(new CustomEvent('mirsad:auth-ready'));});
+    gate.querySelector('#mirsadGuest').addEventListener('click',()=>{localStorage.setItem(CONFIG.GUEST_KEY,'1');discardTransientUi();gate.remove();document.body.classList.remove('mirsad-auth-required');showGuestExit();signalAuthSettled();});
   }
 
   function showOtp(email){
@@ -186,8 +187,11 @@
   let clientSessionEnding=false;
   let authJustCompleted=false;
   let introReturnInFlight=false;
-  const isLivePage=()=>/\/live\.html?$/.test(window.location.pathname);
+  const isLivePage=()=>/\/live(?:\.html?)?$/.test(window.location.pathname);
   const sessionHomeUrl=()=>new URL('index.html',window.location.href).href;
+  function signalAuthSettled(){
+    window.dispatchEvent(new CustomEvent('mirsad:auth-ready'));
+  }
   function returnToIntroAfterAuth(){
     if(!isLivePage()||introReturnInFlight)return;
     introReturnInFlight=true;
@@ -409,6 +413,7 @@
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
+    if(!(authJustCompleted && isLivePage())) signalAuthSettled();
     onboardingStyles();
     const profilePromise=withAuthTimeout(ensureProfile(user),5000).catch(error=>{console.error('[mirsad auth] profile setup failed',error);return null});
     const [profile,unlockAccount,serverOnboarding]=await Promise.all([profilePromise,ensureUnlockAccount(),shouldShowSignupOnboarding()]);
@@ -416,10 +421,11 @@
     void registerPendingReferral();
     showUserMenu(user,profile,unlockAccount);
     window.dispatchEvent(new CustomEvent('mirsad:authenticated'));
-    if(profile && serverOnboarding){void showSignupRules(user,profile).then(()=>{if(authJustCompleted)returnToIntroAfterAuth()});return;}
-    if(isProfilePage()){renderProfilePage(user,profile||{});return;}
+    if(profile && serverOnboarding){void showSignupRules(user,profile).then(()=>{if(authJustCompleted)returnToIntroAfterAuth(); else signalAuthSettled()});return;}
+    if(isProfilePage()){renderProfilePage(user,profile||{});signalAuthSettled();return;}
     if(profile && !profile.onboarding_completed)setTimeout(()=>showProfileBanner(user),350);
     if(authJustCompleted)returnToIntroAfterAuth();
+    else signalAuthSettled();
   }
 
   function resetOAuthButtonAfterReturn(){
@@ -485,9 +491,10 @@
     const session=await withAuthTimeout(recoverSession(),AUTH_RECOVERY_TIMEOUT_MS);
     cleanAuthUrl();
     if(session?.user){
-      await finishAuthenticated(session.user);return;
+      try{await finishAuthenticated(session.user)}catch(error){console.error('[mirsad auth] finish failed',error);document.body.classList.remove('mirsad-auth-required');signalAuthSettled()}
+      return;
     }
-    if(isGuest()){if(isProfilePage()){localStorage.removeItem(CONFIG.GUEST_KEY);showGate();return;}document.body.classList.remove('mirsad-auth-required');showGuestExit();window.dispatchEvent(new CustomEvent('mirsad:auth-ready'));return;}
+    if(isGuest()){if(isProfilePage()){localStorage.removeItem(CONFIG.GUEST_KEY);showGate();return;}document.body.classList.remove('mirsad-auth-required');showGuestExit();signalAuthSettled();return;}
     showGate();
     if(oauthError)statusText(document.getElementById('mirsadAuthStatus'),'تعذر إكمال تسجيل الدخول عبر Google. حاول مرة أخرى.');
   }
