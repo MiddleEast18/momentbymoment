@@ -383,18 +383,24 @@
 
   function showUserMenu(user,profile=null,unlockAccount=null){
     document.getElementById('mirsadUserMenu')?.remove();
-    document.body.classList.toggle('mirsad-admin-view',Boolean(unlockAccount?.unlimited_unlocks));
+    const isOwnerView=Boolean(unlockAccount?.unlimited_unlocks);
+    document.body.classList.toggle('mirsad-admin-view',isOwnerView);
     const wrap=document.createElement('div');wrap.id='mirsadUserMenu';wrap.className='mirsad-user-menu';
     const initial=(user.email||'مِ').trim().charAt(0).toUpperCase();
     const avatar=avatarUrl(profile?.avatar_url||user.user_metadata?.avatar_url||user.user_metadata?.picture||'');
-    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'&quot;')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${unlockAccount?.unlimited_unlocks?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span><button class="mirsad-balance-recharge" type="button" data-recharge aria-label="شحن الرصيد" title="شحن الرصيد">+</button></div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>بريد النظام</button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button><button class="mirsad-user-item" type="button" data-daily-reward>مكافأة يومية</button><button class="mirsad-user-item" type="button" data-wheel-reward>سحب المكافأة</button><button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    const mailLabel=isOwnerView?'مالك النظام':'بريد النظام';
+    const recharge=isOwnerView?'':`<button class="mirsad-balance-recharge" type="button" data-recharge aria-label="شحن الرصيد" title="شحن الرصيد">+</button>`;
+    const extraItems=isOwnerView?'':`<button class="mirsad-user-item" type="button" data-daily-reward>مكافأة يومية</button><button class="mirsad-user-item" type="button" data-wheel-reward>سحب المكافأة</button>`;
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'"')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${isOwnerView?'حساب المالك · فتحات غير محدودة':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span>${recharge}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>${mailLabel}</button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button>${extraItems}<button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown');
     btn.addEventListener('click',()=>{menu.hidden=!menu.hidden});
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
     wrap.querySelector('[data-system-mail]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('system-mail.html',window.location.href).href});
-    wrap.querySelector('[data-consumption-recovery]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('consumption-recovery.html',window.location.href).href});wrap.querySelector('[data-daily-reward]').addEventListener('click',()=>{menu.hidden=true;window.location.href=dailyRewardPageUrl()});wrap.querySelector('[data-wheel-reward]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('wheel-reward.html',window.location.href).href});
-    wrap.querySelector('[data-recharge]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('billing.html',window.location.href).href});
+    wrap.querySelector('[data-consumption-recovery]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('consumption-recovery.html',window.location.href).href});
+    wrap.querySelector('[data-daily-reward]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=dailyRewardPageUrl()});
+    wrap.querySelector('[data-wheel-reward]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('wheel-reward.html',window.location.href).href});
+    wrap.querySelector('[data-recharge]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('billing.html',window.location.href).href});
     wrap.querySelector('[data-signout]').addEventListener('click',async()=>{const button=wrap.querySelector('[data-signout]');if(button.disabled)return;button.disabled=true;button.setAttribute('aria-busy','true');menu.hidden=true;const animation=await playLogoutAnimation();const{error}=await sb.auth.signOut({scope:'local'});if(error){completeLogoutAnimation(animation);button.disabled=false;button.removeAttribute('aria-busy');console.error('[mirsad auth] signout failed',error);return;}completeLogoutAnimation(animation);endClientSession()});
     document.addEventListener('click',e=>{if(!wrap.contains(e.target))menu.hidden=true},{once:false});
   }
