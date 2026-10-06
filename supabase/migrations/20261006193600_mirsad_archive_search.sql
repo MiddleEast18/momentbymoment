@@ -1,6 +1,6 @@
 -- Isolated semantic-search sidecar for news_articles that still exist in the live table.
 -- Does not modify news_articles, ingestion, translation, trimming, or live-feed ordering.
--- This migration is prepared locally only; it has NOT been applied to production.
+-- Article cards remain sourced from news_articles; only fingerprints and vectors are stored here.
 
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 
