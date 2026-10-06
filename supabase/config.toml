@@ -1,0 +1,5 @@
+[functions.mirsad-archive-chat]
+verify_jwt = false
+
+[functions.mirsad-archive-index]
+verify_jwt = true

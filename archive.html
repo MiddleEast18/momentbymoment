@@ -3,31 +3,94 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الأرشيف — مِرصاد</title>
+  <meta name="theme-color" content="#0b0f14">
+  <title>باحث الأخبار — مِرصاد</title>
+  <meta name="description" content="اسأل مِرصاد للعثور على الأخبار المحفوظة خارج نافذة البث المباشر.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="info.css?v=202610020020">
-  <link rel="stylesheet" href="reader-settings.css?v=202610050820">
-<script src="reader-settings.js?v=202610050820"></script>
-<link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-<script src="mirsad-nav.js?v=202610042205" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=202610020110">
+  <link rel="stylesheet" href="news-reader.css?v=202609180045">
+  <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
+  <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
+  <link rel="stylesheet" href="archive-chat.css?v=202610061945">
 </head>
-<body>
-  <div class="wrap">
-    <header class="top">
-      <a class="brand" href="live.html"><span class="mark" aria-hidden="true">◉</span> مِرصاد</a>
-      <a class="back" href="live.html">العودة إلى البث</a>
-    </header>
-    <p class="kicker">تعريف الذاكرة</p>
-    <h1>الأرشيف</h1>
-    <p class="lead">الأرشيف في مِرصاد ذاكرة عرض، لا مكتبة كل ما نُشر.</p>
-    <section class="grid">
-<article class="card"><h2>نافذة لا مستودع مفتوح</h2><p>ما يبقى أمامك هو ما تزال نافذة العرض تحتمله. غياب عنوان قديم لا يعني إنكار وقوعه، بل أنه خرج من النافذة الحالية. هذه الصفحة لا تستعيد قائمة العناوين.</p></article>
-<article class="card"><h2>التحديث ليس خبراً جديداً</h2><p>إذا تطورت الواقعة نفسها، تبقى بطاقة واحدة ويزيد أثر التحديث عليها. تكرار العنوان في أرشيف يدوي يربك القارئ، لذلك لا نبني هنا جدولاً موازياً للشبكة.</p></article>
-<article class="card"><h2>ما لا يدخل الذاكرة الظاهرة</h2><p>المادة المعلقة للمراجعة لا تُعرض ريثما تُحسم. الأرشيف لا يُستخدم باباً خلفياً لرؤيتها. حين تُقبل تظهر في البث، لا في قائمة خاصة بهذه الصفحة.</p></article>
-</section>
-    <footer class="wire-footer"><p>مِرصاد — واجهة عرض للرصد الإخباري. الأخبار المعلقة للتحقق لا تظهر، وتبقى حقوق المواد الأصلية لأصحابها.</p><nav aria-label="روابط معلومات الموقع"><a href="about.html">من نحن</a><span>·</span><a href="contact.html">اتصل بنا</a><span>·</span><a href="arab-countries.html">أخبار الدول العربية</a><span>·</span><a href="privacy.html">سياسة الخصوصية</a><span>·</span><a href="terms.html">شروط الاستخدام</a></nav></footer>
-  </div>
+<body class="archive-chat-page">
+  <header class="archive-header">
+    <a class="archive-brand" href="live.html" aria-label="مِرصاد — العودة إلى البث">
+      <span class="archive-brand__mark" aria-hidden="true">◉</span>
+      <span><strong>مِرصاد</strong><small>باحث الأخبار</small></span>
+    </a>
+    <a class="archive-back" href="live.html"><span aria-hidden="true">→</span> العودة إلى البث</a>
+  </header>
+
+  <main class="archive-main">
+    <section class="archive-intro" aria-labelledby="archiveTitle">
+      <p class="archive-kicker"><span class="archive-kicker__dot" aria-hidden="true"></span> ذاكرة أخبار مِرصاد</p>
+      <h1 id="archiveTitle">ابحث في الأخبار،<br><span>واسأل بطريقتك.</span></h1>
+      <p class="archive-intro__copy">أخبرني عمّا تبحث عنه، وسأحاول العثور على بطاقات الأخبار المحفوظة خارج نافذة البث المباشر.</p>
+      <p class="archive-scope">الإجابات مبنية على الأخبار المنشورة المحفوظة في مِرصاد فقط.</p>
+    </section>
+
+    <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
+      <div class="archive-welcome" id="welcomeState">
+        <span class="archive-welcome__symbol" aria-hidden="true">⌕</span>
+        <p>ابدأ بسؤال عن خبر أو واقعة أو مصدر أو فترة زمنية.</p>
+        <div class="archive-suggestions" aria-label="أسئلة مقترحة">
+          <button type="button" class="archive-suggestion">ما الأخبار المتعلقة ببيروت؟</button>
+          <button type="button" class="archive-suggestion">ابحث عن خبر الزلزال في تركيا</button>
+          <button type="button" class="archive-suggestion">أخبار الطاقة خلال الأسبوع الماضي</button>
+        </div>
+      </div>
+    </section>
+
+    <form class="archive-composer" id="archiveForm" autocomplete="off">
+      <label class="visually-hidden" for="archivePrompt">اكتب سؤالك عن الأخبار</label>
+      <textarea id="archivePrompt" name="query" rows="1" maxlength="500" placeholder="اسأل عن خبر في أرشيف مِرصاد…" required></textarea>
+      <div class="archive-composer__bottom">
+        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> بحث في الأخبار فقط</span>
+        <button class="archive-send" id="archiveSend" type="submit" aria-label="إرسال السؤال">
+          <span class="archive-send__label">إرسال</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </form>
+  </main>
+
+  <footer class="archive-footer"><span>مرصاد — ذاكرة عرض للأخبار المنشورة</span><a href="method.html">منهجية الرصد</a></footer>
+
+  <template id="archiveMessageTemplate">
+    <article class="archive-message">
+      <div class="archive-message__avatar" aria-hidden="true">◉</div>
+      <div class="archive-message__body">
+        <p class="archive-message__name">مِرصاد</p>
+        <div class="archive-message__text"></div>
+        <div class="archive-message__results" hidden></div>
+      </div>
+    </article>
+  </template>
+
+  <template id="archiveUserMessageTemplate">
+    <article class="archive-message archive-message--user">
+      <div class="archive-message__body"><div class="archive-message__text"></div></div>
+    </article>
+  </template>
+
+  <template id="archiveCardTemplate">
+    <a class="card archive-result-card" target="_blank" rel="noopener noreferrer">
+      <span class="card__update-badge" hidden></span>
+      <span class="card__verification-badge" hidden></span>
+      <div class="card__eyebrow"><span class="card__dot"></span><span class="card__category"></span><span class="card__source"></span></div>
+      <h2 class="card__headline"></h2>
+      <p class="card__summary"></p>
+      <p class="card__evidence"></p>
+      <div class="card__meta"><span class="card__confidence"></span><time class="card__time"></time></div>
+    </a>
+  </template>
+
+  <script src="news-text-normalizer.js?v=202609130721"></script>
+  <script src="archive-chat.js?v=202610061945" defer></script>
+  <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
