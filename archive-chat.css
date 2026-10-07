@@ -1,10 +1,6 @@
 /* Archive chat: isolated page styles; article cards reuse the live-board classes. */
 .archive-chat-page { min-height: 100svh; display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 0, rgba(201,162,39,.075), transparent 38%), var(--bg); }
 .archive-header { width: min(1120px, 100%); margin-inline: auto; padding: max(16px, env(safe-area-inset-top)) 24px 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--panel-border); }
-.archive-brand { display: inline-flex; align-items: center; gap: 11px; color: var(--text); text-decoration: none; }
-.archive-brand__mark { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(201,162,39,.58); border-radius: 50%; color: var(--gold); font-size: 22px; box-shadow: 0 0 22px rgba(201,162,39,.08); }
-.archive-brand strong { display: block; font-family: var(--font-display); font-size: 17px; line-height: 1.25; }
-.archive-brand small { display: block; margin-top: 2px; color: var(--text-faint); font-size: 11px; }
 .archive-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 7px 12px; border: 1px solid var(--panel-border); border-radius: 999px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: color .16s ease, border-color .16s ease, background .16s ease; }
 .archive-back:hover { color: var(--gold); border-color: rgba(201,162,39,.36); background: var(--gold-soft); }
 .archive-main { width: min(920px, 100%); margin-inline: auto; padding: clamp(28px, 6vh, 64px) 24px 26px; display: flex; flex: 1 0 auto; flex-direction: column; }
@@ -24,7 +20,8 @@
 .archive-suggestion:hover, .archive-suggestion:focus-visible { border-color: rgba(201,162,39,.48); color: var(--gold); background: var(--gold-soft); }
 .archive-message { display: flex; align-items: flex-start; gap: 11px; width: 100%; animation: archive-message-in .2s ease-out; }
 .archive-message--user { justify-content: flex-start; padding-inline-start: 40px; }
-.archive-message__avatar { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(201,162,39,.32); border-radius: 50%; background: rgba(201,162,39,.07); color: var(--gold); font-size: 18px; }
+.archive-message__avatar { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(201,162,39,.32); border-radius: 50%; background: rgba(201,162,39,.07); color: var(--gold); }
+.archive-message__avatar svg { display: block; width: 100%; height: 100%; animation: archive-logo-slow-spin 14s linear infinite; transform-origin: center; }
 .archive-message__body { min-width: 0; max-width: 100%; flex: 1 1 auto; }
 .archive-message--user .archive-message__body { flex: 0 1 auto; max-width: min(82%, 680px); }
 .archive-message__name { margin: 0 0 5px; color: var(--gold); font: 500 11px/1.5 var(--font-mono); }
@@ -55,6 +52,7 @@
 .archive-error { color: #e4a49f; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @keyframes archive-message-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes archive-logo-slow-spin { to { transform: rotate(360deg); } }
 @media (max-width: 640px) {
   .archive-header { padding-inline: 16px; }
   .archive-main { padding: 34px 16px 18px; }
@@ -70,4 +68,4 @@
   .archive-composer { border-radius: 15px; padding: 11px 12px 9px; }
   .archive-footer { padding-inline: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .archive-message, .archive-send, .archive-result-card { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .archive-message, .archive-send, .archive-result-card, .archive-message__avatar svg { animation: none; transition: none; } }
