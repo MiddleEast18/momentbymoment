@@ -36,20 +36,96 @@
       line-height: 1.6;
     }
     .gate {
-      width: min(920px, 100%);
-      margin: 0 auto;
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 22px;
-      padding: 32px 20px 40px;
+      --parallax-x: 0px;
+      --parallax-y: 0px;
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+      align-items: center;
+      gap: clamp(20px, 4vw, 64px);
+      width: 100%;
+      min-height: 100vh;
+      min-height: 100svh;
+      padding: clamp(28px, 6vh, 72px) clamp(24px, 7vw, 112px);
+      overflow: hidden;
+      direction: ltr;
+      background:
+        radial-gradient(ellipse at 18% 52%, rgba(201, 162, 39, 0.055), transparent 42%),
+        radial-gradient(ellipse at 92% 14%, rgba(237, 234, 227, 0.025), transparent 38%);
+    }
+    .map-scene {
+      position: relative;
+      grid-column: 1;
+      grid-row: 1;
+      align-self: stretch;
+      min-width: 0;
+      min-height: min(76vh, 650px);
+      pointer-events: none;
+    }
+    .map-art {
+      position: absolute;
+      top: 50%;
+      left: -13%;
+      display: block;
+      width: min(79vw, 1120px);
+      height: min(88vh, 840px);
+      overflow: visible;
+      transform: translate3d(var(--parallax-x), calc(-50% + var(--parallax-y)), 0);
+      opacity: 0.92;
+      mask-image: linear-gradient(90deg, #000 0%, #000 70%, transparent 100%);
+    }
+    .region-fill { fill: url(#geo-dots); opacity: 0.56; }
+    .survey-grid { fill: url(#survey-grid); opacity: 0.22; }
+    .land-contour {
+      fill: none;
+      stroke: rgba(201, 162, 39, 0.15);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      animation: contour-breathe 34s ease-in-out infinite alternate;
+      transform-origin: center;
+    }
+    .route-line {
+      fill: none;
+      stroke: rgba(201, 162, 39, 0.3);
+      stroke-width: 1.05;
+      stroke-dasharray: 2 7;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+    .route-line--quiet {
+      stroke: rgba(237, 234, 227, 0.13);
+      stroke-dasharray: 1 9;
+    }
+    .node { fill: #c9a227; opacity: 0.72; }
+    .node-halo { fill: none; stroke: rgba(201, 162, 39, 0.28); stroke-width: 1; }
+    .radar-ring {
+      fill: none;
+      stroke: rgba(201, 162, 39, 0.2);
+      stroke-width: 1;
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: radar-breathe 7.5s ease-out infinite;
+    }
+    .radar-ring--late { animation-delay: -3.75s; }
+    .signal-core { fill: #f4d56c; filter: url(#signal-glow); }
+    .signal-spark { fill: #fff1b2; opacity: 0.88; }
+    .gate-copy {
+      position: relative;
+      z-index: 1;
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+      width: min(100%, 540px);
+      padding: clamp(8px, 2vw, 28px) 0;
+      direction: rtl;
+      text-align: right;
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin: 0;
+      margin: 0 0 clamp(24px, 4vh, 42px);
       color: var(--gold);
       font-family: var(--font-display);
       font-weight: 700;
@@ -72,27 +148,16 @@
       max-width: 14ch;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: clamp(32px, 6vw, 56px);
-      line-height: 1.35;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.45;
+      text-wrap: balance;
     }
-    .count {
-      margin: 0;
-      width: fit-content;
-      padding: 8px 14px;
-      border: 1px solid var(--panel-border);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--text-dim);
-      font-family: var(--font-mono);
-      font-size: 13px;
-    }
-    .count strong { color: var(--text); font-weight: 600; }
     .enter {
-      align-self: flex-start;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       min-height: 52px;
+      margin-top: clamp(28px, 5vh, 48px);
       padding: 0 22px;
       border: 1px solid var(--gold);
       border-radius: 999px;
@@ -103,36 +168,65 @@
       font-size: 16px;
       text-decoration: none;
       cursor: pointer;
+      transition: filter 180ms ease, box-shadow 180ms ease;
     }
-    .enter:hover, .enter:active { filter: brightness(1.06); }
-    .enter:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-    .features {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin: 8px 0 0;
-      padding: 0;
-      list-style: none;
+    .enter:hover, .enter:active { filter: brightness(1.06); box-shadow: 0 0 28px rgba(201, 162, 39, 0.17); }
+    .enter:focus-visible { outline: 2px solid var(--gold); outline-offset: 4px; }
+    @keyframes radar-breathe {
+      0% { opacity: 0.52; transform: scale(0.58); }
+      100% { opacity: 0; transform: scale(1.9); }
     }
-    .features li {
-      min-width: 0;
-      padding: 16px 14px 18px;
-      border: 1px solid var(--panel-border);
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(22, 29, 39, 0.96), rgba(16, 21, 28, 0.96));
+    @keyframes contour-breathe {
+      from { opacity: 0.55; transform: translateY(-3px); }
+      to { opacity: 1; transform: translateY(3px); }
     }
-    .features svg { display: block; width: 28px; height: 28px; color: var(--gold); }
-    .features h2 {
-      margin: 12px 0 6px;
-      font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 700;
-      line-height: 1.45;
-    }
-    .features p { margin: 0; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
     @media (max-width: 760px) {
-      .features { grid-template-columns: 1fr; }
-      .gate { justify-content: flex-start; padding-top: 76px; }
+      .gate {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(210px, 1fr);
+        align-content: center;
+        gap: 0;
+        height: 100vh;
+        height: 100svh;
+        min-height: 100vh;
+        min-height: 100svh;
+        padding: max(72px, calc(env(safe-area-inset-top) + 48px)) 26px max(28px, env(safe-area-inset-bottom));
+      }
+      .gate-copy {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: stretch;
+        width: 100%;
+        padding: 0;
+      }
+      .brand { margin-bottom: 18px; font-size: 17px; }
+      h1 { max-width: 18ch; font-size: clamp(30px, 8.2vw, 42px); line-height: 1.5; }
+      .enter { min-height: 50px; margin-top: 24px; }
+      .map-scene {
+        grid-column: 1;
+        grid-row: 2;
+        height: auto;
+        min-height: 210px;
+        margin: 2px -26px 0;
+      }
+      .map-art {
+        top: 50%;
+        left: -4%;
+        width: 112%;
+        height: 120%;
+        mask-image: linear-gradient(180deg, transparent 0%, #000 15%, #000 86%, transparent 100%);
+      }
+    }
+    @media (max-width: 380px) {
+      .gate { padding-inline: 20px; }
+      .map-scene { margin-inline: -20px; }
+      .brand { margin-bottom: 14px; }
+      .enter { margin-top: 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      .land-contour, .radar-ring { animation: none; }
+      .radar-ring { opacity: 0.16; transform: none; }
     }
     html.mirsad-intro-hold { visibility: hidden; }
   </style>
@@ -185,69 +279,107 @@
 </head>
 <body>
   <main class="gate">
-    <p class="brand"><i aria-hidden="true">◉</i> مِرصاد</p>
-    <h1>رصد الشرق الأوسط لحظة بلحظة</h1>
-    <p class="count" id="today" hidden></p>
-    <a class="enter" href="live.html">ادخل إلى البث المباشر</a>
-    <ul class="features">
-      <li>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6 15.5l.7 1.8L8.5 18l-1.8.7L6 20.5l-.7-1.8L3.5 18l1.8-.7L6 15.5zM17 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z" fill="currentColor"/></svg>
-        <h2>تجميع بالذكاء الاصطناعي</h2>
-        <p>تُجمع الروايات المتقاربة في بطاقة واحدة بدل تكرار العناوين.</p>
-      </li>
-      <li>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l6.5 2.4v5.3c0 4.2-2.7 7.2-6.5 8.8-3.8-1.6-6.5-4.6-6.5-8.8V5.9L12 3.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.8 12.1l2.1 2.1 4.4-4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <h2>تقييم الثقة</h2>
-        <p>كل خبر يُوزن بحسب مصادره ودرجة الثقة قبل عرضه.</p>
-      </li>
-      <li>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h10.5M4 12h7M4 16.5h10.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 8.2c1.7-1.5 4.2-1.2 5.2.6.9 1.7.2 3.7-1.5 4.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M18.2 6.2v3.2h3.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <h2>إنجليزي وعربي مترجم</h2>
-        <p>شريط أخبار بالإنجليزية، وأخبار الدول العربية مع ترجمة.</p>
-      </li>
-    </ul>
+    <div class="map-scene" aria-hidden="true">
+      <svg class="map-art" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <pattern id="geo-dots" width="13" height="13" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r="1" fill="rgba(237,234,227,.32)"/>
+          </pattern>
+          <pattern id="survey-grid" width="86" height="86" patternUnits="userSpaceOnUse">
+            <path d="M86 0H0V86" fill="none" stroke="rgba(237,234,227,.12)" stroke-width=".7"/>
+          </pattern>
+          <clipPath id="region-mask">
+            <path d="M80 136 167 98 243 115 304 83 372 120 435 104 483 152 551 146 603 189 684 174 733 218 822 213 862 270 830 316 858 363 808 402 819 460 766 482 740 545 673 535 626 579 558 557 507 600 444 575 388 601 333 566 269 579 232 532 165 520 141 472 90 451 109 399 74 356 104 306 78 254 118 211Z"/>
+          </clipPath>
+          <radialGradient id="signal-halo">
+            <stop offset="0" stop-color="#f4d56c" stop-opacity=".52"/>
+            <stop offset="1" stop-color="#c9a227" stop-opacity="0"/>
+          </radialGradient>
+          <filter id="signal-glow" x="-300%" y="-300%" width="700%" height="700%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <g clip-path="url(#region-mask)">
+          <rect x="50" y="65" width="850" height="560" class="region-fill"/>
+          <rect x="50" y="65" width="850" height="560" class="survey-grid"/>
+        </g>
+        <g class="contours">
+          <path class="land-contour" d="M84 180C223 97 331 143 394 190S560 219 638 192 803 166 874 229"/>
+          <path class="land-contour" d="M79 226C197 155 311 191 384 236S564 269 650 236 792 215 860 274"/>
+          <path class="land-contour" d="M71 278C195 212 299 250 375 291S557 323 651 286 789 272 851 321"/>
+          <path class="land-contour" d="M90 334C204 277 300 311 378 350S555 379 650 341 780 328 838 371"/>
+          <path class="land-contour" d="M110 388C223 341 311 369 390 407S554 433 642 398 768 385 820 425"/>
+          <path class="land-contour" d="M132 444C241 399 329 425 408 461S557 485 635 454 748 441 797 479"/>
+        </g>
+        <g class="routes">
+          <path class="route-line" d="M154 430C219 389 267 353 331 341S435 332 492 289 587 246 666 266 762 291 824 252"/>
+          <path class="route-line" d="M205 190C242 244 291 278 331 341S397 438 480 451 599 421 660 365 738 333 799 353"/>
+          <path class="route-line route-line--quiet" d="M126 294C233 291 267 325 331 341S435 376 498 365 606 324 660 365 726 442 781 458"/>
+          <path class="route-line route-line--quiet" d="M388 158C400 224 425 263 492 289S583 345 599 420"/>
+        </g>
+        <g class="stations">
+          <circle class="node-halo" cx="154" cy="430" r="7"/><circle class="node" cx="154" cy="430" r="2.3"/>
+          <circle class="node-halo" cx="205" cy="190" r="6"/><circle class="node" cx="205" cy="190" r="2"/>
+          <circle class="node-halo" cx="331" cy="341" r="10"/><circle class="node" cx="331" cy="341" r="3"/>
+          <circle class="node-halo" cx="492" cy="289" r="7"/><circle class="node" cx="492" cy="289" r="2.2"/>
+          <circle class="node-halo" cx="599" cy="420" r="6"/><circle class="node" cx="599" cy="420" r="2"/>
+          <circle class="node-halo" cx="660" cy="365" r="9"/><circle class="node" cx="660" cy="365" r="2.8"/>
+          <circle class="node-halo" cx="824" cy="252" r="6"/><circle class="node" cx="824" cy="252" r="2"/>
+          <circle class="radar-ring" cx="331" cy="341" r="15"/><circle class="radar-ring radar-ring--late" cx="660" cy="365" r="15"/>
+        </g>
+        <g class="signal-runner">
+          <circle class="signal-core" cx="0" cy="0" r="4"/>
+          <circle class="signal-spark" cx="0" cy="0" r="1.25"/>
+          <animateMotion id="signal-motion" begin="indefinite" dur="32s" repeatCount="indefinite" rotate="auto" path="M154 430 C219 389 267 353 331 341 S435 332 492 289 587 246 666 266 762 291 824 252 S738 333 660 365 599 421 480 451 397 438 331 341 242 244 205 190"/>
+        </g>
+      </svg>
+    </div>
+    <section class="gate-copy" aria-label="مِرصاد">
+      <p class="brand"><i aria-hidden="true">◉</i> مِرصاد</p>
+      <h1>رصد الشرق الأوسط لحظة بلحظة</h1>
+      <a class="enter" href="live.html">ادخل إلى البث المباشر</a>
+    </section>
   </main>
   <script>
     (function () {
-      var node = document.getElementById('today');
-      var key = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
-      var start = new Date();
-      start.setHours(0, 0, 0, 0);
-      var iso = start.toISOString();
-      var params = new URLSearchParams({
-        select: 'headline,published_at,created_at',
-        is_pending_verification: 'eq.false',
-        or: '(published_at.gte.' + iso + ',created_at.gte.' + iso + ')',
-        limit: '1000'
-      });
-      function isArabicHeadline(value) {
-        var text = String(value || '').trim();
-        if (!text) return false;
-        var arabic = (text.match(/[ء-ي]/g) || []).length;
-        var letters = (text.match(/\p{L}/gu) || []).length;
-        return arabic >= 2 && arabic / Math.max(1, letters) >= 0.2;
+      var motion = document.getElementById('signal-motion');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var root = document.querySelector('.gate');
+      function syncMotion() {
+        if (reduce.matches && root) {
+          root.style.setProperty('--parallax-x', '0px');
+          root.style.setProperty('--parallax-y', '0px');
+        }
+        if (!motion) return;
+        try {
+          if (reduce.matches) motion.endElement();
+          else motion.beginElement();
+        } catch (error) {}
       }
-      function effectiveTime(row) {
-        var published = new Date(row.published_at || 0).getTime();
-        if (Number.isFinite(published) && published <= Date.now() + 5 * 60 * 1000) return published;
-        var created = new Date(row.created_at || 0).getTime();
-        return Number.isFinite(created) ? created : 0;
-      }
-      fetch('https://dndlkenyfymlrjnslyzb.supabase.co/rest/v1/news_articles?' + params.toString(), {
-        headers: { apikey: key, Authorization: 'Bearer ' + key, Accept: 'application/json' }
-      }).then(function (response) {
-        if (!response.ok) throw new Error('count failed');
-        return response.json();
-      }).then(function (rows) {
-        if (!Array.isArray(rows)) throw new Error('count failed');
-        var count = rows.filter(function (row) {
-          return isArabicHeadline(row && row.headline) && effectiveTime(row) >= start.getTime();
-        }).length;
-        node.innerHTML = '<strong>' + count.toLocaleString('ar') + '</strong> خبر اليوم';
-        node.hidden = false;
-      }).catch(function () {
-        node.hidden = true;
-      });
+      syncMotion();
+      if (reduce.addEventListener) reduce.addEventListener('change', syncMotion);
+      else if (reduce.addListener) reduce.addListener(syncMotion);
+      var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+      if (!root || reduce.matches || !finePointer.matches) return;
+      var frame = 0;
+      var point = { x: 0, y: 0 };
+      root.addEventListener('pointermove', function (event) {
+        if (reduce.matches || (event.pointerType && event.pointerType !== 'mouse')) return;
+        var bounds = root.getBoundingClientRect();
+        point.x = ((event.clientX - bounds.left) / bounds.width - 0.5) * 5;
+        point.y = ((event.clientY - bounds.top) / bounds.height - 0.5) * 4;
+        if (frame) return;
+        frame = window.requestAnimationFrame(function () {
+          root.style.setProperty('--parallax-x', point.x.toFixed(1) + 'px');
+          root.style.setProperty('--parallax-y', point.y.toFixed(1) + 'px');
+          frame = 0;
+        });
+      }, { passive: true });
+      root.addEventListener('pointerleave', function () {
+        root.style.setProperty('--parallax-x', '0px');
+        root.style.setProperty('--parallax-y', '0px');
+      }, { passive: true });
     })();
   </script>
 </body>
