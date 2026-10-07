@@ -57,7 +57,7 @@
       .mirsad-user-menu{position:fixed;top:10px;left:10px;z-index:5400}
       .mirsad-user-button{width:34px;height:34px;padding:0;border-radius:50%;border:1px solid var(--gold);background:rgba(16,21,28,.88);color:var(--gold);display:grid;place-items:center;overflow:hidden;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
       .mirsad-user-button img{width:100%;height:100%;object-fit:cover}.mirsad-user-initial{font-size:12px;font-weight:700}
-      .mirsad-mail-dot{position:absolute;top:-1px;left:-1px;width:10px;height:10px;border-radius:50%;background:#e23d3d;border:1.5px solid #0b0f14;box-shadow:0 0 0 1px rgba(226,61,61,.4),0 0 8px rgba(226,61,61,.45);pointer-events:none}.mirsad-discount-dot{position:absolute;top:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:#e23d3d;border:1.5px solid #0b0f14;box-shadow:0 0 0 1px rgba(226,61,61,.4),0 0 8px rgba(226,61,61,.45);pointer-events:none}.mirsad-discount-dot[hidden]{display:none!important}.mirsad-user-item[data-recharge-offer]{display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .mirsad-mail-dot{position:absolute;top:-1px;left:-1px;width:10px;height:10px;border-radius:50%;background:#e23d3d;border:1.5px solid #0b0f14;box-shadow:0 0 0 1px rgba(226,61,61,.4),0 0 8px rgba(226,61,61,.45);pointer-events:none}
       .mirsad-mail-dot[hidden],.mirsad-mail-item-dot[hidden]{display:none!important}
       .mirsad-user-dropdown{position:absolute;top:42px;left:0;width:min(218px,calc(100vw - 20px));padding:6px;border:1px solid var(--panel-border-strong);border-radius:12px;background:rgba(16,21,28,.98);box-shadow:0 10px 30px rgba(0,0,0,.28)}
       .mirsad-user-balance{display:flex;align-items:center;justify-content:space-between;gap:9px;min-width:0;padding:8px 10px;margin-bottom:4px;border-bottom:1px solid var(--panel-border);color:var(--gold);font:600 11px/1.5 var(--font-mono);text-align:right}.mirsad-user-balance [data-balance-label]{min-width:0;overflow-wrap:anywhere}.mirsad-balance-recharge{flex:0 0 22px;width:22px;height:22px;padding:0;border:1px solid var(--gold);border-radius:50%;background:rgba(201,162,39,.12);color:var(--gold);font:700 17px/19px var(--font-mono);cursor:pointer}.mirsad-balance-recharge:hover{background:rgba(201,162,39,.24);transform:scale(1.06)}.mirsad-user-item{display:block;width:100%;padding:9px 10px;border:0;border-radius:8px;background:none;color:var(--text);text-align:right;font:inherit;cursor:pointer}.mirsad-user-item:hover{background:rgba(255,255,255,.06)}
@@ -420,24 +420,6 @@
     }
   }
 
-  async function rechargeOfferStatus(){
-    if(!sb)return false;
-    try{const{data,error}=await sb.rpc('get_recharge_offer_status');if(error)throw error;const row=Array.isArray(data)?data[0]:data;return Boolean(row?.eligible)}catch(error){console.warn('[mirsad recharge discount] status failed',error);return false}
-  }
-  function applyDiscountBadges(wrap,eligible){
-    if(!wrap)return;
-    const profileDot=wrap.querySelector('[data-profile-discount-dot]');
-    const itemDot=wrap.querySelector('[data-discount-item-dot]');
-    const item=wrap.querySelector('[data-recharge-offer]');
-    if(profileDot)profileDot.hidden=!eligible;
-    if(itemDot)itemDot.hidden=!eligible;
-    if(item)item.hidden=!eligible;
-  }
-  async function refreshRechargeOfferBadges(){
-    const wrap=document.getElementById('mirsadUserMenu');
-    if(!wrap||document.body.classList.contains('mirsad-admin-view'))return;
-    applyDiscountBadges(wrap,await rechargeOfferStatus());
-  }
   function showUserMenu(user,profile=null,unlockAccount=null){
     document.getElementById('mirsadUserMenu')?.remove();
     const isOwnerView=Boolean(unlockAccount?.unlimited_unlocks);
@@ -448,10 +430,9 @@
     const mailLabel=isOwnerView?'مالك النظام':'بريد النظام';
     const recharge=isOwnerView?'':`<button class="mirsad-balance-recharge" type="button" data-recharge aria-label="شحن الرصيد" title="شحن الرصيد">+</button>`;
     const extraItems=isOwnerView?'':`<button class="mirsad-user-item" type="button" data-daily-reward>مكافأة يومية</button><button class="mirsad-user-item" type="button" data-wheel-reward>سحب المكافأة</button>`;
-    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'"')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><span class="mirsad-mail-dot" data-profile-mail-dot hidden></span><span class="mirsad-discount-dot" data-profile-discount-dot hidden></span><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${isOwnerView?'حساب المالك · فتحات غير محدودة':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span>${recharge}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>${mailLabel}<span class="mirsad-mail-item-dot" data-mail-item-dot hidden></span></button><button class="mirsad-user-item" type="button" data-recharge-offer hidden>شحنة تالية بخصم 15%<span class="mirsad-mail-item-dot" data-discount-item-dot hidden></span></button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button>${extraItems}<button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
+    wrap.innerHTML=`<button class="mirsad-user-button" type="button" aria-label="الملف الشخصي">${avatar?`<img src="${String(avatar).replace(/"/g,'"')}" alt="">`:`<span class="mirsad-user-initial">${initial}</span>`}</button><span class="mirsad-mail-dot" data-profile-mail-dot hidden></span><div class="mirsad-user-dropdown" hidden><div class="mirsad-user-balance"><span data-balance-label>${isOwnerView?'حساب المالك · فتحات غير محدودة':`فتحات الأخبار: ${Number(unlockAccount?.unlock_balance||0)}`}</span>${recharge}</div><button class="mirsad-user-item" type="button" data-profile>الملف الشخصي</button><button class="mirsad-user-item" type="button" data-system-mail>${mailLabel}<span class="mirsad-mail-item-dot" data-mail-item-dot hidden></span></button><button class="mirsad-user-item" type="button" data-consumption-recovery>استرداد الاستهلاك</button>${extraItems}<button class="mirsad-user-item" type="button" data-signout>تسجيل الخروج</button></div>`;
     document.body.appendChild(wrap);
     const btn=wrap.querySelector('.mirsad-user-button'),menu=wrap.querySelector('.mirsad-user-dropdown'),mailItem=wrap.querySelector('[data-system-mail]');
-    const offerItem=wrap.querySelector('[data-recharge-offer]');
     const revealMailAlert=()=>{
       if(Number(wrap.dataset.mailUnread||0)<1||isOwnerView)return;
       window.setTimeout(()=>mailItem?.classList.add('is-mail-alert'),80);
@@ -463,7 +444,6 @@
     });
     wrap.querySelector('[data-profile]').addEventListener('click',()=>{menu.hidden=true;window.location.href=profilePageUrl()});
     wrap.querySelector('[data-system-mail]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('system-mail.html',window.location.href).href});
-    offerItem?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('billing.html',window.location.href).href});
     wrap.querySelector('[data-consumption-recovery]').addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('consumption-recovery.html',window.location.href).href});
     wrap.querySelector('[data-daily-reward]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=dailyRewardPageUrl()});
     wrap.querySelector('[data-wheel-reward]')?.addEventListener('click',()=>{menu.hidden=true;window.location.href=new URL('wheel-reward.html',window.location.href).href});
@@ -475,11 +455,9 @@
         applyMailBadges(wrap,count);
         if(!menu.hidden)revealMailAlert();
       });
-      void rechargeOfferStatus().then((eligible)=>applyDiscountBadges(wrap,eligible));
     }
   }
   window.addEventListener('mirsad:unlock-balance',event=>{const el=document.querySelector('#mirsadUserMenu [data-balance-label]');if(!el)return;const detail=event.detail||{};el.textContent=detail.unlimited?'فتحات الأخبار: غير محدود':`فتحات الأخبار: ${Math.max(0,Number(detail.remaining)||0)}`;});
-  window.addEventListener('mirsad:unlock-balance',()=>{void refreshRechargeOfferBadges()});
   window.addEventListener('mirsad:system-mail-unread',event=>{
     const wrap=document.getElementById('mirsadUserMenu');
     if(!wrap)return;
