@@ -1,7 +1,7 @@
 /* Archive chat: isolated page styles; article cards reuse the live-board classes. */
 .archive-chat-page { min-height: 100svh; display: flex; flex-direction: column; background: radial-gradient(ellipse at 50% 0, rgba(201,162,39,.075), transparent 38%), var(--bg); }
-.archive-header { width: min(1120px, 100%); margin-inline: auto; padding: max(16px, env(safe-area-inset-top)) 24px 14px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--panel-border); }
-.archive-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 7px 12px; border: 1px solid var(--panel-border); border-radius: 999px; color: var(--text-dim); text-decoration: none; font-size: 13px; transition: color .16s ease, border-color .16s ease, background .16s ease; }
+.archive-header { width: min(1120px, 100%); margin-inline: auto; padding: max(16px, env(safe-area-inset-top)) 24px 14px; display: flex; align-items: center; justify-content: flex-start; direction: ltr; gap: 16px; border-bottom: 1px solid var(--panel-border); }
+.archive-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 7px 12px; border: 1px solid var(--panel-border); border-radius: 999px; color: var(--text-dim); text-decoration: none; font-size: 13px; direction: rtl; transition: color .16s ease, border-color .16s ease, background .16s ease; }
 .archive-back:hover { color: var(--gold); border-color: rgba(201,162,39,.36); background: var(--gold-soft); }
 .archive-main { width: min(920px, 100%); margin-inline: auto; padding: clamp(28px, 6vh, 64px) 24px 26px; display: flex; flex: 1 0 auto; flex-direction: column; }
 .archive-intro { text-align: center; margin: 0 auto 28px; max-width: 650px; }
