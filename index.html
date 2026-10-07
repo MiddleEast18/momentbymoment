@@ -93,6 +93,16 @@
       stroke-linecap: round;
       vector-effect: non-scaling-stroke;
     }
+    .route-line--flow {
+      stroke: rgba(201, 162, 39, 0.2);
+      stroke-dasharray: 1 13;
+      animation: route-drift 28s linear infinite;
+    }
+    .route-line--fine {
+      stroke: rgba(237, 234, 227, 0.105);
+      stroke-width: 0.8;
+      stroke-dasharray: 1 8;
+    }
     .route-line--quiet {
       stroke: rgba(237, 234, 227, 0.13);
       stroke-dasharray: 1 9;
@@ -110,6 +120,8 @@
     .radar-ring--late { animation-delay: -3.75s; }
     .signal-core { fill: #f4d56c; filter: url(#signal-glow); }
     .signal-spark { fill: #fff1b2; opacity: 0.88; }
+    .signal-runner.is-paused .signal-core { animation: signal-blink 0.34s ease-in-out 2; }
+    .signal-runner.is-paused .signal-spark { animation: signal-spark-blink 0.34s ease-in-out 2; }
     .gate-copy {
       position: relative;
       z-index: 1;
@@ -180,6 +192,9 @@
       from { opacity: 0.55; transform: translateY(-3px); }
       to { opacity: 1; transform: translateY(3px); }
     }
+    @keyframes route-drift { to { stroke-dashoffset: -84; } }
+    @keyframes signal-blink { 50% { opacity: 0.18; } }
+    @keyframes signal-spark-blink { 50% { opacity: 0.12; } }
     @media (max-width: 760px) {
       .gate {
         grid-template-columns: minmax(0, 1fr);
@@ -225,8 +240,11 @@
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-      .land-contour, .radar-ring { animation: none; }
+      .land-contour, .radar-ring, .route-line--flow,
+      .signal-runner.is-paused .signal-core, .signal-runner.is-paused .signal-spark { animation: none; }
       .radar-ring { opacity: 0.16; transform: none; }
+      .route-line--flow { stroke-dasharray: 1 13; }
+      .signal-runner.is-paused .signal-core, .signal-runner.is-paused .signal-spark { opacity: 1; }
     }
     html.mirsad-intro-hold { visibility: hidden; }
   </style>
@@ -282,8 +300,9 @@
     <div class="map-scene" aria-hidden="true">
       <svg class="map-art" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid slice">
         <defs>
-          <pattern id="geo-dots" width="13" height="13" patternUnits="userSpaceOnUse">
-            <circle cx="1.5" cy="1.5" r="1" fill="rgba(237,234,227,.32)"/>
+          <pattern id="geo-dots" width="11" height="11" patternUnits="userSpaceOnUse">
+            <circle cx="1.5" cy="1.5" r=".85" fill="rgba(237,234,227,.3)"/>
+            <circle cx="7" cy="6.5" r=".38" fill="rgba(201,162,39,.24)"/>
           </pattern>
           <pattern id="survey-grid" width="86" height="86" patternUnits="userSpaceOnUse">
             <path d="M86 0H0V86" fill="none" stroke="rgba(237,234,227,.12)" stroke-width=".7"/>
@@ -313,10 +332,14 @@
           <path class="land-contour" d="M132 444C241 399 329 425 408 461S557 485 635 454 748 441 797 479"/>
         </g>
         <g class="routes">
-          <path class="route-line" d="M154 430C219 389 267 353 331 341S435 332 492 289 587 246 666 266 762 291 824 252"/>
+          <path class="route-line route-line--flow" d="M154 430C219 389 267 353 331 341S435 332 492 289 587 246 666 266 762 291 824 252"/>
           <path class="route-line" d="M205 190C242 244 291 278 331 341S397 438 480 451 599 421 660 365 738 333 799 353"/>
           <path class="route-line route-line--quiet" d="M126 294C233 291 267 325 331 341S435 376 498 365 606 324 660 365 726 442 781 458"/>
           <path class="route-line route-line--quiet" d="M388 158C400 224 425 263 492 289S583 345 599 420"/>
+          <path class="route-line route-line--fine" d="M154 430C191 378 188 273 205 190M331 341C400 373 440 422 480 451M492 289C548 318 609 349 660 365M666 266C663 306 659 337 660 365M599 420C656 443 724 467 781 458M388 158C326 171 264 178 205 190"/>
+          <path class="route-line route-line--fine" d="M126 294C209 257 293 237 388 158M331 341C392 304 441 295 492 289M498 365C529 388 566 404 599 420M660 365C708 389 753 415 781 458M799 353C818 321 825 285 824 252"/>
+          <path class="route-line route-line--flow" style="animation-delay:-9s;stroke:rgba(237,234,227,.11)" d="M126 294C233 291 267 325 331 341S435 376 498 365 606 324 660 365 726 442 781 458"/>
+          <path class="route-line route-line--fine" d="M244 215C305 239 352 257 412 265S530 249 576 219M262 499C322 472 363 451 421 443S536 458 586 489M704 220C741 238 774 264 794 296M120 365C183 357 229 366 271 399"/>
         </g>
         <g class="stations">
           <circle class="node-halo" cx="154" cy="430" r="7"/><circle class="node" cx="154" cy="430" r="2.3"/>
@@ -331,8 +354,8 @@
         <g class="signal-runner">
           <circle class="signal-core" cx="0" cy="0" r="4"/>
           <circle class="signal-spark" cx="0" cy="0" r="1.25"/>
-          <animateMotion id="signal-motion" begin="indefinite" dur="32s" repeatCount="indefinite" rotate="auto" path="M154 430 C219 389 267 353 331 341 S435 332 492 289 587 246 666 266 762 291 824 252 S738 333 660 365 599 421 480 451 397 438 331 341 242 244 205 190"/>
         </g>
+        <path id="signal-route" d="M154 430 C219 389 267 353 331 341 S435 332 492 289 587 246 666 266 762 291 824 252 C811 292 757 338 799 353 S719 362 660 365 S619 390 599 420 Q551 456 480 451 C415 440 365 382 331 341 S253 242 205 190 Q291 168 388 158 C413 220 438 262 492 289 S567 368 599 420 Q688 469 781 458 C741 414 700 381 660 365 S558 307 492 289 S386 306 331 341 Q231 405 154 430" fill="none" stroke="none"/>
       </svg>
     </div>
     <section class="gate-copy" aria-label="مِرصاد">
@@ -343,26 +366,85 @@
   </main>
   <script>
     (function () {
-      var motion = document.getElementById('signal-motion');
+      var runner = document.querySelector('.signal-runner');
+      var route = document.getElementById('signal-route');
       var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
       var root = document.querySelector('.gate');
+      var frame = 0;
+      var startedAt = 0;
+      var phases = [];
+      var pathLength = 0;
+      var waypoints = [0, 0.17, 0.34, 0.51, 0.68, 0.84, 1];
+      var stops = [0, 420, 520, 400, 560, 420, 900];
+      var travelDuration = 30000;
+
+      function setPosition(progress) {
+        var point = route.getPointAtLength(pathLength * progress);
+        runner.setAttribute('transform', 'translate(' + point.x.toFixed(2) + ' ' + point.y.toFixed(2) + ')');
+      }
+
+      function tick(now) {
+        if (reduce.matches || !runner || !route || !pathLength) return;
+        var elapsed = (now - startedAt) % phases.total;
+        var progress = 0;
+        var paused = false;
+        for (var i = 0; i < phases.items.length; i++) {
+          var phase = phases.items[i];
+          if (elapsed < phase.end) {
+            if (phase.pause) {
+              progress = phase.to;
+              paused = true;
+            } else {
+              var part = Math.max(0, Math.min(1, (elapsed - phase.start) / phase.duration));
+              progress = phase.from + (phase.to - phase.from) * part;
+            }
+            break;
+          }
+        }
+        setPosition(progress);
+        runner.classList.toggle('is-paused', paused);
+        frame = window.requestAnimationFrame(tick);
+      }
+
+      function startSignal() {
+        if (!runner || !route) return;
+        if (frame) window.cancelAnimationFrame(frame);
+        frame = 0;
+        pathLength = route.getTotalLength();
+        phases = { items: [], total: 0 };
+        var movingTotal = waypoints.slice(1).reduce(function (sum, value, index) {
+          return sum + value - waypoints[index];
+        }, 0);
+        for (var i = 0; i < waypoints.length - 1; i++) {
+          var moveDuration = travelDuration * (waypoints[i + 1] - waypoints[i]) / movingTotal;
+          phases.items.push({ start: phases.total, end: phases.total + moveDuration, duration: moveDuration, from: waypoints[i], to: waypoints[i + 1] });
+          phases.total += moveDuration;
+          if (stops[i + 1]) {
+            phases.items.push({ start: phases.total, end: phases.total + stops[i + 1], duration: stops[i + 1], from: waypoints[i + 1], to: waypoints[i + 1], pause: true });
+            phases.total += stops[i + 1];
+          }
+        }
+        runner.classList.remove('is-paused');
+        if (reduce.matches) {
+          setPosition(0);
+          return;
+        }
+        startedAt = performance.now();
+        frame = window.requestAnimationFrame(tick);
+      }
+
       function syncMotion() {
         if (reduce.matches && root) {
           root.style.setProperty('--parallax-x', '0px');
           root.style.setProperty('--parallax-y', '0px');
         }
-        if (!motion) return;
-        try {
-          if (reduce.matches) motion.endElement();
-          else motion.beginElement();
-        } catch (error) {}
+        startSignal();
       }
       syncMotion();
       if (reduce.addEventListener) reduce.addEventListener('change', syncMotion);
       else if (reduce.addListener) reduce.addListener(syncMotion);
       var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
       if (!root || reduce.matches || !finePointer.matches) return;
-      var frame = 0;
       var point = { x: 0, y: 0 };
       root.addEventListener('pointermove', function (event) {
         if (reduce.matches || (event.pointerType && event.pointerType !== 'mouse')) return;
