@@ -131,7 +131,7 @@
     input.value = '';
     input.style.height = 'auto';
     setBusy(true);
-    const placeholder = appendMessage('assistant', 'أبحث في الأخبار المنشورة المحفوظة…');
+    const placeholder = appendMessage('assistant', 'أقرأ ما كتبته…');
     try {
       const result = await search(query);
       const answer = normalize(result.reply || 'اكتمل البحث في الأخبار.');
