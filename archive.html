@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0f14">
   <title>باحث الأخبار — مِرصاد</title>
-  <meta name="description" content="اسأل مِرصاد للعثور على الأخبار المحفوظة خارج نافذة البث المباشر.">
+  <meta name="description" content="اسأل مِرصاد داخل الأرشيف. يفهم سؤالك ويجيب مباشرة، ويعرض بطاقة الخبر عند التطابق فقط.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat.css?v=202610072102">
+  <link rel="stylesheet" href="archive-chat.css?v=202610080235">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
@@ -25,14 +25,14 @@
     <section class="archive-intro" aria-labelledby="archiveTitle">
       <p class="archive-kicker"><span class="archive-kicker__dot" aria-hidden="true"></span> ذاكرة أخبار مِرصاد</p>
       <h1 id="archiveTitle">ابحث في الأخبار،<br><span>واسأل بطريقتك.</span></h1>
-      <p class="archive-intro__copy">أخبرني عمّا تبحث عنه، وسأحاول العثور على بطاقات الأخبار المحفوظة خارج نافذة البث المباشر.</p>
-      <p class="archive-scope">الإجابات مبنية على الأخبار المنشورة المحفوظة في مِرصاد فقط.</p>
+      <p class="archive-intro__copy">اكتب كما تتحدث. أقرأ السؤال كما هو، وأجيب بلغتك، ولا أظهر بطاقة إلا إذا طابقت الخبر فعلًا.</p>
+      <p class="archive-scope">وقائع الأخبار تُؤخذ من البطاقات المحفوظة فقط، ولا تُختلق.</p>
     </section>
 
     <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
       <div class="archive-welcome" id="welcomeState">
         <span class="archive-welcome__symbol" aria-hidden="true">⌕</span>
-        <p>ابدأ بسؤال عن خبر أو واقعة أو مصدر أو فترة زمنية.</p>
+        <p>اسأل عن خبر، أو ناقش ما تقصده. البطاقة تظهر فقط حين تطابق السؤال.</p>
         <div class="archive-suggestions" aria-label="أسئلة مقترحة">
           <button type="button" class="archive-suggestion">ما الأخبار المتعلقة ببيروت؟</button>
           <button type="button" class="archive-suggestion">ابحث عن خبر الزلزال في تركيا</button>
@@ -45,7 +45,7 @@
       <label class="visually-hidden" for="archivePrompt">اكتب سؤالك عن الأخبار</label>
       <textarea id="archivePrompt" name="query" rows="1" maxlength="500" placeholder="اسأل عن خبر في أرشيف مِرصاد…" required></textarea>
       <div class="archive-composer__bottom">
-        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> بحث في الأخبار فقط</span>
+        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> يفهم القصد قبل البطاقة</span>
         <button class="archive-send" id="archiveSend" type="submit" aria-label="إرسال السؤال">
           <span class="archive-send__label">إرسال</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -86,7 +86,7 @@
   </template>
 
   <script src="news-text-normalizer.js?v=202609130721"></script>
-  <script src="archive-chat.js?v=202610061945" defer></script>
+  <script src="archive-chat.js?v=202610080235" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
