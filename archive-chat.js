@@ -110,7 +110,7 @@
     const response = await fetch(CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
-      body: JSON.stringify({ query, history: history.slice(-7, -1) }),
+      body: JSON.stringify({ query, history: history.slice(-6) }),
       signal: AbortSignal.timeout(30000),
     });
     const payload = await response.json().catch(() => ({}));

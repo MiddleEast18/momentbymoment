@@ -12,7 +12,7 @@ const O = new Set(["https://marsad.website", "https://www.marsad.website"]);
 const ENC = new TextEncoder();
 const STOP = new Set(["ابحث", "بحث", "عن", "اخبار", "أخبار", "الأخبار", "خبر", "الخبر", "المتعلقة", "المتعلق", "ما", "ماذا", "هو", "هي", "في", "من", "على", "هل", "حول", "آخر", "اخر", "الجديد", "مؤخرا", "مؤخرًا", "ب", "لي", "التي", "الذي", "هذا", "هذه", "ذلك", "تلك", "عن", "في", "please", "the", "a", "an", "of", "about", "what", "whats", "who", "how", "why", "is", "are", "news", "latest"]);
 
-type Turn = { role: "user" | "assistant"; content: string };
+type Turn = { role: "user" | "assistant"; content: string; article_ids?: string[] };
 type Mind = {
   reply_language: "ar" | "en";
   request_type: string;
@@ -77,7 +77,10 @@ function historyOf(v: unknown): Turn[] {
   if (!Array.isArray(v)) return [];
   return v.slice(-6).map((x) => {
     const r = x && typeof x === "object" ? x as Record<string, unknown> : {};
-    return { role: r.role === "assistant" ? "assistant" as const : "user" as const, content: clean(r.content, 500) };
+    const articleIds = Array.isArray(r.article_ids)
+      ? r.article_ids.map((id) => clean(id, 80)).filter(Boolean).slice(0, 6)
+      : [];
+    return { role: r.role === "assistant" ? "assistant" as const : "user" as const, content: clean(r.content, 500), ...(articleIds.length ? { article_ids: articleIds } : {}) };
   }).filter((x) => x.content);
 }
 function ipOf(r: Request) {
@@ -123,6 +126,12 @@ function socialReply(q: string) {
     ? "Hello. Tell me the story, place, or person you want, and I will answer directly — a news card only if it truly matches."
     : "أهلًا. اكتب الخبر أو المكان أو الشخص الذي تقصده، وسأجيب مباشرة. بطاقة الخبر لا تظهر إلا إذا طابقت سؤالك فعلًا.";
 }
+function asksForAdditionalCard(q: string) {
+  return /(بطاق[ةه]\s*(?:إضافي[ةه]|اخرى|أخرى)|خبر\s*(?:إضافي|اخر|آخر)|واحد[ةه]\s*(?:إضافي[ةه]|اخرى|أخرى)|اعرض\s*(?:لي\s*)?(?:واحد[ةه]\s*)?(?:إضافي[ةه]|اخرى|أخرى)|التالي[ةه]|another\s+card|one\s+more|show\s+(?:me\s+)?another|next\s+(?:card|story))/i.test(fold(q));
+}
+function shownArticleIds(history: Turn[]) {
+  return new Set(history.flatMap((turn) => turn.article_ids || []));
+}
 function emptyMind(q: string, search: boolean): Mind {
   return {
     reply_language: langOf(q),
@@ -164,7 +173,7 @@ const ANSWER = `أنت مِرصاد. اكتب الرد النهائي بلغة r
 - الكلمات: ألفاظ المستخدم حاضرة بمعنى الطلب لا كتشابه عابر.
 - المعنى: الحدث نفسه هو المقصود، لا موضوع مجاور.
 - العنوان: طبيعة الخبر تطابق الطلب، شخصًا أو مكانًا أو فترة أو واقعة.
-رتّب المطابق من الأقرب وبحد أقصى 4 معرفات. إن لم يطابق شيء فاجعل matched_ids فارغة.
+رتّب المطابق من الأقرب. اختر معرفًا واحدًا فقط في الوضع العادي. إذا كان الوضع additional فاختر معرفًا واحدًا لم يظهر في already_shown_ids. إن لم يطابق شيء فاجعل matched_ids فارغة.
 
 الرد: أول جملة هي الجواب المباشر. لا تذكر بطاقة مرفوضة. لا تضف واقعة غير مكتوبة في البطاقات المختارة. عند عدم التطابق قل ذلك بوضوح واقترح تحديد الاسم أو المكان أو الفترة. فقرتان كحد أقصى، بلا حشو.
 راجع قبل الإخراج: هل أجبت السؤال؟ هل في مبالغة؟ هل اللغة هي لغة المستخدم؟ JSON فقط.`;
@@ -275,10 +284,14 @@ function hints(q: string, cards: Record<string, unknown>[]) {
 }
 async function answer(q: string, h: Turn[], mind: Mind, cards: Record<string, unknown>[]) {
   const allow = new Map(cards.map((c) => [String(c.id), c]));
+  const additional = asksForAdditionalCard(q);
+  const alreadyShown = shownArticleIds(h);
   const r = await generate({
     systemInstruction: { parts: [{ text: ANSWER }] },
     contents: [{ role: "user", parts: [{ text: JSON.stringify({
       question: q,
+      display_mode: additional ? "additional" : "first",
+      already_shown_ids: [...alreadyShown],
       conversation: h,
       understanding: { reply_language: mind.reply_language, request_type: mind.request_type, real_goal: mind.real_goal, tone_hint: "direct" },
       cards: hints(mind.search_query || q, cards),
@@ -296,12 +309,19 @@ async function answer(q: string, h: Turn[], mind: Mind, cards: Record<string, un
     },
   }, 12000);
   const p = parseJson(parts(r));
-  const ids = Array.isArray(p.matched_ids) ? [...new Set(p.matched_ids.map(String))].filter((id) => allow.has(id)).slice(0, 4) : [];
-  const articles = ids.map((id) => allow.get(id)!);
-  const reply = replyText(p.reply, 900) || (articles.length
+  const ids = Array.isArray(p.matched_ids) ? [...new Set(p.matched_ids.map(String))].filter((id) => allow.has(id) && (!additional || !alreadyShown.has(id))) : [];
+  const articles = ids.slice(0, 1).map((id) => allow.get(id)!);
+  const remaining = cards.some((card) => {
+    const id = String(card.id);
+    return !alreadyShown.has(id) && !articles.some((article) => String(article.id) === id);
+  });
+  let reply = replyText(p.reply, 900) || (articles.length
     ? (mind.reply_language === "en" ? "This is the closest saved story I found." : "هذا أقرب خبر محفوظ لما طلبته.")
     : (mind.reply_language === "en" ? "I could not find a saved story that actually matches this." : "لم أجد خبرًا محفوظًا يطابق هذا الطلب فعلًا."));
-  return { reply, articles };
+  if (articles.length && remaining) {
+    reply = `${reply}\n\n${mind.reply_language === "en" ? "There are other matching cards. Write “show one more” if you want the next card." : "توجد بطاقات أخرى قريبة. اكتب «اعرض واحدة إضافية» لعرض البطاقة التالية."}`;
+  }
+  return { reply, articles, more_available: remaining };
 }
 function missed(lang: "ar" | "en", method: string) {
   return {
@@ -352,6 +372,11 @@ Deno.serve(async (req: Request) => {
       }
       mind = emptyMind(q, true);
     }
+    if (asksForAdditionalCard(q)) {
+      const previousQuestion = [...h].reverse().find((turn) => turn.role === "user" && !asksForAdditionalCard(turn.content));
+      mind.needs_news_search = true;
+      if (previousQuestion) mind.search_query = words(previousQuestion.content).join(" ");
+    }
     if (!mind.needs_news_search) {
       return J({ reply: mind.direct_reply, articles: [], search: { candidate_count: 0, method: "conversation", intent: mind.request_type } }, 200, o);
     }
@@ -391,12 +416,16 @@ Deno.serve(async (req: Request) => {
       console.error("answer", e instanceof Error ? e.message : "unknown");
       const loose = hints(sq, cards).filter((c) => c.keyword_hits.length >= Math.min(2, words(sq).length || 1));
       const ids = new Set(loose.map((c) => c.id));
-      const articles = cards.filter((c) => ids.has(String(c.id))).slice(0, 3);
+      const alreadyShown = shownArticleIds(h);
+      const additional = asksForAdditionalCard(q);
+      const articles = cards.filter((c) => ids.has(String(c.id)) && (!additional || !alreadyShown.has(String(c.id)))).slice(0, 1);
+      const remaining = cards.some((c) => !alreadyShown.has(String(c.id)) && !articles.some((article) => String(article.id) === String(c.id)));
       return J({
         reply: articles.length
-          ? (mind.reply_language === "en" ? "These are the closest saved stories, matched by the words in your question." : "هذه أقرب الأخبار المحفوظة بحسب كلمات سؤالك.")
+          ? `${mind.reply_language === "en" ? "This is the closest saved story, matched by the words in your question." : "هذا أقرب خبر محفوظ بحسب كلمات سؤالك."}${remaining ? (mind.reply_language === "en" ? " There are other cards; write “show one more” for the next one." : " توجد بطاقات أخرى؛ اكتب «اعرض واحدة إضافية» لعرض التالية.") : ""}`
           : (mind.reply_language === "en" ? "I found nearby items, but none clearly matches what you asked." : "وجدت مواد قريبة، لكن لا واحدة تطابق ما طلبته بوضوح."),
         articles,
+        more_available: remaining,
         search: { candidate_count: cards.length, shown: articles.length, method },
       }, 200, o);
     }
