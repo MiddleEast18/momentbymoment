@@ -25,7 +25,7 @@
 .archive-message__body { min-width: 0; max-width: 100%; flex: 1 1 auto; }
 .archive-message--user .archive-message__body { flex: 0 1 auto; max-width: min(82%, 680px); }
 .archive-message__name { margin: 0 0 5px; color: var(--gold); font: 500 11px/1.5 var(--font-mono); }
-.archive-message__text { color: var(--text); font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.archive-message__text { color: var(--text); font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; white-space: pre-wrap; }
 .archive-message--user .archive-message__text { padding: 10px 14px; border: 1px solid rgba(201,162,39,.22); border-radius: 15px 15px 3px 15px; background: rgba(201,162,39,.09); }
 .archive-message__results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
 .archive-result-card { min-height: 190px; height: auto; padding: 16px; text-decoration: none; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
@@ -45,7 +45,7 @@
 .archive-send:disabled { opacity: .58; cursor: wait; transform: none; }
 .archive-send svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); }
 .archive-send.is-loading .archive-send__label { font-size: 0; }
-.archive-send.is-loading .archive-send__label::after { content: 'جارٍ البحث'; font-size: 12px; }
+.archive-send.is-loading .archive-send__label::after { content: 'أفكر'; font-size: 12px; }
 .archive-footer { width: min(920px, 100%); margin: 0 auto; padding: 0 24px max(15px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; gap: 12px; color: var(--text-faint); font-size: 10.5px; }
 .archive-footer a { color: var(--text-faint); text-decoration: none; }
 .archive-footer a:hover { color: var(--gold); }
