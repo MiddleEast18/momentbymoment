@@ -3,7 +3,7 @@
 .archive-header { width: min(1120px, 100%); margin-inline: auto; padding: max(16px, env(safe-area-inset-top)) 24px 14px; display: flex; align-items: center; justify-content: flex-start; direction: ltr; gap: 16px; border-bottom: 1px solid var(--panel-border); }
 .archive-back { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 7px 12px; border: 1px solid var(--panel-border); border-radius: 999px; color: var(--text-dim); text-decoration: none; font-size: 13px; direction: rtl; transition: color .16s ease, border-color .16s ease, background .16s ease; }
 .archive-back:hover { color: var(--gold); border-color: rgba(201,162,39,.36); background: var(--gold-soft); }
-.archive-main { width: min(920px, 100%); margin-inline: auto; padding: clamp(28px, 6vh, 64px) 24px 26px; display: flex; flex: 1 0 auto; flex-direction: column; }
+.archive-main { width: min(820px, 100%); margin-inline: auto; padding: clamp(28px, 6vh, 64px) 24px 26px; display: flex; flex: 1 0 auto; flex-direction: column; }
 .archive-intro { text-align: center; margin: 0 auto 28px; max-width: 650px; }
 .archive-kicker { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 15px; color: var(--gold); font: 500 12px/1.4 var(--font-mono); letter-spacing: .01em; }
 .archive-kicker__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 4px rgba(201,162,39,.1); }
@@ -14,10 +14,11 @@
 .archive-conversation { display: flex; flex: 1 1 auto; flex-direction: column; gap: 20px; min-height: 150px; padding: 16px 0 22px; }
 .archive-welcome { align-self: center; width: min(100%, 660px); padding: 24px 22px; border: 1px solid var(--panel-border); border-radius: 18px; background: linear-gradient(140deg, rgba(255,255,255,.035), rgba(255,255,255,.012)); text-align: center; }
 .archive-welcome__symbol { display: grid; place-items: center; width: 42px; height: 42px; margin: 0 auto 12px; border: 1px solid rgba(201,162,39,.25); border-radius: 14px; color: var(--gold); font: 400 30px/1 var(--font-body); }
-.archive-welcome p { margin: 0 0 15px; color: var(--text-dim); font-size: 14px; }
-.archive-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-.archive-suggestion { min-height: 37px; padding: 7px 12px; border: 1px solid var(--panel-border-strong); border-radius: 999px; background: rgba(255,255,255,.025); color: var(--text-dim); font-size: 12px; cursor: pointer; transition: .16s ease; }
-.archive-suggestion:hover, .archive-suggestion:focus-visible { border-color: rgba(201,162,39,.48); color: var(--gold); background: var(--gold-soft); }
+.archive-welcome p { margin: 0 0 15px; color: var(--text-dim); font-size: 14px; line-height: 1.8; }
+.archive-suggestions, .archive-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.archive-actions { justify-content: flex-start; margin-top: 12px; }
+.archive-suggestion, .archive-action { min-height: 37px; padding: 7px 12px; border: 1px solid var(--panel-border-strong); border-radius: 999px; background: rgba(255,255,255,.025); color: var(--text-dim); font-size: 12px; cursor: pointer; transition: .16s ease; }
+.archive-suggestion:hover, .archive-suggestion:focus-visible, .archive-action:hover, .archive-action:focus-visible { border-color: rgba(201,162,39,.48); color: var(--gold); background: var(--gold-soft); outline: none; }
 .archive-message { display: flex; align-items: flex-start; gap: 11px; width: 100%; animation: archive-message-in .2s ease-out; }
 .archive-message--user { justify-content: flex-start; padding-inline-start: 40px; }
 .archive-message__avatar { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(201,162,39,.32); border-radius: 50%; background: rgba(201,162,39,.07); color: var(--gold); }
@@ -25,15 +26,18 @@
 .archive-message__body { min-width: 0; max-width: 100%; flex: 1 1 auto; }
 .archive-message--user .archive-message__body { flex: 0 1 auto; max-width: min(82%, 680px); }
 .archive-message__name { margin: 0 0 5px; color: var(--gold); font: 500 11px/1.5 var(--font-mono); }
-.archive-message__text { color: var(--text); font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; white-space: pre-wrap; }
+.archive-message__text { color: var(--text); font-size: 14.5px; line-height: 1.9; overflow-wrap: anywhere; white-space: pre-wrap; }
 .archive-message--user .archive-message__text { padding: 10px 14px; border: 1px solid rgba(201,162,39,.22); border-radius: 15px 15px 3px 15px; background: rgba(201,162,39,.09); }
-.archive-message__results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-.archive-result-card { min-height: 190px; height: auto; padding: 16px; text-decoration: none; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.archive-message__results { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 14px; }
+.archive-result-card { min-height: 0; height: auto; padding: 16px 16px 14px; text-decoration: none; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
 .archive-result-card.card-large, .archive-result-card.card-medium { grid-column: auto; grid-row: auto; }
 .archive-result-card:hover { transform: translateY(-2px); border-color: rgba(201,162,39,.35); background-color: #1a222d; }
-.archive-result-card .card__headline { font-size: 16px; }
-.archive-result-card .card__summary { font-size: 12.5px; }
+.archive-result-card .card__headline { font-size: 17px; line-height: 1.55; }
+.archive-result-card .card__summary { font-size: 13px; line-height: 1.75; }
 .archive-result-card .card__time { direction: rtl; }
+.archive-brief { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(237,234,227,.08); border-radius: 14px; background: rgba(255,255,255,.025); display: grid; gap: 8px; }
+.archive-brief__row { margin: 0; color: var(--text); font-size: 13px; line-height: 1.75; }
+.archive-brief__label { display: block; margin-bottom: 1px; color: var(--gold); font: 500 11px/1.5 var(--font-mono); }
 .archive-composer { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 5; width: 100%; margin: auto 0 8px; padding: 13px 15px 10px; border: 1px solid rgba(237,234,227,.13); border-radius: 18px; background: color-mix(in srgb, var(--bg-elevated) 94%, transparent); box-shadow: 0 14px 48px rgba(0,0,0,.34), 0 0 0 4px rgba(255,255,255,.012); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .archive-composer textarea { display: block; width: 100%; min-height: 48px; max-height: 160px; resize: none; border: 0; outline: 0; background: transparent; color: var(--text); font: 400 15px/1.7 var(--font-body); }
 .archive-composer textarea::placeholder { color: var(--text-faint); }
@@ -46,7 +50,7 @@
 .archive-send svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transform: rotate(180deg); }
 .archive-send.is-loading .archive-send__label { font-size: 0; }
 .archive-send.is-loading .archive-send__label::after { content: 'أفكر'; font-size: 12px; }
-.archive-footer { width: min(920px, 100%); margin: 0 auto; padding: 0 24px max(15px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; gap: 12px; color: var(--text-faint); font-size: 10.5px; }
+.archive-footer { width: min(820px, 100%); margin: 0 auto; padding: 0 24px max(15px, env(safe-area-inset-bottom)); display: flex; justify-content: space-between; gap: 12px; color: var(--text-faint); font-size: 10.5px; }
 .archive-footer a { color: var(--text-faint); text-decoration: none; }
 .archive-footer a:hover { color: var(--gold); }
 .archive-error { color: #e4a49f; }
@@ -60,9 +64,8 @@
   .archive-intro__copy { font-size: 13px; }
   .archive-welcome { padding: 18px 13px; }
   .archive-suggestions { display: grid; grid-template-columns: 1fr; }
-  .archive-suggestion { text-align: right; }
-  .archive-message__results { grid-template-columns: 1fr; gap: 10px; }
-  .archive-result-card { min-height: 180px; }
+  .archive-suggestion, .archive-action { text-align: right; }
+  .archive-message__results { gap: 10px; }
   .archive-message--user { padding-inline-start: 18px; }
   .archive-message--user .archive-message__body { max-width: 92%; }
   .archive-composer { border-radius: 15px; padding: 11px 12px 9px; }

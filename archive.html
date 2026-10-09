@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0f14">
   <title>باحث الأخبار — مِرصاد</title>
-  <meta name="description" content="اسأل مِرصاد داخل الأرشيف. يفهم سؤالك ويجيب مباشرة، ويعرض بطاقة الخبر عند التطابق فقط.">
+  <meta name="description" content="اسأل أرشيف مِرصاد. بطاقة واحدة عند التطابق القوي، وشرح مأخوذ من نص الخبر فقط.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat.css?v=202610080235">
+  <link rel="stylesheet" href="archive-chat.css?v=202610081030">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
@@ -25,18 +25,18 @@
     <section class="archive-intro" aria-labelledby="archiveTitle">
       <p class="archive-kicker"><span class="archive-kicker__dot" aria-hidden="true"></span> ذاكرة أخبار مِرصاد</p>
       <h1 id="archiveTitle">ابحث في الأخبار،<br><span>واسأل بطريقتك.</span></h1>
-      <p class="archive-intro__copy">اكتب كما تتحدث. أقرأ السؤال كما هو، وأجيب بلغتك، ولا أظهر بطاقة إلا إذا طابقت الخبر فعلًا.</p>
-      <p class="archive-scope">وقائع الأخبار تُؤخذ من البطاقات المحفوظة فقط، ولا تُختلق.</p>
+      <p class="archive-intro__copy">اكتب كما تتحدث. التحية والمزاح يبقيان حديثًا، والبطاقة لا تظهر إلا إذا طابق الاسم الخبر في عنوانه أو ملخصه.</p>
+      <p class="archive-scope">الشرح يؤخذ من نص البطاقة المنشورة فقط، ولا يُضاف إليه شيء.</p>
     </section>
 
     <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
       <div class="archive-welcome" id="welcomeState">
         <span class="archive-welcome__symbol" aria-hidden="true">⌕</span>
-        <p>اسأل عن خبر، أو ناقش ما تقصده. البطاقة تظهر فقط حين تطابق السؤال.</p>
+        <p>اسأل عن شخص أو مكان أو حدث. إذا لم يكن التطابق قويًا سأطلب توضيحًا بدل بطاقة خاطئة.</p>
         <div class="archive-suggestions" aria-label="أسئلة مقترحة">
           <button type="button" class="archive-suggestion">ما الأخبار المتعلقة ببيروت؟</button>
           <button type="button" class="archive-suggestion">ابحث عن خبر الزلزال في تركيا</button>
-          <button type="button" class="archive-suggestion">أخبار الطاقة خلال الأسبوع الماضي</button>
+          <button type="button" class="archive-suggestion">أخبار الطاقة في السعودية</button>
         </div>
       </div>
     </section>
@@ -45,7 +45,7 @@
       <label class="visually-hidden" for="archivePrompt">اكتب سؤالك عن الأخبار</label>
       <textarea id="archivePrompt" name="query" rows="1" maxlength="500" placeholder="اسأل عن خبر في أرشيف مِرصاد…" required></textarea>
       <div class="archive-composer__bottom">
-        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> يفهم القصد قبل البطاقة</span>
+        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> بطاقة واحدة حين يتضح الاسم</span>
         <button class="archive-send" id="archiveSend" type="submit" aria-label="إرسال السؤال">
           <span class="archive-send__label">إرسال</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -63,6 +63,8 @@
         <p class="archive-message__name">مِرصاد</p>
         <div class="archive-message__text"></div>
         <div class="archive-message__results" hidden></div>
+        <div class="archive-brief" hidden></div>
+        <div class="archive-actions" hidden></div>
       </div>
     </article>
   </template>
@@ -85,8 +87,7 @@
     </a>
   </template>
 
-  <script src="news-text-normalizer.js?v=202609130721"></script>
-  <script src="archive-chat.js?v=202610080235" defer></script>
+  <script src="archive-chat.js?v=202610081030" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
