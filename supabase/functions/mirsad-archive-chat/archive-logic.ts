@@ -111,10 +111,31 @@ function escapeReg(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+export function asksYesNo(value: string) {
+  const folded = fold(value);
+  return /^(?:هل)(?:\s|$)/.test(folded) || /^(?:is|are|did|was|were|do|does|has|have)\b/.test(folded);
+}
+
+export function sameTopic(left: string, right: string) {
+  const words = distinctive(left);
+  const other = new Set(distinctive(right));
+  if (!words.length || !other.size) return false;
+  const hit = words.filter((word) => other.has(word)).length;
+  return hit >= Math.min(words.length, other.size);
+}
+
 export function hasToken(text: string, token: string) {
   if (!token || token.length < 2) return false;
   if (token.length <= 3) return new RegExp(`(?:^|\\s)${escapeReg(token)}(?:\\s|$)`).test(text);
   return text.includes(token);
+}
+
+function partyWord(word: string) {
+  const token = normToken(word);
+  const bare = /^[وفبل]/.test(token) && token.length >= 6 ? token.slice(1) : token;
+  if (token.length < 4 || EVENTISH.has(token) || EVENTISH.has(bare)) return false;
+  const blocked = /^(وقع|وقعت|ضرب|يضرب|اثار|اثارت|قال|قالت|اعلن|اعلنت|ذكر|ذكرت|شمل|تشمل|نقل|نقلت|اكد|اكدت|ارض|ارضيه|هزه|حكوم|مدن|متضرر|خطه|اعمار|جديد|كبير|قوي)$/;
+  return !blocked.test(token) && !blocked.test(bare);
 }
 
 function forms(word: string) {
@@ -155,7 +176,10 @@ export function classify(raw: string): Mind {
   const greetingLead = /^(?:اهلا|اهلين|هلا|هلو|مرحبا|السلام|سلام|صباح الخير|مساء الخير|صباح النور|مساء النور|كيفك|كيف حالك|شلونك|hi|hello|hey|good morning|good evening|thanks|thank you|شكرا|شكرا لك|يسلمو|تمام|حلو|ok|okay)(?:\s|$)/.test(folded);
   if (greetingLead && keys.length === 0) return { ...base, intent: "greeting", searchText: "" };
 
-  if (/(نكت|طرفه|اضحك|joke|مزح|تستهبل)/.test(folded)) return { ...base, intent: "joke", searchText: "" };
+  if (/(نكت|طرفه|اضحك|joke|مزح|تستهبل)/.test(folded)) {
+    const jokeWords = new Set(["نكت", "نكته", "طرفه", "اضحك", "joke", "مزح", "تستهبل"]);
+    return { ...base, intent: "joke", searchText: keys.filter((word) => !jokeWords.has(word)).join(" ") };
+  }
   if (/(ههه+|hahaha|\blol\b|\blmao\b)/.test(folded) && keys.length === 0) return { ...base, intent: "joke", searchText: "" };
 
   const follow = followOf(folded, keys);
@@ -166,7 +190,7 @@ export function classify(raw: string): Mind {
     return { ...base, intent: "ambiguous", searchText: "" };
   }
 
-  const question = /[?؟]/.test(text) || /(هل|لماذا|ليش|كيف|متى|ماذا|why|how|what|when|who)\b/.test(folded);
+  const question = /[?؟]/.test(text) || asksYesNo(text) || /(?:^|\s)(?:لماذا|ليش|كيف|متى|ماذا|why|how|what|when|who)(?:\s|$)/.test(folded);
   return { ...base, intent: question ? "question" : "search" };
 }
 
@@ -228,8 +252,13 @@ export function rankCards(query: string, cards: Card[], exclude: Set<string>) {
     .sort((a, b) => b.rank.score - a.rank.score || b.rank.published.localeCompare(a.rank.published) || a.rank.id.localeCompare(b.rank.id));
 }
 
-export function bestCard(query: string, cards: Card[], exclude: Set<string>) {
-  return rankCards(query, cards, exclude)[0]?.card || null;
+export function bestCard(query: string, cards: Card[], exclude: Set<string>, salt = 0) {
+  const ranked = rankCards(query, cards, exclude);
+  if (!ranked.length) return null;
+  const top = ranked[0].rank.score;
+  const ties = ranked.filter((item) => item.rank.score === top);
+  const index = ties.length ? Math.abs(salt) % ties.length : 0;
+  return ties[index]?.card || null;
 }
 
 export function relatedCards(anchor: string, cards: Card[], exclude: Set<string>) {
@@ -248,154 +277,372 @@ export function relatedCards(anchor: string, cards: Card[], exclude: Set<string>
     .sort((a, b) => b.score - a.score || b.published.localeCompare(a.published));
 }
 
+export function pickLine(options: string[], seed: string, previous: string[] = []) {
+  const unique = [...new Set(options.map((item) => item.replace(/\s+/g, " ").trim()).filter((item) => item.length > 1))];
+  if (!unique.length) return "";
+  const prior = new Set(previous.map((item) => fold(item)));
+  let hash = 2166136261;
+  for (const char of seed) {
+    hash ^= char.codePointAt(0) || 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  const start = (hash >>> 0) % unique.length;
+  for (let index = 0; index < unique.length; index += 1) {
+    const line = unique[(start + index) % unique.length];
+    if (!prior.has(fold(line))) return line;
+  }
+  return unique[start];
+}
+
 export function suggestions(lang: Lang) {
   return lang === "en"
     ? ["Summarize", "Analyze", "Who is mentioned", "Related card", "Another card"]
     : ["لخّص", "حلّل", "الجهات المذكورة", "بطاقة مرتبطة", "بطاقة أخرى"];
 }
 
-export function say(lang: Lang, tone: Tone, key: string) {
-  const ar: Record<string, Record<Tone, string>> = {
+export function say(lang: Lang, tone: Tone, key: string, seed = "", previous: string[] = []) {
+  const ar: Record<string, Record<Tone, string[]>> = {
     greeting: {
-      casual: "هلا. اكتب الاسم أو المكان، وإذا في خبر مطابق بطلعه لك.",
-      plain: "أهلًا. اكتب الشخص أو المكان أو الحدث الذي تريده.",
-      polite: "أهلًا بك. اكتب اسم الشخص أو المكان أو الحدث، من فضلك.",
+      casual: [
+        "هلا. اكتب اسم الشخص أو المدينة وبشوف لك الخبر.",
+        "يا هلا. عطني الاسم أو المكان مباشرة.",
+        "أهلين. مين أو وين تدور؟",
+      ],
+      plain: [
+        "أهلًا. اكتب الشخص أو المكان أو الحدث.",
+        "مرحبًا. أعطني الاسم أو المدينة لأبحث.",
+        "أهلًا بك. أي خبر تريده؟ اكتب الطرف أو المكان.",
+      ],
+      polite: [
+        "أهلًا بك. اكتب اسم الشخص أو المكان، من فضلك.",
+        "مرحبًا. لو سمحت حدّد الشخص أو المدينة أو الحدث.",
+        "أهلًا. يسعدني أبحث عندما تكتب الاسم أو المكان.",
+      ],
     },
     joke: {
-      casual: "هههه مزبوط، بس هون أرشيف أخبار مو مسرح. إذا تبي خبر، اكتب الاسم.",
-      plain: "أفهم المزحة. البحث الإخباري يبدأ لما تكتب شخصًا أو مكانًا أو حدثًا.",
-      polite: "سعيد بالنكتة. عندما تريد خبرًا، اكتب الشخص أو المكان أو الحدث.",
-    },
-    vague: {
-      casual: "ما فهمت القصد. وضّح الاسم أو المكان أو الحدث.",
-      plain: "الطلب غير واضح. حدّد الشخص أو المكان أو الحدث.",
-      polite: "لم أتبين المقصود. حدّد الشخص أو المكان أو الحدث، من فضلك.",
-    },
-    none: {
-      casual: "ما في تطابق قوي بهالاسم. وضّح الشخص أو المكان أو التاريخ أكثر.",
-      plain: "لا يوجد تطابق قوي. حدّد الشخص أو المكان أو الحدث بشكل أوضح.",
-      polite: "لم أجد تطابقًا قويًا. حدّد الشخص أو المكان أو الحدث بصورة أوضح.",
+      casual: [
+        "هههه تمام. إذا تبي خبر حقيقي، اكتب الاسم من دون نكتة.",
+        "ضحكت. الأخبار هنا ما تتألف، عطني شخص أو مكان.",
+        "حلوة. خلّ النكتة ورا، واكتب مين تقصد.",
+      ],
+      plain: [
+        "أفهم المزحة. اكتب شخصًا أو مكانًا إذا تريد خبرًا من الأرشيف.",
+        "ما راح أؤلف نكتة مكان الخبر. حدّد الاسم أو المدينة.",
+        "المزحة وصلت. البحث يبدأ باسم شخص أو مكان أو حدث.",
+      ],
+      polite: [
+        "سعيد بالنكتة. عندما تريد خبرًا، اكتب الشخص أو المكان.",
+        "أقدّر المزحة. للبحث، أحتاج اسم الشخص أو المدينة.",
+        "شكرًا للنكتة. الخبر يحتاج شخصًا أو مكانًا أو حدثًا.",
+      ],
     },
     noCard: {
-      casual: "ما في بطاقة ظاهرة الحين. اكتب الخبر أو الاسم أول.",
-      plain: "لا توجد بطاقة حالية. ابدأ باسم الشخص أو المكان أو الحدث.",
-      polite: "لا توجد بطاقة معروضة حاليًا. ابدأ بالشخص أو المكان أو الحدث.",
+      casual: [
+        "ما في بطاقة قدامك. اكتب الاسم أو المدينة أول.",
+        "لسا ما اخترنا خبر. عطني الشخص أو المكان.",
+        "ابدأ بالاسم، وبعدين أقدر ألخص أو أجيب بطاقة ثانية.",
+      ],
+      plain: [
+        "لا توجد بطاقة حالية. ابدأ باسم الشخص أو المكان.",
+        "ما في خبر معروض. اكتب الحدث أو المدينة أولًا.",
+        "أظهر خبرًا أولًا، ثم اطلب التلخيص أو بطاقة أخرى.",
+      ],
+      polite: [
+        "لا توجد بطاقة معروضة. ابدأ بالشخص أو المكان، من فضلك.",
+        "لم تُعرض بطاقة بعد. اكتب الاسم أو المدينة أولًا.",
+        "بعد عرض خبر، أستطيع تلخيصه أو إحضار غيره.",
+      ],
     },
     noNext: {
-      casual: "خلصت البطاقات المطابقة بهالبحث. ما في بطاقة جديدة من دون تكرار.",
-      plain: "لا توجد بطاقة مطابقة أخرى ضمن هذا البحث من غير تكرار.",
-      polite: "لا تتوفر بطاقة مطابقة إضافية ضمن البحث نفسه من غير تكرار.",
+      casual: [
+        "خلصت البطاقات القوية بهالبحث. ما بكرر اللي طلع.",
+        "ما في خبر جديد بنفس القوة. غيّر الاسم أو المدينة.",
+        "عرضت المتاح المطابق. إذا عندك طرف ثاني اكتبه.",
+      ],
+      plain: [
+        "لا توجد بطاقة مطابقة أخرى من غير تكرار.",
+        "انتهت النتائج القوية لهذا البحث. جرّب اسمًا أدق.",
+        "ما بقي خبر يجمع نفس الكلمات ولم يُعرض.",
+      ],
+      polite: [
+        "لا تتوفر بطاقة إضافية مطابقة من غير تكرار.",
+        "عُرضت البطاقات القوية لهذا الطلب. يمكن تضييق الاسم.",
+        "لم يبقَ خبر أوضح ضمن البحث نفسه.",
+      ],
     },
     noRelated: {
-      casual: "ما لقيت بطاقة مرتبطة بوضوح بنفس الاسم.",
-      plain: "لا توجد بطاقة مرتبطة يظهر فيها الاسم نفسه بوضوح.",
-      polite: "لم أجد بطاقة مرتبطة يظهر فيها الاسم نفسه بوضوح.",
-    },
-    lead: {
-      casual: "هاي أقرب بطاقة، والشرح تحت مأخوذ من نصها فقط.",
-      plain: "هذه أقرب بطاقة مطابقة. الشرح بعدها مأخوذ من نصها فقط.",
-      polite: "هذه أقرب بطاقة مطابقة. الشرح التالي مقتصر على نصها.",
-    },
-    anotherLead: {
-      casual: "بطاقة ثانية من نفس البحث، من غير البطاقات اللي ظهرت.",
-      plain: "بطاقة أخرى من سياق البحث السابق، مع استبعاد ما عُرض.",
-      polite: "هذه بطاقة إضافية من البحث السابق، بعد استبعاد المعروض.",
-    },
-    relatedLead: {
-      casual: "بطاقة مرتبطة بنفس الاسم، ومو تكرار للمعروض.",
-      plain: "بطاقة مرتبطة يظهر فيها الاسم نفسه، وليست تكرارًا لما عُرض.",
-      polite: "هذه بطاقة مرتبطة بالاسم نفسه، وليست تكرارًا للمعروض.",
+      casual: [
+        "ما لقيت خبرًا ثانيًا يظهر فيه نفس الاسم.",
+        "الاسم هذا ما تكرر في بطاقة ثانية واضحة.",
+        "ما في ارتباط ظاهر بنفس الاسم خارج اللي شفته.",
+      ],
+      plain: [
+        "لا توجد بطاقة أخرى يظهر فيها الاسم نفسه بوضوح.",
+        "لم يتكرر الاسم في خبر ثانٍ مطابق.",
+        "ما وجدت ارتباطًا أوضح من البطاقة الحالية.",
+      ],
+      polite: [
+        "لم أجد بطاقة أخرى تحمل الاسم نفسه بوضوح.",
+        "لا يوجد خبر مرتبط يظهر فيه نفس الاسم.",
+        "انتهى ما يتصل بهذا الاسم من غير تكرار.",
+      ],
     },
   };
-  const en: Record<string, string> = {
-    greeting: tone === "casual" ? "Hey. Give me a name, place, or event." : "Hello. Tell me the person, place, or event.",
-    joke: tone === "casual" ? "Ha. This is a news archive, not a comedy set. Drop a name if you want a story." : "I caught the joke. A news lookup starts when you name a person, place, or event.",
-    vague: "I didn't catch that. Name a person, place, or event.",
-    none: "No strong match. Say the person, place, or event more clearly.",
-    noCard: "There's no card on the table yet. Start with a name, place, or event.",
-    noNext: "No other matching card in this search without repeating one.",
-    noRelated: "No related card clearly carries the same name.",
-    lead: "Closest matching card. The note under it uses only that card's text.",
-    anotherLead: "Another card from the same search, skipping what you already saw.",
-    relatedLead: "A related card with the same name, not a repeat.",
+  const en: Record<string, string[]> = {
+    greeting: tone === "casual"
+      ? ["Hey. Give me a name or a city.", "Hi. Who or where should I look up?", "Hello. Drop a person, place, or event."]
+      : ["Hello. Tell me the person, place, or event.", "Welcome. Name a person or a city and I'll look.", "Hello. Which story do you want?"],
+    joke: tone === "casual"
+      ? ["Ha. I won't invent a joke in place of a story. Give me a name.", "Funny. This desk only has published cards. Who do you mean?", "Nice one. Ask again with a person or a place if you want the story."]
+      : ["I caught the joke. A lookup needs a person, place, or event.", "I won't make up a punchline as news. Name someone or somewhere.", "Understood. Tell me who or where when you want an actual card."],
+    noCard: ["There's no card yet. Start with a name or a city.", "Show me a person or a place first.", "I need a story on the table before I can go further."],
+    noNext: ["No other strong card in this search.", "That's the matching set. Try a sharper name.", "Nothing new matches without repeating a card."],
+    noRelated: ["No other card clearly carries the same name.", "That name doesn't show up in a second story.", "I didn't find a related card beyond this one."],
   };
-  if (lang === "en") return en[key] || en.vague;
-  return ar[key]?.[tone] || ar[key]?.plain || ar.vague.plain;
+  if (lang === "en") return pickLine(en[key] || en.greeting, seed || key, previous);
+  const toneLines = ar[key]?.[tone] || ar[key]?.plain || ar.greeting.plain;
+  return pickLine(toneLines, seed || `${key}:${tone}`, previous);
+}
+
+export function vagueReply(lang: Lang, tone: Tone, raw: string, seed = "", previous: string[] = []) {
+  const word = distinctive(raw)[0] || "";
+  if (lang === "en") {
+    const lines = word
+      ? [`"${word}" is too broad. Which person or place?`, `I need more than "${word}". Add a city or a name.`, `Which "${word}"? Tell me where or who.`]
+      : ["I didn't catch that. Name a person, place, or event.", "Say that again with a name or a city.", "That isn't a lookup yet. Who or where?"];
+    return pickLine(tone === "polite" ? lines.map((line) => `Please: ${line}`) : lines, seed || raw, previous);
+  }
+  const lines = word
+    ? [
+      `«${word}» لوحدها واسعة. أي بلد أو أي شخص تقصد؟`,
+      `وضّح «${word}»: وين، أو مين الطرف؟`,
+      `أحتاج غير كلمة «${word}». اكتب المكان أو الاسم.`,
+    ]
+    : [
+      "ما فهمت القصد. اكتب اسم شخص أو مدينة أو حدث.",
+      "الجملة ما فيها طرف واضح. مين أو وين؟",
+      "صغها باسم أو مكان حتى أقدر أبحث.",
+    ];
+  if (tone === "casual" && word) lines[0] = `«${word}» كثير واسعة. قولي وين أو مين.`;
+  if (tone === "polite" && word) lines[0] = `«${word}» وحدها لا تكفي. حدّد البلد أو الشخص، من فضلك.`;
+  return pickLine(lines, seed || raw, previous);
+}
+
+export function missReply(lang: Lang, tone: Tone, query: string, seed = "", previous: string[] = []) {
+  const q = sanitizeInline(query, 60) || (lang === "en" ? "that" : "هذا الطلب");
+  if (lang === "en") {
+    return pickLine([
+      `Nothing strong matches "${q}". Try the full name or add the city.`,
+      `I couldn't pin "${q}" to one card. Add a place or a year.`,
+      `"${q}" doesn't sit together in a single story here. Rephrase the person or the place.`,
+    ], seed || q, previous);
+  }
+  const lines = [
+    `ما في خبر يجمع «${q}» بوضوح. اكتب الاسم كامل أو أضف المكان.`,
+    `على «${q}» ما لقيت تطابقًا قويًا. جرّب المدينة أو السنة.`,
+    `كلمات «${q}» ما اجتمعت في بطاقة واحدة. غيّر الاسم أو المكان.`,
+  ];
+  if (tone === "casual") lines[1] = `ما لقيت شي قوي على «${q}». حط المدينة أو اسم العائلة.`;
+  if (tone === "polite") lines[0] = `لم أجد خبرًا يجمع «${q}» بوضوح. جرّب الاسم الكامل أو المدينة.`;
+  return pickLine(lines, seed || q, previous);
+}
+
+export function jokeReply(lang: Lang, tone: Tone, leftover: string, seed = "", previous: string[] = []) {
+  const name = sanitizeInline(leftover, 40);
+  if (!name) return say(lang, tone, "joke", seed, previous);
+  if (lang === "en") {
+    return pickLine([
+      `I won't invent a joke about ${name}. Ask with the name alone if you want the story.`,
+      `${name} stays a news lookup, not a punchline. Drop the joke word and I'll search.`,
+      `No made-up joke about ${name}. Send the name again when you want a real card.`,
+    ], seed || name, previous);
+  }
+  const lines = [
+    `ما راح ألف نكتة عن ${name}. اكتب الاسم لحاله إذا تبي الخبر.`,
+    `${name} دوري أجيب خبره، مو أختلق طرفة. أعد الاسم بدون كلمة نكتة.`,
+    `عن ${name} ما عندي إلا بطاقات منشورة. احذف النكتة وأعد الطلب.`,
+  ];
+  if (tone === "polite") lines[0] = `لن أؤلف نكتة عن ${name}. أعد الاسم وحده إذا أردت الخبر.`;
+  return pickLine(lines, seed || name, previous);
 }
 
 export function publishedLabel(value: unknown, lang: Lang) {
   const date = new Date(String(value || ""));
   if (!Number.isFinite(date.getTime())) return "";
-  return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "ar", {
-    dateStyle: "medium",
-    timeZone: "Asia/Riyadh",
-  }).format(date);
+  const parts = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Riyadh" }).formatToParts(date);
+  const day = String(Number(parts.find((part) => part.type === "day")?.value || 0));
+  const month = Number(parts.find((part) => part.type === "month")?.value || 0);
+  const year = parts.find((part) => part.type === "year")?.value || "";
+  if (!Number(day) || !month || !year) return "";
+  if (lang === "en") {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${day} ${months[month - 1]} ${year}`;
+  }
+  const months = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  return `${day} ${months[month - 1]} ${year}`;
 }
 
-export function briefingFor(card: Card, lang: Lang): Briefing {
-  const headline = sanitizeInline(card.headline, 280) || (lang === "en" ? "Untitled card" : "بطاقة بلا عنوان");
-  const summary = sanitizeInline(card.summary, 700);
+function spoken(bits: string[]) {
+  return bits.filter(Boolean).map((bit) => /[.!?؟]$/.test(bit) ? bit : `${bit}.`).join(" ");
+}
+
+function factBits(card: Card) {
+  const headline = sanitizeInline(card.headline, 240);
+  const summary = sanitizeInline(card.summary, 520);
+  const pieces = [...summary.split(/\n+|(?<=[.!?؟])\s+/), ...headline.split(/\n+|(?<=[.!?؟])\s+/)]
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 8)
+    .sort((a, b) => b.length - a.length);
+  const kept: string[] = [];
+  for (const bit of pieces) {
+    const folded = fold(bit);
+    if (kept.some((item) => {
+      const other = fold(item);
+      return other === folded || other.includes(folded) || folded.includes(other);
+    })) continue;
+    kept.push(bit);
+    if (kept.length >= 3) break;
+  }
+  return { headline, summary, bits: kept };
+}
+
+export function missingWords(query: string, card: Card) {
+  const blob = fold(`${sanitizeInline(card.headline, 400)} ${sanitizeInline(card.summary, 900)}`);
+  return distinctive(query).filter((word) => !affirmed(blob, word));
+}
+
+function gapLine(card: Card, lang: Lang, query: string) {
+  const text = `${sanitizeInline(card.headline, 300)} ${sanitizeInline(card.summary, 500)}`;
+  const missing = missingWords(query, card).slice(0, 3);
+  if (missing.length) {
+    const list = missing.join(lang === "en" ? ", " : "، ");
+    return lang === "en" ? `The text does not confirm: ${list}.` : `النص ما يؤكد: ${list}.`;
+  }
+  if (!/\d/.test(text)) return lang === "en" ? "No number is written in this text." : "ما فيه رقم في هذا النص.";
+  return lang === "en" ? "Nothing beyond those written sentences is established." : "ما يثبت شيئًا أبعد من الجمل المكتوبة.";
+}
+
+export function briefingFor(card: Card, lang: Lang, query = ""): Briefing {
+  const { headline, bits } = factBits(card);
   const source = sanitizeInline(card.source_name, 80);
   const date = publishedLabel(card.published_at, lang);
-  const contextBits = [
-    lang === "en"
-      ? "People and place are only those literally written in the headline or summary."
-      : "الأطراف والمكان هم المذكورون حرفيًا في العنوان أو الملخص فقط.",
-  ];
-  if (date) contextBits.push(lang === "en" ? `Card publication date: ${date}.` : `تاريخ نشر البطاقة: ${date}.`);
-  if (source) contextBits.push(lang === "en" ? `Source name on the card: ${source}.` : `اسم المصدر على البطاقة: ${source}.`);
+  const names = distinctive(`${headline} ${sanitizeInline(card.summary, 500)}`).filter(partyWord).slice(0, 6);
+  const context = [
+    names.length ? (lang === "en" ? `Named in the text: ${names.join(", ")}.` : `مذكور في النص: ${names.join("، ")}.`) : "",
+    date ? (lang === "en" ? `Published ${date}.` : `تاريخ النشر: ${date}.`) : "",
+    source ? (lang === "en" ? `Source: ${source}.` : `المصدر: ${source}.`) : "",
+  ].filter(Boolean).join(" ");
+  const result = bits.find((bit) => fold(bit) !== fold(headline)) || bits[0] || headline;
   return {
-    event: headline,
-    context: contextBits.join(" "),
-    result: summary || (lang === "en" ? "The card states no result beyond the headline." : "لا نتيجة مكتوبة أبعد من العنوان."),
-    proves: lang === "en"
-      ? "It shows only the wording in the headline and summary above."
-      : "يثبت فقط الصياغة المكتوبة في العنوان والملخص أعلاه.",
-    limits: lang === "en"
-      ? "It does not prove motives, numbers, causes, or later outcomes that are not written there."
-      : "لا يثبت دوافع أو أرقامًا أو أسبابًا أو نتائج لاحقة غير مكتوبة هناك.",
+    event: headline || (lang === "en" ? "Untitled card" : "بطاقة بلا عنوان"),
+    context: context || (lang === "en" ? "The card names no separate party." : "النص ما يفرز طرفًا أو تاريخًا إضافيًا."),
+    result: result || (lang === "en" ? "No result beyond the headline." : "لا نتيجة مكتوبة أبعد من العنوان."),
+    proves: bits[0] ? (lang === "en" ? `The wording says: ${bits[0]}` : `الصياغة تقول: ${bits[0]}`) : (lang === "en" ? "The card has no body text." : "لا نص أبعد من العنوان."),
+    limits: gapLine(card, lang, query),
   };
 }
 
-export function summarizeCard(card: Card, lang: Lang) {
-  const headline = sanitizeInline(card.headline, 280);
-  const summary = sanitizeInline(card.summary, 420);
-  if (lang === "en") return [headline, summary].filter(Boolean).join("\n\n") || "This card has no text to summarize.";
-  return [headline, summary].filter(Boolean).join("\n\n") || "لا نص في هذه البطاقة لألخصه.";
-}
+export type ReplyMode = "fresh" | "another" | "related" | "revisit";
 
-export function analyzeCard(card: Card, lang: Lang, tone: Tone) {
-  const headline = sanitizeInline(card.headline, 280);
-  const summary = sanitizeInline(card.summary, 500);
-  if (lang === "en") {
-    return [
-      "Reading only the text on this card:",
-      headline ? `The headline says: ${headline}` : "The headline is empty.",
-      summary ? `The summary adds: ${summary}` : "There is no summary beyond the headline.",
-      "Anything not written there — cause, scale, or what happened next — stays unproven.",
-    ].join("\n");
+export function composeReply(args: {
+  card: Card;
+  lang: Lang;
+  tone: Tone;
+  query: string;
+  mode: ReplyMode;
+  seed: string;
+  yesNo?: boolean;
+  previous?: string[];
+}) {
+  const { headline, bits } = factBits(args.card);
+  const source = sanitizeInline(args.card.source_name, 80);
+  const date = publishedLabel(args.card.published_at, args.lang);
+  const first = bits[0] || headline;
+  const second = bits[1] || "";
+  const story = spoken(second ? [first, second] : [first]);
+  const asked = distinctive(args.query).slice(0, 4).join(" ");
+  const gaps = missingWords(args.query, args.card);
+  const affirm = Boolean(args.yesNo) && gaps.length === 0 && args.mode === "fresh";
+  const stamp = source ? `${source}${date ? (args.lang === "en" ? `, ${date}` : `، ${date}`) : ""}` : date;
+  const previous = args.previous || [];
+  if (args.lang === "en") {
+    const options = args.mode === "another"
+      ? [`Different card. ${story}`, second ? `Not the previous one. ${spoken([second])}` : `Not the previous one. ${story}`, stamp ? `${stamp}: ${spoken([first])}` : story]
+      : args.mode === "related"
+        ? [`Related by the same name. ${story}`, second ? `Same name, different story: ${spoken([second])}` : `Same name, different story: ${story}`]
+        : args.mode === "revisit"
+          ? [`This is still the strongest card. ${spoken([second || first])}`, `No second story matches as clearly. ${spoken([second || first])}`]
+          : [story, asked ? `On "${asked}": ${spoken([first])}` : spoken([first]), stamp ? `${stamp}: ${spoken([first])}` : spoken([first])];
+    const voiced = affirm ? options.map((line, index) => index % 2 === 0 ? `Yes. ${line}` : `The text says so. ${line}`) : options;
+    return pickLine(voiced, args.seed, previous);
   }
-  const lead = tone === "casual" ? "قراءة سريعة لنص البطاقة نفسها، من دون زيادة:" : "قراءة لنص هذه البطاقة فقط:";
-  return [
-    lead,
-    headline ? `العنوان يقول: ${headline}` : "العنوان فارغ.",
-    summary ? `الملخص يضيف: ${summary}` : "لا ملخص أبعد من العنوان.",
-    "ما لم يُكتب هنا من سبب أو حجم أو ما حدث بعد ذلك يبقى غير مثبت.",
-  ].join("\n");
+  const options = args.mode === "another"
+    ? [`خبر غير اللي سبق. ${story}`, second ? `بطاقة ثانية. ${spoken([second])}` : `بطاقة ثانية. ${story}`, stamp ? `${stamp}: ${spoken([first])}` : story]
+    : args.mode === "related"
+      ? [`نفس الاسم في خبر آخر. ${story}`, second ? `مرتبطة بالاسم، والتفصيل: ${spoken([second])}` : `مرتبطة بالاسم: ${story}`]
+      : args.mode === "revisit"
+        ? [`ما لقيت خبرًا أوضح من هذا. ${spoken([second || first])}`, `بقيت هذي البطاقة الأقوى. ${spoken([second || first])}`]
+        : [story, asked ? `عن «${asked}»: ${spoken([first])}` : spoken([first]), stamp ? `${stamp}: ${spoken([first])}` : spoken([first])];
+  const voiced = affirm
+    ? options.map((line, index) => (index % 2 === 0 ? `نعم. ${line}` : `النص يذكر ذلك. ${line}`))
+    : options;
+  if (args.tone === "casual" && args.mode === "fresh") voiced.push(`شوف: ${spoken([first])}`);
+  if (args.tone === "polite" && args.mode === "fresh") voiced.push(`وجدت هذا في النص: ${spoken([first])}`);
+  return pickLine(voiced, args.seed, previous);
 }
 
-export function entitiesOf(card: Card, lang: Lang) {
+export function summarizeCard(card: Card, lang: Lang, seed = "", previous: string[] = []) {
+  const { headline, bits } = factBits(card);
+  const source = sanitizeInline(card.source_name, 80);
+  const date = publishedLabel(card.published_at, lang);
+  const first = bits[0] || headline;
+  const second = bits[1] || "";
+  const stamp = source ? `${source}${date ? (lang === "en" ? `, ${date}` : `، ${date}`) : ""}` : "";
+  if (lang === "en") {
+    return pickLine([
+      [first, second].filter(Boolean).join(" "),
+      stamp ? `${first} (${stamp})` : first,
+      second || first,
+    ], seed || first, previous) || "This card has no text to summarize.";
+  }
+  return pickLine([
+    [first, second].filter(Boolean).join(" "),
+    stamp ? `${first} (${stamp})` : first,
+    second ? `باختصار: ${second}` : first,
+  ], seed || first, previous) || "لا نص في هذه البطاقة لألخصه.";
+}
+
+export function analyzeCard(card: Card, lang: Lang, tone: Tone, seed = "", previous: string[] = []) {
+  const { headline, bits } = factBits(card);
+  const extra = bits.find((bit) => fold(bit) !== fold(headline)) || "";
+  const gap = gapLine(card, lang, "");
+  if (lang === "en") {
+    return pickLine([
+      `The headline says "${headline || "nothing"}". ${extra ? `The summary adds: ${extra}` : "The summary adds no separate fact."} ${gap}`,
+      `${extra || headline} That is as far as the text goes. ${gap}`,
+      `Read only this card: ${headline}. ${gap}`,
+    ], seed || headline, previous);
+  }
+  const options = [
+    `العنوان يقول «${headline || "لا شيء"}». ${extra ? `الملخص يضيف: ${extra}` : "الملخص ما يضيف واقعة جديدة."} ${gap}`,
+    `${extra || headline} وهنا يقف النص. ${gap}`,
+    tone === "casual" ? `لو نقرأها بهدوء: ${headline}. ${extra ? `وبعدين: ${extra}. ` : ""}${gap}` : `من النص وحده: ${headline}. ${gap}`,
+  ];
+  return pickLine(options, seed || headline, previous);
+}
+
+export function entitiesOf(card: Card, lang: Lang, seed = "", previous: string[] = []) {
   const pool = distinctive(`${sanitizeInline(card.headline, 300)} ${sanitizeInline(card.summary, 700)}`);
-  const names = pool.filter((word) => !EVENTISH.has(word) && word.length >= 4).slice(0, 8);
+  const names = pool.filter(partyWord).slice(0, 8);
   if (!names.length) {
     return lang === "en"
-      ? "The card text does not isolate a clear named party beyond the headline wording."
-      : "نص البطاقة لا يفرز جهة باسم واضح أبعد من صياغة العنوان.";
+      ? pickLine(["No clear name stands apart from the headline.", "The text doesn't isolate a person or a place.", "I can't list a party that the wording itself separates."], seed || "none", previous)
+      : pickLine(["ما فيه اسم واضح زيادة على صياغة العنوان.", "النص ما يفرز شخصًا أو مكانًا لحاله.", "ما أقدر أعد جهة ما كتبها النص كاسم."], seed || "none", previous);
   }
   const list = names.join(lang === "en" ? ", " : "، ");
   return lang === "en"
-    ? `Words on this card that look like names or places, and nothing added: ${list}.`
-    : `ألفاظ ظاهرة في نص البطاقة فقط، وقد تكون أسماء أو أماكن: ${list}.`;
+    ? pickLine([`Named in this text: ${list}.`, `The card writes: ${list}. Nothing added from outside.`, `People or places on the card: ${list}.`], seed || list, previous)
+    : pickLine([`اللي يظهر بالاسم: ${list}.`, `البطاقة تكتب: ${list}. ما أضفت جهة من برّا.`, `أشخاص أو أماكن في النص: ${list}.`], seed || list, previous);
 }
 
 export function anchorName(card: Card, previousQuery: string) {

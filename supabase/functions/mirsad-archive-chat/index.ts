@@ -6,15 +6,22 @@ import {
   bestCard,
   briefingFor,
   classify,
+  asksYesNo,
+  composeReply,
   entitiesOf,
+  jokeReply,
+  missReply,
   publicCard,
   relatedCards,
+  sameTopic,
   sanitizeInline,
   say,
   suggestions,
   summarizeCard,
+  vagueReply,
   type Card,
   type Lang,
+  type ReplyMode,
 } from "./archive-logic.ts";
 
 const U = Deno.env.get("SUPABASE_URL") || "";
@@ -115,7 +122,7 @@ function merge(pool: Card[], rows: unknown[]) {
 }
 
 async function textSearch(db: ReturnType<typeof createClient>, text: string) {
-  const result = await db.rpc("mirsad_archive_chat_text_search", { p_search_text: text, p_limit: 6 });
+  const result = await db.rpc("mirsad_archive_chat_text_search", { p_search_text: text, p_limit: 14 });
   if (result.error) throw new Error("search_failed");
   return Array.isArray(result.data) ? result.data : [];
 }
@@ -145,7 +152,7 @@ async function semanticSearch(db: ReturnType<typeof createClient>, text: string)
     const result = await db.rpc("mirsad_archive_search", {
       p_embedding: `[${vector.join(",")}]`,
       p_search_text: text,
-      p_limit: 4,
+      p_limit: 8,
     });
     if (result.error) return [];
     return Array.isArray(result.data) ? result.data : [];
@@ -163,9 +170,9 @@ async function loadArticle(db: ReturnType<typeof createClient>, id: string) {
   return result.data as Card;
 }
 
-function packet(lang: Lang, tone: "casual" | "plain" | "polite", key: string, extra: Record<string, unknown> = {}) {
+function packet(lang: Lang, tone: "casual" | "plain" | "polite", reply: string, extra: Record<string, unknown> = {}) {
   return {
-    reply: say(lang, tone, key),
+    reply,
     briefing: null,
     articles: [],
     suggestions: [],
@@ -176,11 +183,11 @@ function packet(lang: Lang, tone: "casual" | "plain" | "polite", key: string, ex
   };
 }
 
-function withCard(lang: Lang, tone: "casual" | "plain" | "polite", lead: string, card: Card, query: string, shown: number, method: string) {
+function withCard(lang: Lang, tone: "casual" | "plain" | "polite", card: Card, query: string, shown: number, method: string, mode: ReplyMode, seed: string, previous: string[], yesNo: boolean) {
   const article = publicCard(card);
   return {
-    reply: say(lang, tone, lead),
-    briefing: briefingFor(card, lang),
+    reply: composeReply({ card, lang, tone, query, mode, seed, yesNo, previous }),
+    briefing: briefingFor(card, lang, query),
     articles: [article],
     suggestions: suggestions(lang),
     lang,
@@ -217,19 +224,23 @@ Deno.serve(async (req: Request) => {
     const shown = idsOf(body, history);
     const previousQuery = rememberedQuery(body, history);
     const activeId = rememberedArticle(body, history);
+    const previousReplies = history.filter((turn) => turn.role === "assistant").map((turn) => turn.content);
+    const seed = `${query}|${history.length}`;
+    const yesNo = asksYesNo(query);
 
-    if (mind.intent === "greeting") return json(packet(mind.lang, mind.tone, "greeting", { method: "greeting" }), 200, origin);
-    if (mind.intent === "joke") return json(packet(mind.lang, mind.tone, "joke", { method: "joke" }), 200, origin);
-    if (mind.intent === "ambiguous") return json(packet(mind.lang, mind.tone, "vague", { method: "clarify" }), 200, origin);
+    if (mind.intent === "greeting") return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "greeting", seed, previousReplies), { method: "greeting" }), 200, origin);
+    if (mind.intent === "joke") return json(packet(mind.lang, mind.tone, jokeReply(mind.lang, mind.tone, mind.searchText, seed, previousReplies), { method: "joke" }), 200, origin);
+    if (mind.intent === "ambiguous") return json(packet(mind.lang, mind.tone, vagueReply(mind.lang, mind.tone, query, seed, previousReplies), { method: "clarify" }), 200, origin);
 
     if (mind.follow === "summarize" || mind.follow === "analyze" || mind.follow === "entities") {
       const card = await loadArticle(db, activeId);
-      if (!card) return json(packet(mind.lang, mind.tone, "noCard", { method: "card-context", active_article_id: "", search_query: previousQuery }), 200, origin);
+      if (!card) return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noCard", seed, previousReplies), { method: "card-context", active_article_id: "", search_query: previousQuery }), 200, origin);
+      const followSeed = `${activeId}|${history.length}|${mind.follow}`;
       const reply = mind.follow === "summarize"
-        ? summarizeCard(card, mind.lang)
+        ? summarizeCard(card, mind.lang, followSeed, previousReplies)
         : mind.follow === "analyze"
-          ? analyzeCard(card, mind.lang, mind.tone)
-          : entitiesOf(card, mind.lang);
+          ? analyzeCard(card, mind.lang, mind.tone, followSeed, previousReplies)
+          : entitiesOf(card, mind.lang, followSeed, previousReplies);
       return json({
         reply,
         briefing: null,
@@ -247,50 +258,56 @@ Deno.serve(async (req: Request) => {
       const queryText = mind.follow === "related"
         ? (anchorName(card || {}, previousQuery) || previousQuery)
         : (previousQuery || (card ? sanitizeInline(card.headline, 180) : ""));
-      if (!queryText) return json(packet(mind.lang, mind.tone, "noCard", { method: "card-context" }), 200, origin);
+      if (!queryText) return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noCard", seed, previousReplies), { method: "card-context" }), 200, origin);
       const pool: Card[] = [];
       merge(pool, await textSearch(db, queryText));
       if (mind.follow === "related") {
         const anchor = anchorName(card || {}, previousQuery);
-        if (!anchor) return json(packet(mind.lang, mind.tone, "noRelated", { method: "related", search_query: previousQuery, active_article_id: activeId }), 200, origin);
+        if (!anchor) return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noRelated", seed, previousReplies), { method: "related", search_query: previousQuery, active_article_id: activeId }), 200, origin);
         let picked = relatedCards(anchor, pool, shown)[0]?.card || null;
         if (!picked) {
           merge(pool, await semanticSearch(db, anchor));
           picked = relatedCards(anchor, pool, shown)[0]?.card || null;
         }
-        if (!picked) return json(packet(mind.lang, mind.tone, "noRelated", { method: "related", search_query: previousQuery, active_article_id: activeId }), 200, origin);
-        return json(withCard(mind.lang, mind.tone, "relatedLead", picked, previousQuery || anchor, pool.length, "related"), 200, origin);
+        if (!picked) return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noRelated", seed, previousReplies), { method: "related", search_query: previousQuery, active_article_id: activeId }), 200, origin);
+        return json(withCard(mind.lang, mind.tone, picked, previousQuery || anchor, pool.length, "related", "related", `${seed}|${picked.id}`, previousReplies, false), 200, origin);
       }
       const meaning = previousQuery || queryText;
-      let picked = bestCard(meaning, pool, shown);
+      let picked = bestCard(meaning, pool, shown, history.length);
       if (!picked) {
         merge(pool, await semanticSearch(db, meaning));
-        picked = bestCard(meaning, pool, shown);
+        picked = bestCard(meaning, pool, shown, history.length);
       }
-      if (!picked) return json(packet(mind.lang, mind.tone, "noNext", { method: "another", search_query: meaning, active_article_id: activeId }), 200, origin);
-      return json(withCard(mind.lang, mind.tone, "anotherLead", picked, meaning, pool.length, "another"), 200, origin);
+      if (!picked) return json(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noNext", seed, previousReplies), { method: "another", search_query: meaning, active_article_id: activeId }), 200, origin);
+      return json(withCard(mind.lang, mind.tone, picked, meaning, pool.length, "another", "another", `${seed}|${picked.id}`, previousReplies, false), 200, origin);
     }
 
     const searchText = mind.searchText;
     const pool: Card[] = [];
     let method = "text";
+    const choose = (exclude: Set<string>) => bestCard(searchText, pool, exclude, history.length);
     merge(pool, await textSearch(db, searchText));
-    let picked = bestCard(searchText, pool, new Set());
+    let picked = choose(shown);
     if (!picked) {
       const names = searchText.split(" ").filter((word) => word.length >= 4).slice(0, 2);
       for (const name of names) {
         merge(pool, await textSearch(db, name));
-        picked = bestCard(searchText, pool, new Set());
+        picked = choose(shown);
         if (picked) break;
       }
     }
     if (!picked) {
       merge(pool, await semanticSearch(db, searchText));
-      picked = bestCard(searchText, pool, new Set());
+      picked = choose(shown);
       if (picked) method = "semantic";
     }
-    if (!picked) return json(packet(mind.lang, mind.tone, "none", { method, search_query: searchText }), 200, origin);
-    return json(withCard(mind.lang, mind.tone, "lead", picked, searchText, pool.length, method), 200, origin);
+    let mode: ReplyMode = previousQuery && sameTopic(searchText, previousQuery) && shown.size ? "another" : "fresh";
+    if (!picked) {
+      picked = choose(new Set());
+      if (picked && shown.has(String(picked.id || ""))) mode = "revisit";
+    }
+    if (!picked) return json(packet(mind.lang, mind.tone, missReply(mind.lang, mind.tone, searchText, seed, previousReplies), { method, search_query: searchText }), 200, origin);
+    return json(withCard(mind.lang, mind.tone, picked, searchText, pool.length, method, mode, `${seed}|${picked.id}|${mode}`, previousReplies, yesNo), 200, origin);
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     console.error("request", code);
