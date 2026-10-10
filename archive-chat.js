@@ -231,7 +231,7 @@
         active_article_id: state.activeId,
         search_query: state.searchQuery,
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(125000),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -287,7 +287,10 @@
       persist();
     } catch (error) {
       pending.remove();
-      const entry = { role: 'assistant', text: error.message || 'تعذر البحث الآن.', error: true };
+      const message = error?.name === 'TimeoutError' || error?.name === 'AbortError'
+        ? 'تأخر الرد من خدمة الأرشيف. انتظر قليلًا قبل إعادة المحاولة حتى لا يتكرر الطلب.'
+        : (error.message || 'تعذر إكمال طلب الأرشيف. حاول مرة أخرى بعد قليل.');
+      const entry = { role: 'assistant', text: message, error: true };
       appendEntry(entry);
       remember(entry);
     } finally {
