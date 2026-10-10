@@ -36,7 +36,8 @@ const FILLER = new Set([
   "اهلا", "اهلين", "هلا", "هلو", "مرحبا", "السلام", "سلام", "صباح", "مساء", "الخير", "النور", "كيفك", "شلونك",
   "hi", "hello", "hey", "thanks", "thank", "شكرا", "يسلمو", "تسلم", "تمام", "حلو", "ok", "okay", "بك", "رحمه", "بركاته",
   "لك", "you", "good", "morning", "evening", "عليكم", "ورحمه", "الله",
-]);
+  "and", "in", "to", "for", "on", "at", "with", "during", "from", "by", "near", "do", "did", "does", "was", "were", "has", "have", "had", "happen", "happens", "happened", "والتي",
+].map(normToken));
 
 const EVENTISH = new Set([
   "زلزال", "هزه", "حرب", "اتفاق", "اتفاقية", "اجتماع", "قمه", "اسعار", "نفط", "طاقه", "مباراه", "هدف", "قتل", "هجوم",
@@ -86,7 +87,8 @@ function isFiller(word: string) {
 export function distinctive(value: string) {
   const seen = new Set<string>();
   for (const part of fold(value).split(" ")) {
-    const token = normToken(part);
+    let token = normToken(part);
+    if (/^[وفبل]/.test(token) && token.length >= 6) token = normToken(token.slice(1));
     if (isFiller(token) || seen.has(token)) continue;
     seen.add(token);
     if (seen.size >= 8) break;

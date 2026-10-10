@@ -23,6 +23,7 @@
   const userTemplate = document.getElementById('archiveUserMessageTemplate');
   const cardTemplate = document.getElementById('archiveCardTemplate');
   const state = { history: [], shownIds: [], activeId: '', searchQuery: '', transcript: [] };
+  const openingArticles = new Set();
   let busy = false;
 
   function normalize(value) {
@@ -118,23 +119,34 @@
   async function openArchiveArticle(event, article) {
     event.preventDefault();
     const href = safeHttpUrl(article.source_url);
-    if (!href || busy) return;
-    const tab = window.open('about:blank', '_blank');
-    if (tab) tab.opener = null;
+    const articleId = String(article.id || '');
+    if (!href || !articleId || busy || openingArticles.has(articleId)) return;
+    openingArticles.add(articleId);
+    const card = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    card?.setAttribute('aria-busy', 'true');
+    let tab = null;
     try {
+      tab = window.open('about:blank', '_blank');
+      if (tab) tab.opener = null;
       const response = await fetch(CHAT_URL, {
         method: 'POST',
         headers: await authorizationHeaders(),
-        body: JSON.stringify({ operation: 'archive_open', article_id: String(article.id || '') }),
+        body: JSON.stringify({ operation: 'archive_open', article_id: articleId }),
         signal: AbortSignal.timeout(15000),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(normalize(payload.error) || 'تعذر فتح الخبر.');
+      showBalance(payload);
       if (tab) tab.location.href = href;
       else window.location.assign(href);
     } catch (error) {
       if (tab) tab.close();
-      appendEntry({ role: 'assistant', text: error.message || 'تعذر فتح الخبر.', error: true });
+      const entry = { role: 'assistant', text: error.message || 'تعذر فتح الخبر.', error: true };
+      appendEntry(entry);
+      remember(entry);
+    } finally {
+      openingArticles.delete(articleId);
+      card?.removeAttribute('aria-busy');
     }
   }
 
@@ -212,7 +224,9 @@
         results.appendChild(renderCard(cards[0]));
         const note = document.createElement('p');
         note.className = 'archive-card-note';
-        note.textContent = 'فتح المصدر يخصم فتحة، بما في ذلك إعادة فتح الخبر نفسه.';
+        note.textContent = entry.lang === 'en'
+          ? 'Opening the source costs 2 unlocks, including repeat opens.'
+          : 'فتح المصدر يخصم فتحتين، بما في ذلك إعادة فتح الخبر نفسه.';
         results.appendChild(note);
       }
       renderBrief(node, entry.briefing, entry.lang || 'ar');
@@ -241,7 +255,7 @@
     if (!text || !payload) return;
     text.replaceChildren();
     if (payload.unlimited === true) text.textContent = 'رصيد الفتحات غير محدود';
-    else if (Number.isFinite(Number(payload.remaining_unlocks))) text.textContent = `المتبقي ${payload.remaining_unlocks} فتحة`;
+    else if (payload.remaining_unlocks != null && Number.isFinite(Number(payload.remaining_unlocks))) text.textContent = `المتبقي ${payload.remaining_unlocks} فتحة`;
   }
 
   function startPending() {

@@ -202,6 +202,14 @@ async function charge(db: ReturnType<typeof createClient>, userId: string, opera
   return row;
 }
 
+async function ensureAffordable(db: ReturnType<typeof createClient>, userId: string, operations: string[], articleId: string | null = null) {
+  const result = await db.rpc("charge_archive_operations", { p_user_id: userId, p_operations: operations, p_article_id: articleId, p_commit: false });
+  if (result.error) throw new Error("charge_failed");
+  const row = Array.isArray(result.data) ? result.data[0] : result.data;
+  if (!row?.allowed) throw new Error("insufficient_unlocks");
+  return row;
+}
+
 async function editorialReply(query: string, card: Card, lang: Lang, context: Turn[] = [], grounded = "") {
   const article = { headline: sanitizeInline(card.headline, 300), summary: sanitizeInline(card.summary, 900), source: sanitizeInline(card.source_name, 100), published_at: sanitizeInline(card.published_at, 60) };
   const history = context.slice(-6).map(({ role, content }) => ({ role, content: sanitizeInline(content, 500) }));
@@ -341,6 +349,7 @@ Deno.serve(async (req: Request) => {
       const charged = await charge(db, user.id, ["archive_open"], articleId);
       return json({ charged: true, remaining_unlocks: charged.remaining_unlocks, unlimited: charged.unlimited }, 200, origin);
     }
+    if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف." }, 401, origin);
     const quota = await db.rpc("mirsad_archive_consume_rate_limit", {
       p_subject_hash: await sha(address),
       p_window_start: new Date(Math.floor(Date.now() / 300000) * 300000).toISOString(),
@@ -358,28 +367,25 @@ Deno.serve(async (req: Request) => {
     const yesNo = asksYesNo(query);
 
     if (mind.intent === "greeting") {
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف." }, 401, origin);
       const charged = await charge(db, user.id, ["archive_other"]);
       return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "greeting", seed, previousReplies), { method: "greeting" }), charged), 200, origin);
     }
     if (mind.intent === "joke") {
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف." }, 401, origin);
       const charged = await charge(db, user.id, ["archive_other"]);
       return json(priced(packet(mind.lang, mind.tone, jokeReply(mind.lang, mind.tone, mind.searchText, seed, previousReplies), { method: "joke" }), charged), 200, origin);
     }
     if (mind.intent === "ambiguous" && !(activeId && history.length && isContextualFollowup(query))) {
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف." }, 401, origin);
       const charged = await charge(db, user.id, ["archive_other"]);
       return json(priced(packet(mind.lang, mind.tone, vagueReply(mind.lang, mind.tone, query, seed, previousReplies), { method: "clarify" }), charged), 200, origin);
     }
 
     if (mind.follow === "summarize" || mind.follow === "analyze" || mind.follow === "entities") {
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
       const card = await loadArticle(db, activeId);
       if (!card) {
         const charged = await charge(db, user.id, ["archive_followup"]);
         return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noCard", seed, previousReplies), { method: "card-context", active_article_id: "", search_query: previousQuery }), charged), 200, origin);
       }
+      await ensureAffordable(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], activeId || null);
       const editorial = await editorialReply(`${previousQuery || sanitizeInline(card.headline, 180)} — ${query}`, card, mind.lang, history, composeReply({ card, lang: mind.lang, tone: mind.tone, query, mode: "fresh", seed, previous: previousReplies, yesNo }));
       const charged = await charge(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], activeId || null);
       return json(priced({
@@ -400,16 +406,15 @@ Deno.serve(async (req: Request) => {
         ? (anchorName(card || {}, previousQuery) || previousQuery)
         : (previousQuery || (card ? sanitizeInline(card.headline, 180) : ""));
       if (!queryText) {
-        if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
         const charged = await charge(db, user.id, ["archive_followup"]);
         return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noCard", seed, previousReplies), { method: "card-context" }), charged), 200, origin);
       }
+      await ensureAffordable(db, user.id, ["archive_followup"]);
       const pool: Card[] = [];
       merge(pool, await textSearch(db, queryText));
       if (mind.follow === "related") {
         const anchor = anchorName(card || {}, previousQuery);
         if (!anchor) {
-          if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
           const charged = await charge(db, user.id, ["archive_followup"]);
           return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noRelated", seed, previousReplies), { method: "related", search_query: previousQuery, active_article_id: activeId }), charged), 200, origin);
         }
@@ -419,11 +424,10 @@ Deno.serve(async (req: Request) => {
           picked = relatedCards(anchor, pool, shown)[0]?.card || null;
         }
         if (!picked) {
-          if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
           const charged = await charge(db, user.id, ["archive_followup"]);
           return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noRelated", seed, previousReplies), { method: "related", search_query: previousQuery, active_article_id: activeId }), charged), 200, origin);
         }
-        if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
+        await ensureAffordable(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], String(picked.id));
         const result = await withCard(mind.lang, mind.tone, picked, previousQuery || anchor, pool.length, "related", "related", `${seed}|${picked.id}`, previousReplies, false, history);
         const charged = await charge(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], String(picked.id));
         return json(priced(result, charged), 200, origin);
@@ -435,23 +439,22 @@ Deno.serve(async (req: Request) => {
         picked = bestCard(meaning, pool, shown, history.length);
       }
       if (!picked) {
-        if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
         const charged = await charge(db, user.id, ["archive_followup"]);
         return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noNext", seed, previousReplies), { method: "another", search_query: meaning, active_article_id: activeId }), charged), 200, origin);
       }
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
+      await ensureAffordable(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], String(picked.id));
       const result = await withCard(mind.lang, mind.tone, picked, meaning, pool.length, "another", "another", `${seed}|${picked.id}`, previousReplies, false, history);
       const charged = await charge(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], String(picked.id));
       return json(priced(result, charged), 200, origin);
     }
 
     if (activeId && history.length && isContextualFollowup(query)) {
-      if (!user) return json({ error: "سجّل الدخول لاستخدام عمليات الأرشيف المدفوعة." }, 401, origin);
       const card = await loadArticle(db, activeId);
       if (!card) {
         const charged = await charge(db, user.id, ["archive_followup"]);
         return json(priced(packet(mind.lang, mind.tone, say(mind.lang, mind.tone, "noCard", seed, previousReplies), { method: "card-context", search_query: previousQuery }), charged), 200, origin);
       }
+      await ensureAffordable(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], activeId);
       const editorial = await editorialReply(`${previousQuery || sanitizeInline(card.headline, 180)} — ${query}`, card, mind.lang, history, composeReply({ card, lang: mind.lang, tone: mind.tone, query, mode: "fresh", seed, previous: previousReplies, yesNo }));
       const charged = await charge(db, user.id, ["archive_followup", "archive_briefing", "archive_dialogue"], activeId);
       return json(priced({
@@ -466,8 +469,8 @@ Deno.serve(async (req: Request) => {
       }, charged), 200, origin);
     }
 
-    if (!user) return json({ error: "سجّل الدخول لاستخدام البحث في أرشيف مِرصاد." }, 401, origin);
     const searchText = mind.searchText;
+    await ensureAffordable(db, user.id, ["archive_search"]);
     const pool: Card[] = [];
     let method = "text";
     const choose = (exclude: Set<string>) => bestCard(searchText, pool, exclude, history.length);
@@ -495,6 +498,7 @@ Deno.serve(async (req: Request) => {
       const charged = await charge(db, user.id, ["archive_search"]);
       return json(priced(packet(mind.lang, mind.tone, missReply(mind.lang, mind.tone, searchText, seed, previousReplies), { method, search_query: searchText }), charged), 200, origin);
     }
+    await ensureAffordable(db, user.id, ["archive_search", "archive_briefing", "archive_dialogue"], String(picked.id));
     const result = await withCard(mind.lang, mind.tone, picked, searchText, pool.length, method, mode, `${seed}|${picked.id}|${mode}`, previousReplies, yesNo, history);
     const charged = await charge(db, user.id, ["archive_search", "archive_briefing", "archive_dialogue"], String(picked.id));
     return json(priced(result, charged), 200, origin);
