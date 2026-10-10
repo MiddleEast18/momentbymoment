@@ -153,6 +153,7 @@
       if (!value) continue;
       const row = document.createElement('p');
       row.className = 'archive-brief__row';
+      if (key === 'analysis') row.classList.add('archive-brief__row--analysis');
       const name = document.createElement('span');
       name.className = 'archive-brief__label';
       name.textContent = labels[key];
@@ -162,7 +163,18 @@
       box.appendChild(row);
       count += 1;
     }
-    box.hidden = count === 0;
+    if (!count) {
+      box.hidden = true;
+      return;
+    }
+    const details = document.createElement('details');
+    details.className = 'archive-brief__details';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = lang === 'en' ? 'Detailed reading' : 'القراءة المفصلة';
+    details.append(summary, ...[...box.childNodes]);
+    box.replaceChildren(details);
+    box.hidden = false;
   }
 
   function renderActions(node, items) {
@@ -198,6 +210,10 @@
       if (cards.length) {
         results.hidden = false;
         results.appendChild(renderCard(cards[0]));
+        const note = document.createElement('p');
+        note.className = 'archive-card-note';
+        note.textContent = 'فتح المصدر يخصم فتحة، بما في ذلك إعادة فتح الخبر نفسه.';
+        results.appendChild(note);
       }
       renderBrief(node, entry.briefing, entry.lang || 'ar');
       renderActions(node, entry.suggestions);
@@ -218,6 +234,39 @@
     sendButton.classList.toggle('is-loading', value);
     sendButton.setAttribute('aria-busy', value ? 'true' : 'false');
     input.disabled = value;
+  }
+
+  function showBalance(payload) {
+    const text = document.getElementById('archiveHintText');
+    if (!text || !payload) return;
+    text.replaceChildren();
+    if (payload.unlimited === true) text.textContent = 'رصيد الفتحات غير محدود';
+    else if (Number.isFinite(Number(payload.remaining_unlocks))) text.textContent = `المتبقي ${payload.remaining_unlocks} فتحة`;
+  }
+
+  function startPending() {
+    const node = appendEntry({ role: 'assistant', text: 'أبحث في الأخبار المطابقة…' });
+    node.classList.add('is-pending');
+    const textNode = node.querySelector('.archive-message__text');
+    const lines = ['أبحث في الأخبار المطابقة…', 'أراجع العنوان والملخص…', 'أصوغ القراءة الصحفية…'];
+    let step = 0;
+    const timer = setInterval(() => {
+      step = Math.min(step + 1, lines.length - 1);
+      textNode.textContent = lines[step];
+    }, 4200);
+    return { node, stop() { clearInterval(timer); } };
+  }
+
+  async function refreshAccess() {
+    const text = document.getElementById('archiveHintText');
+    if (!text || !supabase) return;
+    const { data } = await supabase.auth.getSession().catch(() => ({ data: null }));
+    if (data?.session) return;
+    text.replaceChildren();
+    const link = document.createElement('a');
+    link.href = 'profile.html';
+    link.textContent = 'سجّل الدخول لاستخدام الأرشيف';
+    text.append(link);
   }
 
   async function search(query) {
@@ -245,6 +294,14 @@
   async function submitQuestion(rawQuestion) {
     const query = normalize(rawQuestion).slice(0, 500);
     if (!query || busy) return;
+    try {
+      await authorizationHeaders();
+    } catch (error) {
+      welcome.hidden = true;
+      appendEntry({ role: 'assistant', text: error.message || 'سجّل الدخول أولًا.', error: true });
+      refreshAccess();
+      return;
+    }
     welcome.hidden = true;
     appendEntry({ role: 'user', text: query });
     remember({ role: 'user', text: query });
@@ -252,7 +309,7 @@
     input.value = '';
     input.style.height = 'auto';
     setBusy(true);
-    const pending = appendEntry({ role: 'assistant', text: 'أراجع الكلام…' });
+    const pending = startPending();
     try {
       const result = await search(query);
       const answer = normalize(result.reply || 'تم.');
@@ -265,10 +322,12 @@
         suggestions: result.suggestions || [],
         lang: result.lang || 'ar',
       };
-      pending.remove();
+      pending.stop();
+      pending.node.remove();
       const node = appendEntry(entry);
       node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       remember(entry);
+      showBalance(result);
       if (result.search_query) state.searchQuery = normalize(result.search_query).slice(0, 180);
       if (result.active_article_id) state.activeId = String(result.active_article_id);
       if (articles[0]?.id) {
@@ -286,7 +345,8 @@
       if (state.history.length > 8) state.history.splice(0, state.history.length - 8);
       persist();
     } catch (error) {
-      pending.remove();
+      pending.stop();
+      pending.node.remove();
       const message = error?.name === 'TimeoutError' || error?.name === 'AbortError'
         ? 'تأخر الرد من خدمة الأرشيف. انتظر قليلًا قبل إعادة المحاولة حتى لا يتكرر الطلب.'
         : (error.message || 'تعذر إكمال طلب الأرشيف. حاول مرة أخرى بعد قليل.');
@@ -335,4 +395,5 @@
     });
   });
   restore();
+  refreshAccess();
 })();

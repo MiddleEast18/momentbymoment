@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat.css?v=202610081030">
+  <link rel="stylesheet" href="archive-chat.css?v=202610101100">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
@@ -45,7 +45,7 @@
       <label class="visually-hidden" for="archivePrompt">اكتب سؤالك عن الأخبار</label>
       <textarea id="archivePrompt" name="query" rows="1" maxlength="500" placeholder="اسأل عن خبر في أرشيف مِرصاد…" required></textarea>
       <div class="archive-composer__bottom">
-        <span class="archive-composer__hint"><span aria-hidden="true">◉</span> بطاقة واحدة حين يتضح الاسم</span>
+        <span class="archive-composer__hint" id="archiveHint"><span aria-hidden="true">◉</span> <span id="archiveHintText">بطاقة واحدة عند تطابق واضح</span></span>
         <button class="archive-send" id="archiveSend" type="submit" aria-label="إرسال السؤال">
           <span class="archive-send__label">إرسال</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -88,7 +88,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="archive-chat.js?v=6a36c3f" defer></script>
+  <script src="archive-chat.js?v=202610101100" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
