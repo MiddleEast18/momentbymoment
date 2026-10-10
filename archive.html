@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0f14">
   <title>باحث الأخبار — مِرصاد</title>
-  <meta name="description" content="اسأل أرشيف مِرصاد. بطاقة واحدة عند التطابق القوي، وشرح مأخوذ من نص الخبر فقط.">
+  <meta name="description" content="ابحث في أرشيف مِرصاد واقرأ تحليلًا صحفيًا مستندًا إلى عنوان الخبر وملخصه المحفوظين.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,8 +25,8 @@
     <section class="archive-intro" aria-labelledby="archiveTitle">
       <p class="archive-kicker"><span class="archive-kicker__dot" aria-hidden="true"></span> ذاكرة أخبار مِرصاد</p>
       <h1 id="archiveTitle">ابحث في الأخبار،<br><span>واسأل بطريقتك.</span></h1>
-      <p class="archive-intro__copy">اكتب كما تتحدث. التحية والمزاح يبقيان حديثًا، والبطاقة لا تظهر إلا إذا طابق الاسم الخبر في عنوانه أو ملخصه.</p>
-      <p class="archive-scope">الشرح يؤخذ من نص البطاقة المنشورة فقط، ولا يُضاف إليه شيء.</p>
+      <p class="archive-intro__copy">اكتب كما تتحدث. يبحث مرصاد في أخبار الأرشيف، ويظهر بطاقة واحدة عند تطابق الاسم في عنوانها أو ملخصها.</p>
+      <p class="archive-scope">قراءة صحفية للحدث وسياقه وأطرافه ودلالاته والنتائج المحتملة، استنادًا إلى العنوان والملخص المحفوظين دون إضافة وقائع غير واردة.</p>
     </section>
 
     <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
@@ -87,7 +87,8 @@
     </a>
   </template>
 
-  <script src="archive-chat.js?v=202610081030" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="archive-chat.js?v=202610101100" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>

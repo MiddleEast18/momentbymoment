@@ -4,12 +4,15 @@
   const SUPABASE_URL = 'https://dndlkenyfymlrjnslyzb.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
   const CHAT_URL = `${SUPABASE_URL}/functions/v1/mirsad-archive-chat`;
+  const supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' },
+  });
   const STORE_KEY = 'marsad-archive-chat-v1';
   const CATEGORY_LABELS = { Politics: 'سياسة', Economy: 'اقتصاد', Tech: 'تقنية', Society: 'مجتمع', Sports: 'رياضة' };
   const CATEGORY_COLORS = { Politics: '#8b7bc7', Economy: '#c9a227', Tech: '#4f9dde', Society: '#b8794a', Sports: '#4fa8a0' };
   const LABELS = {
-    ar: { event: 'الحدث', context: 'الأطراف والمكان والتاريخ', result: 'أهم نتيجة', proves: 'ما يثبته', limits: 'ما لا يثبته' },
-    en: { event: 'Event', context: 'People, place, date', result: 'Main result', proves: 'What it shows', limits: 'What it does not show' },
+    ar: { event: 'الحدث', context: 'السياق والأطراف', significance: 'الدلالة', outcomes: 'النتائج المحتملة', analysis: 'القراءة الصحفية' },
+    en: { event: 'Event', context: 'Context and parties', significance: 'Significance', outcomes: 'Possible implications', analysis: 'Editorial analysis' },
   };
   const form = document.getElementById('archiveForm');
   const input = document.getElementById('archivePrompt');
@@ -101,13 +104,44 @@
     time.textContent = formatTime(article.published_at);
     time.dateTime = article.published_at || '';
     card.setAttribute('aria-label', `فتح المصدر: ${normalize(article.headline || '')}`);
+    card.addEventListener('click', (event) => { void openArchiveArticle(event, article); });
     return card;
+  }
+
+  async function authorizationHeaders() {
+    if (!supabase) throw new Error('تعذر تهيئة تسجيل الدخول. أعد تحميل الصفحة.');
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.access_token) throw new Error('سجّل الدخول أولًا لاستخدام الأرشيف وخصم الفتحات.');
+    return { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: `Bearer ${data.session.access_token}` };
+  }
+
+  async function openArchiveArticle(event, article) {
+    event.preventDefault();
+    const href = safeHttpUrl(article.source_url);
+    if (!href || busy) return;
+    const tab = window.open('about:blank', '_blank');
+    if (tab) tab.opener = null;
+    try {
+      const response = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: await authorizationHeaders(),
+        body: JSON.stringify({ operation: 'archive_open', article_id: String(article.id || '') }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(normalize(payload.error) || 'تعذر فتح الخبر.');
+      if (tab) tab.location.href = href;
+      else window.location.assign(href);
+    } catch (error) {
+      if (tab) tab.close();
+      appendEntry({ role: 'assistant', text: error.message || 'تعذر فتح الخبر.', error: true });
+    }
   }
 
   function renderBrief(node, briefing, lang) {
     const box = node.querySelector('.archive-brief');
     const labels = LABELS[lang] || LABELS.ar;
-    const rows = ['event', 'context', 'result', 'proves', 'limits'];
+    const rows = ['event', 'context', 'significance', 'outcomes', 'analysis'];
     box.replaceChildren();
     if (!briefing || typeof briefing !== 'object') {
       box.hidden = true;
@@ -189,7 +223,7 @@
   async function search(query) {
     const response = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY },
+      headers: await authorizationHeaders(),
       body: JSON.stringify({
         query,
         history: state.history.slice(-8),
