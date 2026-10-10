@@ -8,8 +8,8 @@
   const CATEGORY_LABELS = { Politics: 'سياسة', Economy: 'اقتصاد', Tech: 'تقنية', Society: 'مجتمع', Sports: 'رياضة' };
   const CATEGORY_COLORS = { Politics: '#8b7bc7', Economy: '#c9a227', Tech: '#4f9dde', Society: '#b8794a', Sports: '#4fa8a0' };
   const LABELS = {
-    ar: { event: 'الحدث', context: 'السياق والأطراف', significance: 'الدلالات', outcomes: 'النتائج المحتملة', analysis: 'التحليل' },
-    en: { event: 'Event', context: 'Context and parties', significance: 'Significance', outcomes: 'Possible outcomes', analysis: 'Analysis' },
+    ar: { event: 'الحدث', context: 'الأطراف والمكان والتاريخ', result: 'أهم نتيجة', proves: 'ما يثبته', limits: 'ما لا يثبته' },
+    en: { event: 'Event', context: 'People, place, date', result: 'Main result', proves: 'What it shows', limits: 'What it does not show' },
   };
   const form = document.getElementById('archiveForm');
   const input = document.getElementById('archivePrompt');
@@ -19,7 +19,6 @@
   const messageTemplate = document.getElementById('archiveMessageTemplate');
   const userTemplate = document.getElementById('archiveUserMessageTemplate');
   const cardTemplate = document.getElementById('archiveCardTemplate');
-  const authClient = window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }) : null;
   const state = { history: [], shownIds: [], activeId: '', searchQuery: '', transcript: [] };
   let busy = false;
 
@@ -47,8 +46,6 @@
     } catch { /* private mode */ }
   }
 
-  async function authHeaders() { const headers = { 'Content-Type': 'application/json', apikey: SUPABASE_KEY }; try { const session = authClient ? (await authClient.auth.getSession()).data.session : null; if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`; } catch {} return headers; }
-  async function chargeOpen(articleId) { const response = await fetch(CHAT_URL, { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ operation: 'archive_open', article_id: articleId }), signal: AbortSignal.timeout(15000) }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(normalize(payload.error) || 'تعذر فتح المصدر الآن.'); return payload; }
   function safeHttpUrl(value) {
     try {
       const url = new URL(String(value || ''));
@@ -104,14 +101,13 @@
     time.textContent = formatTime(article.published_at);
     time.dateTime = article.published_at || '';
     card.setAttribute('aria-label', `فتح المصدر: ${normalize(article.headline || '')}`);
-    if (href && article.id) card.addEventListener('click', async (event) => { event.preventDefault(); try { await chargeOpen(String(article.id)); window.open(href, '_blank', 'noopener,noreferrer'); } catch (error) { window.alert(error.message || 'تعذر فتح المصدر.'); } });
     return card;
   }
 
   function renderBrief(node, briefing, lang) {
     const box = node.querySelector('.archive-brief');
     const labels = LABELS[lang] || LABELS.ar;
-    const rows = ['event', 'context', 'significance', 'outcomes', 'analysis'];
+    const rows = ['event', 'context', 'result', 'proves', 'limits'];
     box.replaceChildren();
     if (!briefing || typeof briefing !== 'object') {
       box.hidden = true;
@@ -193,7 +189,7 @@
   async function search(query) {
     const response = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: await authHeaders(),
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY },
       body: JSON.stringify({
         query,
         history: state.history.slice(-8),
