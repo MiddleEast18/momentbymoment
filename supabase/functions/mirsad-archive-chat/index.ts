@@ -22,7 +22,7 @@ import {
   type Card,
   type Lang,
   type ReplyMode,
-} from "./archive-logic.ts";
+} from "https://raw.githubusercontent.com/MiddleEast18/momentbymoment/ad1c6459663b2e1cf45bbba85e24aff12ec34348/supabase/functions/mirsad-archive-chat/archive-logic.ts";
 
 const U = Deno.env.get("SUPABASE_URL") || "";
 const K = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -244,7 +244,7 @@ async function withCard(lang: Lang, tone: "casual" | "plain" | "polite", card: C
   catch {
     const fallback = briefingFor(card, lang, query);
     editorial = { reply: composeReply({ card, lang, tone, query, mode, seed, yesNo, previous }), briefing: { event: fallback.event, context: fallback.context, significance: fallback.result, outcomes: "", analysis: "" } };
-  } }
+  }
   return { reply: editorial.reply, briefing: editorial.briefing, articles: [article], suggestions: suggestions(lang), lang, active_article_id: article.id, search_query: sanitizeInline(query, 180), search: { candidate_count: shown, shown: 1, method } };
 }
 
