@@ -131,7 +131,7 @@
       const response = await fetch(CHAT_URL, {
         method: 'POST',
         headers: await authorizationHeaders(),
-        body: JSON.stringify({ operation: 'archive_open', article_id: articleId }),
+        body: JSON.stringify({ action: 'open', article_id: articleId }),
         signal: AbortSignal.timeout(15000),
       });
       const payload = await response.json().catch(() => ({}));
@@ -253,9 +253,11 @@
   function showBalance(payload) {
     const text = document.getElementById('archiveHintText');
     if (!text || !payload) return;
+    const account = payload.unlocks && typeof payload.unlocks === 'object' ? payload.unlocks : payload;
     text.replaceChildren();
-    if (payload.unlimited === true) text.textContent = 'رصيد الفتحات غير محدود';
-    else if (payload.remaining_unlocks != null && Number.isFinite(Number(payload.remaining_unlocks))) text.textContent = `المتبقي ${payload.remaining_unlocks} فتحة`;
+    const remaining = account.remaining ?? account.remaining_unlocks ?? payload.remaining_unlocks ?? payload.remaining;
+    if (account.unlimited === true || payload.unlimited === true || payload.unlimited_unlocks === true) text.textContent = 'رصيد الفتحات غير محدود';
+    else if (remaining != null && Number.isFinite(Number(remaining))) text.textContent = `المتبقي ${remaining} فتحة`;
   }
 
   function startPending() {
