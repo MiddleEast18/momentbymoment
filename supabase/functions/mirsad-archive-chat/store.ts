@@ -46,5 +46,11 @@ export function makeStore(db: any): Store {
       if (r.error || !row) return null;
       return { allowed: !!row.allowed, charged: !!row.charged, amount: Number(row.charged_amount || 0), remaining: Number(row.remaining_unlocks || 0), unlimited: !!row.unlimited, operations: row.operations || [] } as ChargeResult;
     },
+    async chargeChat(userId, requestId) {
+      const r = await db.rpc("consume_archive_chat_charge", { p_user_id: userId, p_request_id: requestId });
+      const row = Array.isArray(r.data) ? r.data[0] : r.data;
+      if (r.error || !row) return null;
+      return { allowed: !!row.allowed, charged: !!row.charged, amount: Number(row.charged_amount || row.required_unlocks || 0), remaining: Number(row.remaining_unlocks || 0), unlimited: !!row.unlimited, operations: ["archive_chat"] } as ChargeResult;
+    },
   };
 }
