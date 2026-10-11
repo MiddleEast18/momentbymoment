@@ -12,16 +12,16 @@ export interface Gemini {
 }
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODELS: { id: string; thinking: "MINIMAL" | "LOW" }[] = [
-  { id: "gemini-3.5-flash-lite", thinking: "MINIMAL" },
-  { id: "gemini-3.6-flash", thinking: "LOW" },
-  { id: "gemini-3.8-flash", thinking: "LOW" },
+const MODELS: { id: string; thinking: "minimal" | "low" }[] = [
+  { id: "gemini-3.5-flash-lite", thinking: "minimal" },
+  { id: "gemini-3.6-flash", thinking: "low" },
+  { id: "gemini-3.8-flash", thinking: "low" },
 ];
 const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 3072;
 const working: Partial<Record<Stage, string>> = {};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const safeApiReason = (data: Record<string, any>) => String(data?.error?.status || data?.error?.message || "unknown").replace(/[\r\n]+/g, " ").slice(0, 160);
+const safeApiReason = (data: Record<string, any>) => String(data?.error?.message || data?.error?.status || "unknown").replace(/[\r\n]+/g, " ").slice(0, 180);
 
 export function parseJsonLoose(text: string): Record<string, unknown> {
   const clean = text.replace(/^\uFEFF/, "").replace(/```(?:json)?/gi, "").trim();
@@ -38,8 +38,10 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
   return {
     has: (s) => !!keyOf(s),
     async json(stage, o) {
-      const key = keyOf(stage);
-      if (!key) throw new GeminiError("missing_key");
+      const primary = keyOf(stage);
+      if (!primary) throw new GeminiError("missing_key");
+      const keyOrder = stage === "nexus" && keys.core && keys.core !== primary ? [primary, keys.core] : [primary];
+      let last = "failed";
       const payload = (thinking: string | null) => JSON.stringify({
         systemInstruction: { parts: [{ text: o.system }] },
         contents: [{ role: "user", parts: [{ text: o.user }] }],
@@ -51,11 +53,7 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
         safetySettings: ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]
           .map((category) => ({ category, threshold: "BLOCK_ONLY_HIGH" })),
       });
-      const preferred = MODELS.find((m) => m.id === working[stage]);
-      const order = preferred ? [preferred, ...MODELS.filter((m) => m.id !== preferred.id)] : MODELS;
-      let last = "failed";
-      let sawResourceExhausted = false;
-      const call = async (model: string, thinking: string | null) => {
+      const call = async (key: string, model: string, thinking: string | null) => {
         const res = await fetchFn(`${API}/${model}:generateContent`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -65,45 +63,71 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
         const data = await res.json().catch(() => ({})) as Record<string, any>;
         return { res, data };
       };
-      for (const model of order) {
-        let thinking: string | null = model.thinking;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          let res: Response, data: Record<string, any>;
-          try {
-            ({ res, data } = await call(model.id, thinking));
-          } catch {
-            last = "network";
-            if (attempt === 0) { await sleep(400); continue; }
+      const complete = async (key: string) => {
+        const preferred = MODELS.find((m) => m.id === working[stage]);
+        const order = preferred ? [preferred, ...MODELS.filter((m) => m.id !== preferred.id)] : MODELS;
+        let sawResourceExhausted = false;
+        for (const model of order) {
+          let thinking: string | null = model.thinking;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            let res: Response, data: Record<string, any>;
+            try {
+              ({ res, data } = await call(key, model.id, thinking));
+            } catch {
+              last = "network";
+              if (attempt === 0) { await sleep(400); continue; }
+              break;
+            }
+            if (res.ok) {
+              const cand = data?.candidates?.[0];
+              const text = (cand?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => String(p.text || "")).join("").trim();
+              if (!text) {
+                last = cand?.finishReason === "SAFETY" || data?.promptFeedback?.blockReason ? "blocked" : "empty";
+                if (thinking && last === "empty") { thinking = null; continue; }
+                break;
+              }
+              try { const out = parseJsonLoose(text); working[stage] = model.id; return out; }
+              catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt < 2) continue; break; }
+            }
+            const reason = safeApiReason(data);
+            if (res.status === 401 || res.status === 403) throw new GeminiError(`auth_${res.status}`);
+            if (thinking && res.status === 400) {
+              console.warn("gemini_http", { stage, model: model.id, status: res.status, reason, dropped_thinking: true });
+              thinking = null;
+              continue;
+            }
+            if (res.status === 404 || (res.status === 400 && /model|not found|not supported/i.test(reason))) {
+              if (working[stage] === model.id) delete working[stage];
+              last = `model_${res.status}`;
+              break;
+            }
+            console.warn("gemini_http", { stage, model: model.id, status: res.status, reason });
+            if (res.status === 429) {
+              sawResourceExhausted = true;
+              if (working[stage] === model.id) delete working[stage];
+              last = "resource_exhausted";
+              break;
+            }
+            last = `http_${res.status}`;
+            if ((res.status === 408 || res.status >= 500) && attempt < 2) { await sleep(500); continue; }
             break;
           }
-          if (res.ok) {
-            const cand = data?.candidates?.[0];
-            const text = (cand?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => String(p.text || "")).join("").trim();
-            if (!text) { last = cand?.finishReason === "SAFETY" || data?.promptFeedback?.blockReason ? "blocked" : "empty"; break; }
-            try { const out = parseJsonLoose(text); working[stage] = model.id; return out; }
-            catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt === 0) continue; break; }
+        }
+        throw new GeminiError(sawResourceExhausted && last === "resource_exhausted" ? "resource_exhausted" : last);
+      };
+      for (let i = 0; i < keyOrder.length; i++) {
+        try {
+          return await complete(keyOrder[i]);
+        } catch (error) {
+          last = error instanceof GeminiError ? error.code : "failed";
+          if (i < keyOrder.length - 1) {
+            console.warn("gemini_stage_failover", { stage, reason: last });
+            continue;
           }
-          const reason = safeApiReason(data);
-          if (res.status === 401 || res.status === 403) throw new GeminiError(`auth_${res.status}`);
-          if (thinking && res.status === 400 && /thinking/i.test(reason)) { thinking = null; continue; }
-          if (res.status === 404 || (res.status === 400 && /model|not found|not supported/i.test(reason))) {
-            if (working[stage] === model.id) delete working[stage];
-            last = `model_${res.status}`;
-            break;
-          }
-          console.warn("gemini_http", { stage, model: model.id, status: res.status, reason });
-          if (res.status === 429) {
-            sawResourceExhausted = true;
-            if (working[stage] === model.id) delete working[stage];
-            last = "resource_exhausted";
-            break;
-          }
-          last = res.status >= 500 || res.status === 408 ? `http_${res.status}` : `http_${res.status}`;
-          if ((res.status === 408 || res.status >= 500) && attempt === 0) { await sleep(500); continue; }
-          break;
+          throw error instanceof GeminiError ? error : new GeminiError(last);
         }
       }
-      throw new GeminiError(sawResourceExhausted && last === "resource_exhausted" ? "resource_exhausted" : last);
+      throw new GeminiError(last);
     },
     async embed(text) {
       if (!keys.core) throw new GeminiError("missing_key");
