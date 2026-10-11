@@ -31,6 +31,13 @@ const UUID = /^[0-9a-f-]{16,80}$/i;
 const MIN_COST = 2;
 const analysisCache = new Map<string, { at: number; analysis: Analysis }>();
 const CACHE_TTL = 6 * 3600 * 1000;
+const REVIEW_VARIANTS = [
+  "ابدأ بخلاصة الحدث ثم اربطها بسياقه ودلالته.",
+  "ابدأ من سياق الخبر ثم وضّح ما تضيفه الوقائع إلى فهمه.",
+  "اجعل العلاقة بين الأطراف محور القراءة، بقدر ما تسنده المواد.",
+  "قدّم الدلالة أولًا ثم اربطها بالوقائع التي تحملها، من دون تنبؤ جازم.",
+  "اختر ترتيبًا سرديًا طبيعيًا مختلفًا عن الإجابات السابقة، مع تجنب أي قالب ثابت.",
+];
 
 const cors = (origin: string | null, origins: Set<string>) => ({
   "Access-Control-Allow-Origin": origin && origins.has(origin) ? origin : "https://marsad.website",
@@ -131,9 +138,9 @@ async function retrieve(deps: Deps, plan: Plan, mind: Mind, shown: Set<string>, 
   return { cards: cards.slice(0, 5), method, count: pool.length };
 }
 
-type Composed = { reply: string; analysis: Analysis | null; refs: string[]; pipeline: "core+nexus" | "core-only" };
+type Composed = { reply: string; analysis: Analysis | null; refs: string[]; pipeline: "core+nexus" };
 async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; turns: string; mats: Mat[]; lang: Lang; tone: Tone; wantAnalysis: boolean; cacheKey: string }): Promise<Composed | null> {
-  if (!deps.gemini.has("core")) return null;
+  if (!deps.gemini.has("core") || !deps.gemini.has("nexus")) return null;
   const hit = a.cacheKey ? analysisCache.get(a.cacheKey) : undefined;
   const cached = hit && Date.now() - hit.at < CACHE_TTL ? hit.analysis : null;
   const needAnalysis = a.wantAnalysis && !cached;
@@ -148,19 +155,20 @@ async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; 
     draft = norm(await deps.gemini.json("core", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached), maxTokens: 3500, temperature: 0.35 }));
   } catch (e) { console.warn("core_failed", e instanceof Error ? e.message : "unknown"); return null; }
   if (!draft.reply) return null;
-  let final = draft, pipeline: Composed["pipeline"] = "core-only";
-  if (deps.gemini.has("nexus")) {
-    try {
-      const rev = norm(await deps.gemini.json("nexus", { system: REVIEW_SYSTEM, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }), maxTokens: 4000, temperature: 0.2 }));
-      if (rev.reply) { final = { reply: rev.reply, analysis: needAnalysis ? (rev.analysis || draft.analysis) : null, refs: rev.refs.length ? rev.refs : draft.refs }; pipeline = "core+nexus"; }
-    } catch (e) { console.warn("nexus_failed", e instanceof Error ? e.message : "unknown"); }
-  } else console.warn("nexus_key_missing");
-  const analysis = cached || final.analysis;
-  if (a.cacheKey && analysis && !cached && pipeline === "core+nexus") {
+  const style = REVIEW_VARIANTS[Math.floor(Math.random() * REVIEW_VARIANTS.length)];
+  try {
+    const rev = norm(await deps.gemini.json("nexus", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }), maxTokens: 4000, temperature: 0.35 }));
+    if (!rev.reply) return null;
+    const analysis = cached || (needAnalysis ? rev.analysis || draft.analysis : null);
+    if (a.cacheKey && analysis && !cached) {
     if (analysisCache.size > 300) analysisCache.delete(analysisCache.keys().next().value as string);
     analysisCache.set(a.cacheKey, { at: Date.now(), analysis });
+    }
+    return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : draft.refs, pipeline: "core+nexus" };
+  } catch (e) {
+    console.warn("nexus_failed", e instanceof Error ? e.message : "unknown");
+    return null;
   }
-  return { reply: final.reply, analysis, refs: final.refs, pipeline };
 }
 
 export async function handleChat(req: Request, deps: Deps): Promise<Response> {
@@ -318,15 +326,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const cacheKey = cardKind ? `${pid}|${String(primary.headline).length}|${String(primary.summary).length}|${primary.update_count}|${primary.updated_at ?? ""}` : "";
     const out = await compose(deps, { kind, sub: plan.sub, question: plan.standalone || query, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey });
 
-    let finalOps = b.list;
-    if (!out) {
-      // Smart layer unavailable: card kinds degrade to plain retrieval; conversational kinds cannot be answered.
-      if (!cardKind || action === "briefing") return fail503("الشرح الذكي غير متاح مؤقتًا. لم تُخصم أي فتحات.");
-      finalOps = b.list.filter((o) => o !== "archive_briefing");
-      const d = await deps.store.charge(userId, finalOps, billId, false);
-      if (!d?.allowed) return d ? insufficient(d) : fail503();
-    }
-    const done = await deps.store.charge(userId, finalOps, billId, true);
+    if (!out) return fail503("لم يكتمل الرد عبر مرحلتي Gemini. لم تُخصم أي فتحات.");
+    const done = await deps.store.charge(userId, b.list, billId, true);
     if (!done) return fail503();
     if (!done.allowed) return insufficient(done);
 
