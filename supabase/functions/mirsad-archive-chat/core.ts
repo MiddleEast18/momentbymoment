@@ -197,7 +197,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   const query = sanitizeInline(body.query, 500);
   if (action !== "open" && action !== "briefing" && action !== "commit_chat" && query.length < 2) return json({ error: "اكتب سؤالًا أطول قليلًا." }, 400);
   const suppliedRequestId = sanitizeInline(body.request_id, 80);
-  const requestId = CHAT_REQUEST_ID.test(suppliedRequestId) ? suppliedRequestId : crypto.randomUUID();
+  const clientChargeConfirm = CHAT_REQUEST_ID.test(suppliedRequestId);
+  const requestId = clientChargeConfirm ? suppliedRequestId : crypto.randomUUID();
 
   if (action !== "commit_chat") {
     const now = deps.now ? deps.now() : Date.now();
@@ -340,7 +341,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
 
     if (!out) return fail503("لم يكتمل الرد بعد المراجعة. لم تُخصم أي فتحات.");
 
-    // Return only a complete, reviewer-approved answer; the page persists it before calling commit_chat.
+    // New clients persist the answer before commit_chat; legacy page builds still charge here after success.
     const cited = mats.filter((m) => out.refs.includes(m.ref)).map((m) => m.card);
     const citedWithPrimary = [primary, ...cited.filter((card) => String(card.id) !== String(primary.id))];
     const shownCards = cardKind || kind === "about_active_card" ? [primary] : citedWithPrimary.slice(0, 3);
@@ -354,7 +355,11 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       search_query: cardKind && kind !== "another_card" && kind !== "related_card" ? (plan.queries[0] || mind.searchText || previousQuery) : previousQuery || plan.queries[0] || "",
       search: { candidate_count: candidates, shown: shownCards.length, method }, pipeline: out.pipeline,
     };
-    return json({ ...successPayload, request_id: requestId, charge_pending: true });
+    if (clientChargeConfirm) return json({ ...successPayload, request_id: requestId, charge_pending: true });
+    const done = await deps.store.chargeChat(userId, requestId);
+    if (!done) return fail503("تعذر تأكيد تكلفة الرد. لم تُخصم أي فتحات.");
+    if (!done.allowed) return insufficient(done);
+    return json({ ...successPayload, unlocks: unlocksOf(done) });
   } catch (e) {
     console.error("request", e instanceof Error ? e.message : "unknown");
     return json({ error: "حدث خطأ أثناء المعالجة. حاول مرة أخرى. لم تُخصم أي فتحات إن لم تصلك إجابة." }, 502);

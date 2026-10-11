@@ -4,6 +4,9 @@ alter table public.archive_chat_charges
   alter column charged_amount set default 50;
 
 alter table public.archive_chat_charges
+  alter column reviewer_amount set default 0;
+
+alter table public.archive_chat_charges
   drop constraint if exists archive_chat_charges_charged_amount_check,
   drop constraint if exists archive_chat_charges_reviewer_amount_check;
 
