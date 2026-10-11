@@ -22,7 +22,7 @@
   const messageTemplate = document.getElementById('archiveMessageTemplate');
   const userTemplate = document.getElementById('archiveUserMessageTemplate');
   const cardTemplate = document.getElementById('archiveCardTemplate');
-  const state = { history: [], shownIds: [], activeId: '', searchQuery: '', transcript: [] };
+  const state = { history: [], shownIds: [], activeId: '', searchQuery: '', transcript: [], retryRequest: null };
   const openingArticles = new Set();
   let busy = false;
 
@@ -46,6 +46,7 @@
         activeId: state.activeId,
         searchQuery: state.searchQuery,
         transcript: state.transcript.slice(-24),
+        retryRequest: state.retryRequest,
       }));
     } catch { /* private mode */ }
   }
@@ -285,7 +286,15 @@
     text.append(link);
   }
 
-  async function search(query) {
+  function newRequestId() {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  async function search(query, requestId) {
     const response = await fetch(CHAT_URL, {
       method: 'POST',
       headers: await authorizationHeaders(),
@@ -295,8 +304,9 @@
         shown_ids: state.shownIds.slice(-40),
         active_article_id: state.activeId,
         search_query: state.searchQuery,
+        request_id: requestId,
       }),
-      signal: AbortSignal.timeout(125000),
+      signal: AbortSignal.timeout(180000),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -304,6 +314,18 @@
       error.status = response.status;
       throw error;
     }
+    return payload;
+  }
+
+  async function commitChatCharge(requestId) {
+    const response = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: await authorizationHeaders(),
+      body: JSON.stringify({ action: 'commit_chat', request_id: requestId }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(normalize(payload.error) || 'تعذر تأكيد خصم رد الأرشيف. أعد المحاولة.');
     return payload;
   }
 
@@ -318,16 +340,42 @@
       refreshAccess();
       return;
     }
+    if (state.retryRequest?.query === query && state.retryRequest.phase === 'commit') {
+      setBusy(true);
+      try {
+        const result = await commitChatCharge(state.retryRequest.id);
+        state.retryRequest = null;
+        persist();
+        showBalance(result);
+        input.value = '';
+        input.style.height = 'auto';
+      } catch (error) {
+        const entry = { role: 'assistant', text: error.message || 'تعذر تأكيد خصم رد الأرشيف. أعد المحاولة.', error: true };
+        appendEntry(entry);
+        remember(entry);
+        persist();
+      } finally {
+        setBusy(false);
+        input.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const retryingReply = state.retryRequest?.query === query;
     welcome.hidden = true;
-    appendEntry({ role: 'user', text: query });
-    remember({ role: 'user', text: query });
-    state.history.push({ role: 'user', content: query });
+    if (!retryingReply) {
+      appendEntry({ role: 'user', text: query });
+      remember({ role: 'user', text: query });
+      state.history.push({ role: 'user', content: query });
+    }
     input.value = '';
     input.style.height = 'auto';
     setBusy(true);
+    const requestId = state.retryRequest?.query === query ? state.retryRequest.id : newRequestId();
+    state.retryRequest = { query, id: requestId };
+    persist();
     const pending = startPending();
     try {
-      const result = await search(query);
+      const result = await search(query, requestId);
       const answer = normalize(result.reply || 'تم.');
       const articles = Array.isArray(result.articles) ? result.articles.slice(0, 1) : [];
       const entry = {
@@ -343,7 +391,6 @@
       const node = appendEntry(entry);
       node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       remember(entry);
-      showBalance(result);
       if (result.search_query) state.searchQuery = normalize(result.search_query).slice(0, 180);
       if (result.active_article_id) state.activeId = String(result.active_article_id);
       if (articles[0]?.id) {
@@ -359,7 +406,23 @@
         active_article_id: state.activeId,
       });
       if (state.history.length > 8) state.history.splice(0, state.history.length - 8);
+      state.retryRequest = result.charge_pending
+        ? { query, id: String(result.request_id || requestId), phase: 'commit' }
+        : null;
       persist();
+      if (result.charge_pending) {
+        try {
+          const charge = await commitChatCharge(state.retryRequest.id);
+          state.retryRequest = null;
+          persist();
+          showBalance(charge);
+        } catch (chargeError) {
+          const notice = { role: 'assistant', text: chargeError.message || 'تم الرد، لكن تعذر تأكيد خصم 50 فتحة. أعد إرسال السؤال نفسه لإكمال التحديث.', error: true };
+          appendEntry(notice);
+          remember(notice);
+          persist();
+        }
+      }
     } catch (error) {
       pending.stop();
       pending.node.remove();
@@ -367,8 +430,10 @@
         ? 'تأخر الرد من خدمة الأرشيف. انتظر قليلًا قبل إعادة المحاولة حتى لا يتكرر الطلب.'
         : (error.message || 'تعذر إكمال طلب الأرشيف. حاول مرة أخرى بعد قليل.');
       const entry = { role: 'assistant', text: message, error: true };
+      state.retryRequest = { query, id: requestId };
       appendEntry(entry);
       remember(entry);
+      persist();
     } finally {
       setBusy(false);
       input.focus({ preventScroll: true });
@@ -383,6 +448,10 @@
       state.shownIds = Array.isArray(saved.shownIds) ? saved.shownIds.slice(-40).map(String) : [];
       state.activeId = String(saved.activeId || '');
       state.searchQuery = String(saved.searchQuery || '');
+      const retry = saved.retryRequest;
+      state.retryRequest = retry && typeof retry.query === 'string' && typeof retry.id === 'string'
+        ? { query: retry.query.slice(0, 500), id: retry.id.slice(0, 80) }
+        : null;
       state.transcript = saved.transcript.slice(-24);
       if (!state.transcript.length) return;
       welcome.hidden = true;
