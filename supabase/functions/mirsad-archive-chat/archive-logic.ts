@@ -519,7 +519,7 @@ function gapLine(card: Card, lang: Lang, query: string) {
     return lang === "en" ? `The text does not confirm: ${list}.` : `النص ما يؤكد: ${list}.`;
   }
   if (!/\d/.test(text)) return lang === "en" ? "No number is written in this text." : "ما فيه رقم في هذا النص.";
-  return lang === "en" ? "Nothing beyond those written sentences is established." : "ما يثبت شيئًا أبعد من الجمل المكتوبة.";
+  return lang === "en" ? "The card stops at the sentences it already wrote." : "البطاقة تقف عند الجمل التي كتبتها.";
 }
 
 export function briefingFor(card: Card, lang: Lang, query = ""): Briefing {
@@ -537,8 +537,8 @@ export function briefingFor(card: Card, lang: Lang, query = ""): Briefing {
     event: headline || (lang === "en" ? "Untitled card" : "بطاقة بلا عنوان"),
     context: context || (lang === "en" ? "The card names no separate party." : "النص ما يفرز طرفًا أو تاريخًا إضافيًا."),
     result: result || (lang === "en" ? "No result beyond the headline." : "لا نتيجة مكتوبة أبعد من العنوان."),
-    proves: bits[0] ? (lang === "en" ? `The wording says: ${bits[0]}` : `الصياغة تقول: ${bits[0]}`) : (lang === "en" ? "The card has no body text." : "لا نص أبعد من العنوان."),
-    limits: gapLine(card, lang, query),
+    proves: "",
+    limits: "",
   };
 }
 
