@@ -12,13 +12,16 @@ export interface Gemini {
 }
 
 const API = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"];
+const MODELS: { id: string; thinking: "MINIMAL" | "LOW" }[] = [
+  { id: "gemini-3.5-flash-lite", thinking: "MINIMAL" },
+  { id: "gemini-3.6-flash", thinking: "LOW" },
+  { id: "gemini-3.8-flash", thinking: "LOW" },
+];
 const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 3072;
 const working: Partial<Record<Stage, string>> = {};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const MAX_ATTEMPTS = 2;
-const safeApiReason = (data: Record<string, any>) => String(data?.error?.status || data?.error?.message || "unknown").replace(/[\r\n]+/g, " ").slice(0, 120);
+const safeApiReason = (data: Record<string, any>) => String(data?.error?.status || data?.error?.message || "unknown").replace(/[\r\n]+/g, " ").slice(0, 160);
 
 export function parseJsonLoose(text: string): Record<string, unknown> {
   const clean = text.replace(/^\uFEFF/, "").replace(/```(?:json)?/gi, "").trim();
@@ -37,51 +40,70 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
     async json(stage, o) {
       const key = keyOf(stage);
       if (!key) throw new GeminiError("missing_key");
-      const body = JSON.stringify({
+      const payload = (thinking: string | null) => JSON.stringify({
         systemInstruction: { parts: [{ text: o.system }] },
         contents: [{ role: "user", parts: [{ text: o.user }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens: o.maxTokens },
+        generationConfig: {
+          responseMimeType: "application/json",
+          maxOutputTokens: o.maxTokens,
+          ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}),
+        },
         safetySettings: ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]
           .map((category) => ({ category, threshold: "BLOCK_ONLY_HIGH" })),
       });
-      const order = working[stage] ? [working[stage]!, ...MODELS.filter((m) => m !== working[stage])] : MODELS;
+      const preferred = MODELS.find((m) => m.id === working[stage]);
+      const order = preferred ? [preferred, ...MODELS.filter((m) => m.id !== preferred.id)] : MODELS;
       let last = "failed";
       let sawResourceExhausted = false;
+      const call = async (model: string, thinking: string | null) => {
+        const res = await fetchFn(`${API}/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: payload(thinking),
+          signal: AbortSignal.timeout(22000),
+        });
+        const data = await res.json().catch(() => ({})) as Record<string, any>;
+        return { res, data };
+      };
       for (const model of order) {
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-          let res: Response;
+        let thinking: string | null = model.thinking;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          let res: Response, data: Record<string, any>;
           try {
-            res = await fetchFn(`${API}/${model}:generateContent`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-              body, signal: AbortSignal.timeout(12000),
-            });
+            ({ res, data } = await call(model.id, thinking));
           } catch {
             last = "network";
-            if (attempt + 1 < MAX_ATTEMPTS) { await sleep(500 * 2 ** attempt + Math.floor(Math.random() * 250)); continue; }
+            if (attempt === 0) { await sleep(400); continue; }
             break;
           }
-          const data = await res.json().catch(() => ({})) as Record<string, any>;
           if (res.ok) {
             const cand = data?.candidates?.[0];
             const text = (cand?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => String(p.text || "")).join("").trim();
             if (!text) { last = cand?.finishReason === "SAFETY" || data?.promptFeedback?.blockReason ? "blocked" : "empty"; break; }
-            try { const out = parseJsonLoose(text); working[stage] = model; return out; }
-            catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; continue; }
+            try { const out = parseJsonLoose(text); working[stage] = model.id; return out; }
+            catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt === 0) continue; break; }
           }
+          const reason = safeApiReason(data);
           if (res.status === 401 || res.status === 403) throw new GeminiError(`auth_${res.status}`);
-          if (res.status === 404 || (res.status === 400 && /model|not found|not supported/i.test(String(data?.error?.message || "")))) { if (!sawResourceExhausted) last = `model_${res.status}`; break; }
-          if (res.status === 429) sawResourceExhausted = true;
-          else if (!sawResourceExhausted) last = `http_${res.status}`;
-          console.warn("gemini_http", { stage, model, status: res.status, reason: safeApiReason(data) });
-          if (res.status === 429 || res.status === 408 || res.status >= 500) {
-            if (attempt + 1 < MAX_ATTEMPTS) { await sleep(700 * 2 ** attempt + Math.floor(Math.random() * 300)); continue; }
+          if (thinking && res.status === 400 && /thinking/i.test(reason)) { thinking = null; continue; }
+          if (res.status === 404 || (res.status === 400 && /model|not found|not supported/i.test(reason))) {
+            if (working[stage] === model.id) delete working[stage];
+            last = `model_${res.status}`;
             break;
           }
+          console.warn("gemini_http", { stage, model: model.id, status: res.status, reason });
+          if (res.status === 429) {
+            sawResourceExhausted = true;
+            if (working[stage] === model.id) delete working[stage];
+            last = "resource_exhausted";
+            break;
+          }
+          last = res.status >= 500 || res.status === 408 ? `http_${res.status}` : `http_${res.status}`;
+          if ((res.status === 408 || res.status >= 500) && attempt === 0) { await sleep(500); continue; }
           break;
         }
       }
-      throw new GeminiError(sawResourceExhausted ? "resource_exhausted" : last);
+      throw new GeminiError(sawResourceExhausted && last === "resource_exhausted" ? "resource_exhausted" : last);
     },
     async embed(text) {
       if (!keys.core) throw new GeminiError("missing_key");
@@ -121,18 +143,24 @@ const ANALYSIS_SPEC = `حقل analysis قراءة إضافية للخبر الر
 
 export const UNDERSTAND_SYSTEM = `${RULES}
 
-مهمتك الآن: افهم أولًا الرسائل السابقة والبطاقة النشطة، واستخلص داخليًا خلاصة قصيرة للموضوع النشط. حدّد هل الرسالة سؤال جديد أم متابعة. إذا كانت متابعة فحلّ الضمائر والإحالات في standalone_question واكتب السؤال كاملًا بالموضوع المقصود؛ لا تترك «هذا/ذلك/ماذا عنه؟» بلا مرجع. لا تجب عن السؤال الآن. أعد JSON بهذا الشكل:
+مهمتك الآن الفهم فقط، لا الإجابة. اقرأ الرسائل السابقة والبطاقة النشطة ثم:
+1. لخّص موضوع المحادثة السابقة في context_summary بجملة قصيرة، أو اتركه فارغًا إن لم يوجد سياق.
+2. حدّد هل الرسالة سؤال جديد أم متابعة.
+3. إذا كانت متابعة، أعد كتابة السؤال كاملًا في standalone_question بعد حل الضمائر («ماذا عنه؟» تصبح السؤال بالموضوع المقصود). لا تترك إشارة بلا مرجع.
+4. استعلامات البحث أسماء وأماكن وأحداث وردت فعلًا في الرسالة أو في السياق المحال إليه، لا ضمائر.
+أعد JSON فقط:
 {"kind":"smalltalk|find_news|ask_about_news|about_active_card|another_card|related_card|out_of_scope|unclear",
  "sub":"summarize|analyze|entities|general",
- "standalone_question":"السؤال كاملًا ومستقلًا بعد حل الضمائر والإحالات",
- "search_queries":["حتى ثلاثة استعلامات قصيرة (1-4 كلمات): أسماء وأماكن وأحداث وردت فعلًا في الرسالة أو في السياق المُحال إليه"],
+ "context_summary":"خلاصة السياق السابق أو فارغ",
+ "standalone_question":"السؤال كاملًا ومستقلًا",
+ "search_queries":["حتى ثلاثة استعلامات قصيرة من 1 إلى 4 كلمات"],
  "lang":"ar|en","tone":"casual|plain|polite","clarify":"سؤال توضيحي قصير إن كان kind=unclear وإلا فارغ"}
-- find_news: يطلب أخبارًا عن شخص أو حدث أو مكان («ماذا حدث في…»، «أخبار…»).
-- ask_about_news: يطلب تفسيرًا أو ربطًا أو مقارنة أو رأيًا تحليليًا يُجاب من أخبار الأرشيف.
-- about_active_card: سؤال أو طلب (تلخيص/تحليل/الجهات المذكورة/استفسار) يخص البطاقة النشطة، ولو بالإحالة («ما تأثير ذلك؟»، «ومن المستفيد؟»). sub يحدد النوع.
+- find_news: يطلب أخبارًا عن شخص أو حدث أو مكان.
+- ask_about_news: يطلب تفسيرًا أو ربطًا أو مقارنة تُجاب من أخبار الأرشيف.
+- about_active_card: يخص البطاقة النشطة ولو بالإحالة. sub يحدد التلخيص أو التحليل أو الجهات أو سؤالًا عامًا.
 - another_card / related_card: يريد بطاقة أخرى أو مرتبطة.
 - smalltalk: تحية أو شكر أو مزاح. out_of_scope: خارج الأخبار. unclear: لا يمكن تحديد المقصود.
-إن كان الموضوع جديدًا ومستقلًا عن السياق فتجاهل السياق. لا تخترع أسماء.`;
+إن كان الموضوع جديدًا ومستقلًا فتجاهل السياق. لا تخترع أسماء. طابق لغة المستخدم ولهجته في الحقول النصية.`;
 
 export function understandUser(query: string, turns: string, active: Card | null) {
   return `<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n<active_card>\n${active ? `${sanitizeInline(active.headline, 280)}\n${sanitizeInline(active.summary, 400)}` : "(لا توجد)"}\n</active_card>\n<message>\n${sanitizeInline(query, 500)}\n</message>`;
@@ -178,8 +206,8 @@ ${withAnalysis ? ANALYSIS_SPEC : "لا تُنتج analysis؛ اجعله null."}
 used_refs: المواد التي استندت إليها فعلًا فقط. إن لم تكن أي مادة ذات صلة بالسؤال فاجعلها [] وقل ذلك في reply.`;
 }
 
-export function draftUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, cached: unknown, feedback = "") {
-  return `<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n${materialsBlock(mats, lang)}\n${cached ? `<ready_analysis>\n${JSON.stringify(cached)}\n</ready_analysis>\n(التحليل جاهز؛ اجعل reply منسجمًا معه ولا تُنتج analysis.)\n` : ""}${feedback ? `<review_feedback>\n${sanitizeInline(feedback, 1200)}\n</review_feedback>\nأصلح المسودة وفق ملاحظات المراجع، وبالاستناد إلى المواد وحدها.\n` : ""}<user_language>${lang === "en" ? "English" : "العربية"} | النبرة: ${tone}</user_language>\n<question>\n${sanitizeInline(question, 500)}\n</question>`;
+export function draftUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, cached: unknown, feedback = "", summary = "") {
+  return `<context_summary>\n${sanitizeInline(summary, 400) || "(لا خلاصة سابقة)"}\n</context_summary>\n<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n${materialsBlock(mats, lang)}\n${cached ? `<ready_analysis>\n${JSON.stringify(cached)}\n</ready_analysis>\n(التحليل جاهز؛ اجعل reply منسجمًا معه ولا تُنتج analysis.)\n` : ""}${feedback ? `<review_feedback>\n${sanitizeInline(feedback, 1200)}\n</review_feedback>\nأصلح المسودة وفق ملاحظات المراجع، وبالاستناد إلى المواد وحدها.\n` : ""}<user_language>${lang === "en" ? "English" : "العربية"} | النبرة: ${tone}</user_language>\n<question>\n${sanitizeInline(question, 500)}\n</question>`;
 }
 
 export const REVIEW_SYSTEM = `${RULES}
@@ -193,8 +221,8 @@ export const REVIEW_SYSTEM = `${RULES}
 6. قرر صراحةً هل أصبحت المسودة صالحة للنشر: approved=true فقط إذا أجابت القصد وكانت كل معلوماتها مسندة ولم تكرر الرد السابق؛ وإلا approved=false واكتب ملاحظات محددة قابلة للتنفيذ.
 7. أعد JSON صالحًا بهذه البنية: {"reply":"...","analysis":null,"used_refs":["A1"],"approved":true,"feedback":""}. إن كان analysis في المسودة null فأبقه null. اترك فارغًا أي حقل لا تسنده المواد.`;
 
-export function reviewUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, draft: unknown) {
-  return `<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n${materialsBlock(mats, lang)}\n<user_language>${lang === "en" ? "English" : "العربية"} | النبرة: ${tone}</user_language>\n<question>\n${sanitizeInline(question, 500)}\n</question>\n<draft>\n${JSON.stringify(draft)}\n</draft>`;
+export function reviewUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, draft: unknown, summary = "") {
+  return `<context_summary>\n${sanitizeInline(summary, 400) || "(لا خلاصة سابقة)"}\n</context_summary>\n<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n${materialsBlock(mats, lang)}\n<user_language>${lang === "en" ? "English" : "العربية"} | النبرة: ${tone}</user_language>\n<question>\n${sanitizeInline(question, 500)}\n</question>\n<draft>\n${JSON.stringify(draft)}\n</draft>`;
 }
 
 export const ANALYSIS_KEYS = ["event", "context", "parties", "implications", "outlook"] as const;

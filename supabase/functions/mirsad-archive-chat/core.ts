@@ -24,7 +24,7 @@ export interface Deps { store: Store; gemini: Gemini; hash(v: string): Promise<s
 
 type Kind = "smalltalk" | "find_news" | "ask_about_news" | "about_active_card" | "another_card" | "related_card" | "out_of_scope" | "unclear";
 type Sub = "summarize" | "analyze" | "entities" | "general";
-type Plan = { kind: Kind; sub: Sub; standalone: string; queries: string[]; lang: Lang; tone: Tone; clarify: string; by: "model" | "rules" };
+type Plan = { kind: Kind; sub: Sub; standalone: string; summary: string; queries: string[]; lang: Lang; tone: Tone; clarify: string; by: "model" | "rules" };
 type Turn = { role: "user" | "assistant"; content: string; article_ids?: string[]; search_query?: string; active_article_id?: string };
 
 const KINDS = new Set<Kind>(["smalltalk", "find_news", "ask_about_news", "about_active_card", "another_card", "related_card", "out_of_scope", "unclear"]);
@@ -87,7 +87,7 @@ function merge(pool: Card[], rows: unknown[], cap = 18) {
 }
 
 function rulesPlan(mind: Mind, query: string): Plan {
-  const base = { sub: "general" as Sub, standalone: query, queries: mind.searchText ? [mind.searchText] : [], lang: mind.lang, tone: mind.tone, clarify: "", by: "rules" as const };
+  const base = { sub: "general" as Sub, standalone: query, summary: "", queries: mind.searchText ? [mind.searchText] : [], lang: mind.lang, tone: mind.tone, clarify: "", by: "rules" as const };
   if (mind.intent === "greeting" || mind.intent === "joke") return { ...base, kind: "smalltalk" };
   if (mind.intent === "ambiguous") return { ...base, kind: "unclear" };
   if (mind.follow === "another") return { ...base, kind: "another_card" };
@@ -99,16 +99,16 @@ function rulesPlan(mind: Mind, query: string): Plan {
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
   if (!deps.gemini.has("core")) throw new Error("core_understanding_missing");
   try {
-    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 900 });
-    const kind = String(r.kind || "") as Kind;
+    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 1400 });
+    const kind = String(r.kind || "").trim() as Kind;
     if (!KINDS.has(kind)) throw new Error("core_understanding_invalid_kind");
-    const standalone = sanitizeInline(r.standalone_question, 300);
-    if (!standalone) throw new Error("core_understanding_missing_standalone_question");
+    const standalone = sanitizeInline(r.standalone_question || r.standaloneQuestion || r.question, 300) || query;
+    const summary = sanitizeInline(r.context_summary || r.contextSummary, 400);
     const sub = (["summarize", "analyze", "entities", "general"].includes(String(r.sub)) ? String(r.sub) : "general") as Sub;
     const queries = (Array.isArray(r.search_queries) ? r.search_queries : []).map((q) => sanitizeInline(q, 60)).filter((q) => q.length >= 2).slice(0, 3);
     const lang: Lang = r.lang === "en" ? "en" : r.lang === "ar" ? "ar" : mind.lang;
     const tone: Tone = r.tone === "casual" || r.tone === "polite" || r.tone === "plain" ? r.tone : mind.tone;
-    return { kind, sub, standalone, queries: queries.length ? queries : [standalone.slice(0, 60)], lang, tone, clarify: sanitizeInline(r.clarify, 200), by: "model" };
+    return { kind, sub, standalone, summary, queries: queries.length ? queries : [standalone.slice(0, 60)], lang, tone, clarify: sanitizeInline(r.clarify, 200), by: "model" };
   } catch (e) {
     console.warn("core_understanding_failed", e instanceof Error ? e.message : "unknown");
     throw e;
@@ -142,7 +142,7 @@ async function retrieve(deps: Deps, plan: Plan, mind: Mind, shown: Set<string>, 
 }
 
 type Composed = { reply: string; analysis: Analysis | null; refs: string[]; pipeline: "core+nexus" };
-async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; turns: string; mats: Mat[]; lang: Lang; tone: Tone; wantAnalysis: boolean; cacheKey: string }): Promise<Composed | null> {
+async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; summary: string; turns: string; mats: Mat[]; lang: Lang; tone: Tone; wantAnalysis: boolean; cacheKey: string }): Promise<Composed | null> {
   if (!deps.gemini.has("core") || !deps.gemini.has("nexus")) return null;
   const hit = a.cacheKey ? analysisCache.get(a.cacheKey) : undefined;
   const cached = hit && Date.now() - hit.at < CACHE_TTL ? hit.analysis : null;
@@ -155,29 +155,33 @@ async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; 
   });
   let draft: ReturnType<typeof norm> | null = null;
   let feedback = "";
+  let last: ReturnType<typeof norm> | null = null;
   const style = REVIEW_VARIANTS[Math.floor(Math.random() * REVIEW_VARIANTS.length)];
+  const approvedOf = (raw: Record<string, unknown>) => raw.approved === true || raw.approved === "true" || raw.approved === 1;
+  const finish = (rev: ReturnType<typeof norm>, fromDraft: ReturnType<typeof norm>) => {
+    const analysis = cached || (needAnalysis ? rev.analysis || fromDraft.analysis : null);
+    if (a.cacheKey && analysis && !cached) {
+      if (analysisCache.size > 300) analysisCache.delete(analysisCache.keys().next().value as string);
+      analysisCache.set(a.cacheKey, { at: Date.now(), analysis });
+    }
+    return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : (fromDraft.refs.length ? fromDraft.refs : (valid.has("A1") ? ["A1"] : [])), pipeline: "core+nexus" as const };
+  };
   for (let round = 1; round <= 3; round++) {
     try {
-      draft = norm(await deps.gemini.json("nexus", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached, feedback), maxTokens: 3500 }));
-    } catch (e) { console.warn("nexus_draft_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); return null; }
-    if (!draft.reply) return null;
+      draft = norm(await deps.gemini.json("nexus", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached, feedback, a.summary), maxTokens: 3500 }));
+    } catch (e) { console.warn("nexus_draft_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); break; }
+    if (!draft.reply) break;
     try {
-      const raw = await deps.gemini.json("core", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من 3.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }), maxTokens: 4000 });
+      const raw = await deps.gemini.json("core", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من 3.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }, a.summary), maxTokens: 4000 });
       const rev = norm(raw);
       feedback = sanitizeInline(raw.feedback, 1200);
-      if (!rev.reply) return null;
-      if (raw.approved === true) {
-        const analysis = cached || (needAnalysis ? rev.analysis || draft.analysis : null);
-        if (a.cacheKey && analysis && !cached) {
-          if (analysisCache.size > 300) analysisCache.delete(analysisCache.keys().next().value as string);
-          analysisCache.set(a.cacheKey, { at: Date.now(), analysis });
-        }
-        return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : (draft.refs.length ? draft.refs : (valid.has("A1") ? ["A1"] : [])), pipeline: "core+nexus" };
-      }
-      if (!feedback || round === 3) return null;
-    } catch (e) { console.warn("core_review_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); return null; }
+      if (!rev.reply) break;
+      last = rev;
+      const accepted = approvedOf(raw) || (!feedback && raw.approved == null);
+      if (accepted || round === 3) return finish(rev, draft);
+    } catch (e) { console.warn("core_review_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); break; }
   }
-  return null;
+  return last && draft ? finish(last, draft) : null;
 }
 
 export async function handleChat(req: Request, deps: Deps): Promise<Response> {
@@ -280,14 +284,14 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const active = activeId ? await deps.store.loadArticle(activeId) : null;
     let plan: Plan;
     if (action === "briefing") {
-      plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
+      plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", summary: "", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
     } else {
       try { plan = await understand(deps, query, history, active, mind); }
       catch (e) {
         const reason = e instanceof Error ? e.message : "unknown";
         return fail503(reason === "resource_exhausted"
-          ? "محرك فهم الأرشيف مشغول الآن. أعد المحاولة لاحقًا؛ لم تُخصم أي فتحات."
-          : "تعذر فهم السؤال عبر محرك الأرشيف الآن. أعد المحاولة لاحقًا؛ لم تُخصم أي فتحات.");
+          ? "محرك فهم الأرشيف مشغول الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة."
+          : "تعذر فهم السؤال عبر محرك الأرشيف الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة.");
       }
     }
     const { lang, tone } = plan;
@@ -334,10 +338,18 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       }
       candidates = pool.length; method = kind === "related_card" ? "related" : "another";
     } else {
-      const r = await retrieve(deps, plan, mind, new Set(), kind === "ask_about_news"); candidates = r.count; method = r.method;
+      let r: { cards: Card[]; method: string; count: number };
+      try {
+        r = await retrieve(deps, plan, mind, new Set(), kind === "ask_about_news");
+      } catch (e) {
+        console.warn("retrieve_failed", e instanceof Error ? e.message : "unknown");
+        return fail503("تعذر جلب أخبار الأرشيف الآن. لم يتم خصم أي فتحة.");
+      }
+      candidates = r.count; method = r.method;
       if (!r.cards.length) return freeCanned("none", lang, tone, { method });
       primary = r.cards[0]; others = r.cards.slice(1, kind === "ask_about_news" ? 5 : 3);
     }
+    if (!primary?.id) return fail503("تعذر تجهيز خبر الأرشيف. لم يتم خصم أي فتحة.");
     const cardKind = kind === "find_news" || kind === "another_card" || kind === "related_card" || action === "briefing";
     const pid = String(primary.id);
     const revisions = await deps.store.revisions(pid).catch(() => []);
@@ -347,9 +359,9 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const bal = await deps.store.balance(userId);
     if (!bal.unlimited && bal.balance < CHAT_COST) return json({ error: `رصيد الفتحات لا يكفي لرد الأرشيف (المطلوب ${CHAT_COST}، المتبقي ${bal.balance}).`, code: "insufficient_unlocks", required: CHAT_COST, remaining: bal.balance }, 402);
     const cacheKey = cardKind ? `${pid}|${String(primary.headline).length}|${String(primary.summary).length}|${primary.update_count}|${primary.updated_at ?? ""}` : "";
-    const out = await compose(deps, { kind, sub: plan.sub, question: plan.standalone || query, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey });
+    const out = await compose(deps, { kind, sub: plan.sub, question: plan.standalone || query, summary: plan.summary, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey });
 
-    if (!out) return fail503("لم يكتمل الرد بعد المراجعة. لم تُخصم أي فتحات.");
+    if (!out) return fail503("لم يكتمل رد الأرشيف بعد المراجعة. لم يتم خصم أي فتحة.");
 
     // New clients persist the answer before commit_chat; legacy page builds still charge here after success.
     const cited = mats.filter((m) => out.refs.includes(m.ref)).map((m) => m.card);
@@ -371,7 +383,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     if (!done.allowed) return insufficient(done);
     return json({ ...successPayload, unlocks: unlocksOf(done) });
   } catch (e) {
-    console.error("request", e instanceof Error ? e.message : "unknown");
-    return json({ error: "حدث خطأ أثناء المعالجة. حاول مرة أخرى. لم تُخصم أي فتحات إن لم تصلك إجابة." }, 502);
+    console.error("archive_pipeline_failed", e instanceof Error ? e.message : "unknown");
+    return json({ error: "حدث خطأ أثناء معالجة الأرشيف. لم يتم خصم أي فتحة." }, 502);
   }
 }
