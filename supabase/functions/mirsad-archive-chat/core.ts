@@ -164,7 +164,7 @@ async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; 
     if (analysisCache.size > 300) analysisCache.delete(analysisCache.keys().next().value as string);
     analysisCache.set(a.cacheKey, { at: Date.now(), analysis });
     }
-    return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : draft.refs, pipeline: "core+nexus" };
+    return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : (draft.refs.length ? draft.refs : (valid.has("A1") ? ["A1"] : [])), pipeline: "core+nexus" };
   } catch (e) {
     console.warn("nexus_failed", e instanceof Error ? e.message : "unknown");
     return null;
@@ -332,7 +332,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     if (!done.allowed) return insufficient(done);
 
     const cited = out ? mats.filter((m) => out.refs.includes(m.ref)).map((m) => m.card) : [];
-    const shownCards = cardKind || kind === "about_active_card" ? (kind === "about_active_card" ? [] : [primary]) : cited.slice(0, 3);
+    const citedWithPrimary = [primary, ...cited.filter((card) => String(card.id) !== String(primary.id))];
+    const shownCards = cardKind || kind === "about_active_card" ? [primary] : citedWithPrimary.slice(0, 3);
     const nextActive = cardKind ? pid : (shownCards[0] ? String(shownCards[0].id) : activeId);
     return json({
       reply: out ? out.reply : say(lang, tone, "degraded"),

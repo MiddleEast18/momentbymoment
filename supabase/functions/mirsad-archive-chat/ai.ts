@@ -17,6 +17,8 @@ const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 3072;
 const working: Partial<Record<Stage, string>> = {};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const MAX_ATTEMPTS = 1;
+const safeApiReason = (data: Record<string, any>) => String(data?.error?.status || data?.error?.message || "unknown").replace(/[\r\n]+/g, " ").slice(0, 120);
 
 export function parseJsonLoose(text: string): Record<string, unknown> {
   const clean = text.replace(/^\uFEFF/, "").replace(/```(?:json)?/gi, "").trim();
@@ -45,13 +47,13 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
       const order = working[stage] ? [working[stage]!, ...MODELS.filter((m) => m !== working[stage])] : MODELS;
       let last = "failed";
       for (const model of order) {
-        for (let attempt = 0; attempt < 2; attempt++) {
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
           let res: Response;
           try {
             res = await fetchFn(`${API}/${model}:generateContent`, {
               method: "POST",
               headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-              body, signal: AbortSignal.timeout(40000),
+              body, signal: AbortSignal.timeout(12000),
             });
           } catch { last = "network"; await sleep(500); continue; }
           const data = await res.json().catch(() => ({})) as Record<string, any>;
@@ -65,6 +67,7 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
           if (res.status === 401 || res.status === 403) throw new GeminiError(`auth_${res.status}`);
           if (res.status === 404 || (res.status === 400 && /model|not found|not supported/i.test(String(data?.error?.message || "")))) { last = `model_${res.status}`; break; }
           last = `http_${res.status}`;
+          console.warn("gemini_http", { stage, model, status: res.status, reason: safeApiReason(data) });
           if (res.status === 429 || res.status >= 500) { await sleep(700); continue; }
           break;
         }
@@ -194,6 +197,7 @@ export function toBriefing(a: Analysis | null) {
   const join = (...xs: string[]) => xs.filter(Boolean).join(" ");
   return {
     event: a.event, context: join(a.context, a.parties), result: join(a.implications, a.outlook),
+    significance: a.implications, outcomes: a.outlook, analysis: join(a.parties, a.implications, a.outlook),
     proves: "", limits: "",
     parties: a.parties, implications: a.implications, outlook: a.outlook,
     text: ANALYSIS_KEYS.map((k) => a[k]).filter(Boolean).join("\n\n"),

@@ -161,7 +161,8 @@
     }
     let count = 0;
     for (const key of rows) {
-      const value = normalize(briefing[key] || '');
+      const aliases = { significance: ['implications', 'result'], outcomes: ['outlook', 'result'], analysis: ['text', 'result'] };
+      const value = normalize(briefing[key] || (aliases[key] || []).map((alias) => briefing[alias]).find(Boolean) || '');
       if (!value) continue;
       const row = document.createElement('p');
       row.className = 'archive-brief__row';
@@ -217,11 +218,11 @@
     textNode.textContent = normalize(entry.text || '');
     if (entry.error) textNode.classList.add('archive-error');
     if (role !== 'user') {
-      const cards = Array.isArray(entry.articles) ? entry.articles.slice(0, 1) : [];
+      const cards = Array.isArray(entry.articles) ? entry.articles.slice(0, 3) : [];
       const results = node.querySelector('.archive-message__results');
       if (cards.length) {
         results.hidden = false;
-        results.appendChild(renderCard(cards[0]));
+        for (const article of cards) results.appendChild(renderCard(article));
         const note = document.createElement('p');
         note.className = 'archive-card-note';
         note.textContent = entry.lang === 'en'
@@ -329,7 +330,7 @@
     try {
       const result = await search(query);
       const answer = normalize(result.reply || 'تم.');
-      const articles = Array.isArray(result.articles) ? result.articles.slice(0, 1) : [];
+      const articles = Array.isArray(result.articles) ? result.articles.slice(0, 3) : [];
       const entry = {
         role: 'assistant',
         text: answer,
@@ -346,11 +347,12 @@
       showBalance(result);
       if (result.search_query) state.searchQuery = normalize(result.search_query).slice(0, 180);
       if (result.active_article_id) state.activeId = String(result.active_article_id);
-      if (articles[0]?.id) {
-        const id = String(articles[0].id);
+      for (const article of articles) {
+        if (!article?.id) continue;
+        const id = String(article.id);
         if (!state.shownIds.includes(id)) state.shownIds.push(id);
-        state.activeId = id;
       }
+      if (articles[0]?.id) state.activeId = String(articles[0].id);
       state.history.push({
         role: 'assistant',
         content: answer,

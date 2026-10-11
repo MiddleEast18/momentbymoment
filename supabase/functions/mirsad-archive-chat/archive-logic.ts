@@ -16,7 +16,7 @@ const FILLER = new Set([
   "حلل","جهات","مذكوره","المذكوره","related","another","card","summarize","analyze","show","one","more","next",
   "me","some","any","هناك","عنها","عنه","لها","له","حق","مال","تبع","لو","اذا","إن","ان","ثم","قد",
   "وقد","كما","وذلك","حيث","تم","يتم","حتى","نحو","دون","ضد","عبر","لدى","عند","اكثر","مدينه","عاصمه",
-  "mentioned","entities","entity","whos","summarise",
+  "mentioned","entities","entity","whos","summarise","تاثير","يعني","معني","اثر","لخصها","لخصه","لخصلي","اختصرها",
   "اهلا","اهلين","هلا","هلو","مرحبا","السلام","سلام","صباح","مساء","الخير","النور","كيفك","شلونك",
   "hi","hello","hey","thanks","thank","شكرا","يسلمو","تسلم","تمام","حلو","ok","okay","بك","رحمه","بركاته",
   "لك","you","good","morning","evening","عليكم","ورحمه","الله",
@@ -131,8 +131,9 @@ function followOf(folded: string, keys: string[]): Follow {
   if (extra.length) return "";
   if (folded.length <= 56 && /(بطاقه (اخري|اضافيه)|خبر (اخر|ثاني)|اعرض (لي )?(واحده |بطاقه )?(اخري|اضافيه)|another card|one more|show another|next card)/.test(folded)) return "another";
   if (folded.length <= 42 && /(بطاقه مرتبط|خبر مرتبط|related card|^related$)/.test(folded)) return "related";
-  if (folded.length <= 28 && /(^لخص|لخصها|لخصلي|summarize|summary|sum up)/.test(folded)) return "summarize";
-  if (folded.length <= 28 && /(^حلل|حللها|تحليل|analyze|analysis)/.test(folded)) return "analyze";
+  if (folded.length <= 48 && /^(?:ما\s+)?(?:تاثير|اثر)\s+(?:ذلك|هذا|الخبر)|^(?:ماذا|ما)\s+(?:يعني|معني)\s+(?:ذلك|هذا|الخبر)|^من\s+المستفيد/.test(folded)) return "analyze";
+  if (folded.length <= 40 && /(^لخص|لخصها|لخصه|لخصلي|لخص\s+(?:الخبر|هذا|ذلك)|اختصرها|summarize|summary|sum up)/.test(folded)) return "summarize";
+  if (folded.length <= 36 && /(^حلل|حللها|حلله|تحليل|analyze|analysis)/.test(folded)) return "analyze";
   if (folded.length <= 48 && /(المذكوره|الاطراف المذكوره|mentioned entit|who is mentioned|whos mentioned)/.test(folded)) return "entities";
   return "";
 }
