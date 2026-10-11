@@ -97,20 +97,21 @@ function rulesPlan(mind: Mind, query: string): Plan {
 }
 
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
-  const rules = rulesPlan(mind, query);
-  if (!deps.gemini.has("core")) return rules;
+  if (!deps.gemini.has("core")) throw new Error("core_understanding_missing");
   try {
-    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 700, temperature: 0.1 });
+    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 900 });
     const kind = String(r.kind || "") as Kind;
-    if (!KINDS.has(kind)) return rules;
+    if (!KINDS.has(kind)) throw new Error("core_understanding_invalid_kind");
+    const standalone = sanitizeInline(r.standalone_question, 300);
+    if (!standalone) throw new Error("core_understanding_missing_standalone_question");
     const sub = (["summarize", "analyze", "entities", "general"].includes(String(r.sub)) ? String(r.sub) : "general") as Sub;
     const queries = (Array.isArray(r.search_queries) ? r.search_queries : []).map((q) => sanitizeInline(q, 60)).filter((q) => q.length >= 2).slice(0, 3);
     const lang: Lang = r.lang === "en" ? "en" : r.lang === "ar" ? "ar" : mind.lang;
     const tone: Tone = r.tone === "casual" || r.tone === "polite" || r.tone === "plain" ? r.tone : mind.tone;
-    return { kind, sub, standalone: sanitizeInline(r.standalone_question, 300) || query, queries: queries.length ? queries : rules.queries, lang, tone, clarify: sanitizeInline(r.clarify, 200), by: "model" };
+    return { kind, sub, standalone, queries: queries.length ? queries : [standalone.slice(0, 60)], lang, tone, clarify: sanitizeInline(r.clarify, 200), by: "model" };
   } catch (e) {
-    console.warn("understand_fallback", e instanceof Error ? e.message : "unknown");
-    return rules;
+    console.warn("core_understanding_failed", e instanceof Error ? e.message : "unknown");
+    throw e;
   }
 }
 
@@ -157,11 +158,11 @@ async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; 
   const style = REVIEW_VARIANTS[Math.floor(Math.random() * REVIEW_VARIANTS.length)];
   for (let round = 1; round <= 3; round++) {
     try {
-      draft = norm(await deps.gemini.json("nexus", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached, feedback), maxTokens: 3500, temperature: 0.35 }));
+      draft = norm(await deps.gemini.json("nexus", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached, feedback), maxTokens: 3500 }));
     } catch (e) { console.warn("nexus_draft_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); return null; }
     if (!draft.reply) return null;
     try {
-      const raw = await deps.gemini.json("core", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من 3.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }), maxTokens: 4000, temperature: 0.35 });
+      const raw = await deps.gemini.json("core", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من 3.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }), maxTokens: 4000 });
       const rev = norm(raw);
       feedback = sanitizeInline(raw.feedback, 1200);
       if (!rev.reply) return null;
@@ -277,9 +278,18 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
 
     const active = activeId ? await deps.store.loadArticle(activeId) : null;
-    const plan: Plan = action === "briefing"
-      ? { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" }
-      : await understand(deps, query, history, active, mind);
+    let plan: Plan;
+    if (action === "briefing") {
+      plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
+    } else {
+      try { plan = await understand(deps, query, history, active, mind); }
+      catch (e) {
+        const reason = e instanceof Error ? e.message : "unknown";
+        return fail503(reason === "resource_exhausted"
+          ? "محرك فهم الأرشيف مشغول الآن. أعد المحاولة لاحقًا؛ لم تُخصم أي فتحات."
+          : "تعذر فهم السؤال عبر محرك الأرشيف الآن. أعد المحاولة لاحقًا؛ لم تُخصم أي فتحات.");
+      }
+    }
     const { lang, tone } = plan;
 
     if (plan.kind === "smalltalk") return freeCanned(mind.intent === "joke" ? "joke" : "greeting", lang, tone);
