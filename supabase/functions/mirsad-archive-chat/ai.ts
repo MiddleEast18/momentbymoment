@@ -20,7 +20,7 @@ const MODELS: { id: string; thinking: "minimal" | "low" }[] = [
 ];
 const EMBED_MODEL = "gemini-embedding-001";
 const EMBED_DIM = 3072;
-const CALL_MS = 22000;
+const CALL_MS = 10000;
 const DEAD_MS = 10 * 60 * 1000;
 const working: Partial<Record<Stage, string>> = {};
 // A key that Google rejected stays out of rotation for a while, so a bad secret costs one call, not six.
@@ -83,15 +83,15 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
     const order2 = preferred ? [preferred, ...MODELS.filter((m) => m.id !== preferred.id)] : MODELS;
     let sawResourceExhausted = false;
     for (const model of order2) {
-      let thinking: string | null = model.thinking;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // Thinking is off: it turns a valid key into a 20s hang, and the archive budget cannot absorb that.
+      let thinking: string | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
         let res: Response, data: Record<string, any>;
         try {
           ({ res, data } = await call(model.id, thinking));
         } catch (e) {
           if (e instanceof GeminiError) throw e;
           last = "network";
-          if (attempt === 0) { await sleep(400); continue; }
           break;
         }
         if (res.ok) {
@@ -99,11 +99,10 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
           const text = (cand?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => String(p.text || "")).join("").trim();
           if (!text) {
             last = cand?.finishReason === "SAFETY" || data?.promptFeedback?.blockReason ? "blocked" : "empty";
-            if (thinking && last === "empty") { thinking = null; continue; }
             break;
           }
           try { const out = parseJsonLoose(text); working[slot] = model.id; return out; }
-          catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt < 2) continue; break; }
+          catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt < 1) continue; break; }
         }
         const reason = safeApiReason(data);
         if (keyRejected(res.status, reason)) throw new GeminiError(`auth_${res.status}`);
@@ -118,14 +117,14 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
           break;
         }
         console.warn("gemini_http", { slot, model: model.id, status: res.status, reason });
-        if (res.status === 429) {
+        if (res.status === 429 || res.status === 503 || res.status === 529) {
           sawResourceExhausted = true;
           if (working[slot] === model.id) delete working[slot];
           last = "resource_exhausted";
           break;
         }
         last = `http_${res.status}`;
-        if ((res.status === 408 || res.status >= 500) && attempt < 2) { await sleep(500); continue; }
+        if ((res.status === 408 || res.status >= 500) && attempt < 1) { await sleep(300); continue; }
         break;
       }
     }

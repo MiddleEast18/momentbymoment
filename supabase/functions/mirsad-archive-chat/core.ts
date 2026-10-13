@@ -37,7 +37,7 @@ const UUID = /^[0-9a-f-]{16,80}$/i;
 const CHAT_COST = 50;
 const CHAT_REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 // The platform kills long requests; every model call is bounded by this budget so we answer (or fall back) first.
-const BUDGET_MS = 115_000;
+const BUDGET_MS = 85_000;
 
 const cors = (origin: string | null, origins: Set<string>) => ({
   "Access-Control-Allow-Origin": origin && origins.has(origin) ? origin : "https://marsad.website",
@@ -97,7 +97,7 @@ function rulesPlan(mind: Mind, query: string): Plan {
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
   if (!deps.gemini.has("core")) throw new Error("core_understanding_missing");
   try {
-    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 1400, deadlineAt: Date.now() + 40_000 });
+    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 900, deadlineAt: Date.now() + 12_000 });
     const kind = String(r.kind || "").trim() as Kind;
     if (!KINDS.has(kind)) throw new Error("core_understanding_invalid_kind");
     const standalone = sanitizeInline(r.standalone_question || r.standaloneQuestion || r.question, 300) || query;
@@ -282,10 +282,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       try { plan = await understand(deps, query, history, active, mind); }
       catch (e) {
         const reason = e instanceof Error ? e.message : "unknown";
-        console.error("archive_understand_failed", { request_id: requestId, reason });
-        return fail503(reason === "resource_exhausted"
-          ? "محرك فهم الأرشيف مشغول الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة."
-          : "تعذر فهم السؤال عبر محرك الأرشيف الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة.");
+        console.warn("core_understanding_fallback", { request_id: requestId, reason });
+        plan = rulesPlan(mind, query);
       }
     }
     const { lang, tone } = plan;

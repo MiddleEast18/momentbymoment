@@ -6,7 +6,7 @@ import { type Candidate, cleanEntities, corpusOf, verifyCandidate } from "./veri
 // even rounds swap them. Each round re-feeds the previous draft plus concrete corrective notes.
 export const MAX_ROUNDS = 4;
 const CACHE_TTL = 6 * 3600 * 1000;
-const FATAL = new Set(["missing_key", "deadline", "resource_exhausted"]);
+const FATAL = new Set(["missing_key", "deadline", "resource_exhausted", "network", "http_503", "http_529", "auth_400", "auth_401", "auth_403"]);
 const cache = new Map<string, { at: number; analysis: Analysis; entities: Entity[] }>();
 const VARIANTS = [
   "ابدأ بخلاصة الحدث ثم اربطها بسياقه ودلالته.",
@@ -45,7 +45,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
   let feedback = "", previous = "", reason = "unverified", rounds = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
-    if (a.deadlineAt - Date.now() < 25_000) { reason = "deadline"; break; }
+    if (a.deadlineAt - Date.now() < 12_000) { reason = "deadline"; break; }
     rounds = round;
     const draftSlot: Stage = round % 2 === 1 ? "nexus" : "core";
     const reviewSlot: Stage = round % 2 === 1 ? "core" : "nexus";
@@ -61,7 +61,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     } catch (e) {
       reason = codeOf(e);
       console.warn("compose_draft_failed", { round, slot: draftSlot, reason });
-      if (FATAL.has(reason)) break;
+      if (FATAL.has(reason) || reason.startsWith("auth_")) break;
       continue;
     }
     if (!draft.reply) { feedback = "المسودة السابقة كانت فارغة؛ اكتب ردًا كاملًا يجيب السؤال."; reason = "empty_draft"; continue; }
@@ -78,7 +78,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
       reason = codeOf(e);
       console.warn("compose_review_failed", { round, slot: reviewSlot, reason });
       previous = JSON.stringify(draft).slice(0, 4000);
-      if (FATAL.has(reason)) break;
+      if (FATAL.has(reason) || reason.startsWith("auth_")) break;
       continue;
     }
     const rev = norm(raw);
