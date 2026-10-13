@@ -1,5 +1,8 @@
 import type { Card } from "./archive-logic.ts";
-import type { ChargeResult, Store } from "./core.ts";
+import type { ChargeResult, Memory, PassageHit, Store } from "./core.ts";
+import type { BodyRow, PassageRow } from "./evidence.ts";
+
+const vec = (v: number[]) => `[${v.join(",")}]`;
 
 // deno-lint-ignore no-explicit-any
 export function makeStore(db: any): Store {
@@ -23,8 +26,13 @@ export function makeStore(db: any): Store {
       return Array.isArray(r.data) ? r.data : [];
     },
     async semanticSearch(text, vector) {
-      const r = await db.rpc("mirsad_archive_search", { p_embedding: `[${vector.join(",")}]`, p_search_text: text, p_limit: 4 });
+      const r = await db.rpc("mirsad_archive_search", { p_embedding: vec(vector), p_search_text: text, p_limit: 4 });
       return r.error || !Array.isArray(r.data) ? [] : r.data;
+    },
+    async searchPassages(text, vector) {
+      const r = await db.rpc("archive_reply_search_passages", { p_embedding: vector ? vec(vector) : null, p_search_text: text, p_limit: 8 });
+      if (r.error || !Array.isArray(r.data)) return [];
+      return (r.data as Record<string, unknown>[]).map((x) => ({ article_id: String(x.article_id), passage_index: Number(x.passage_index), passage_text: String(x.passage_text || ""), score: Number(x.score || 0) })) as PassageHit[];
     },
     async loadArticle(id) {
       if (!UUID.test(id)) return null;
@@ -51,6 +59,39 @@ export function makeStore(db: any): Store {
       const row = Array.isArray(r.data) ? r.data[0] : r.data;
       if (r.error || !row) return null;
       return { allowed: !!row.allowed, charged: !!row.charged, amount: Number(row.charged_amount || row.required_unlocks || 0), remaining: Number(row.remaining_unlocks || 0), unlimited: !!row.unlimited, operations: ["archive_chat"] } as ChargeResult;
+    },
+    // ---- independent article-text store (archive_reply_*): never touches ingestion tables
+    async loadBody(id) {
+      const r = await db.from("archive_reply_bodies").select("article_id, source_url, body_text, fetch_status, content_hash, fetched_at").eq("article_id", id).maybeSingle();
+      return r.error ? null : (r.data as BodyRow | null);
+    },
+    async saveBody(row) {
+      const r = await db.from("archive_reply_bodies").upsert({ ...row, fetched_at: new Date().toISOString() }, { onConflict: "article_id" });
+      if (r.error) throw new Error("body_save_failed");
+    },
+    async loadPassages(id) {
+      const r = await db.from("archive_reply_passages").select("article_id, passage_index, passage_text").eq("article_id", id).order("passage_index", { ascending: true });
+      return r.error || !Array.isArray(r.data) ? [] : (r.data as PassageRow[]);
+    },
+    async replacePassages(id, rows) {
+      const del = await db.from("archive_reply_passages").delete().eq("article_id", id);
+      if (del.error) throw new Error("passages_delete_failed");
+      if (!rows.length) return;
+      const now = new Date().toISOString();
+      const ins = await db.from("archive_reply_passages").insert(rows.map((r) => ({ article_id: id, passage_index: r.passage_index, passage_text: r.passage_text, embedding: r.embedding ? vec(r.embedding) : null, updated_at: now })));
+      if (ins.error) throw new Error("passages_insert_failed");
+    },
+    async setPassageEmbedding(id, index, vector) {
+      const r = await db.from("archive_reply_passages").update({ embedding: vec(vector), updated_at: new Date().toISOString() }).eq("article_id", id).eq("passage_index", index);
+      if (r.error) throw new Error("embedding_save_failed");
+    },
+    async getMemory(userId) {
+      const r = await db.from("archive_reply_memory").select("context_summary, approved_reply, active_article_id, search_query").eq("user_id", userId).maybeSingle();
+      return r.error || !r.data ? null : (r.data as Memory);
+    },
+    async saveMemory(userId, m) {
+      const r = await db.from("archive_reply_memory").upsert({ user_id: userId, context_summary: m.context_summary, approved_reply: m.approved_reply, active_article_id: m.active_article_id, search_query: m.search_query, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+      if (r.error) throw new Error("memory_save_failed");
     },
   };
 }
