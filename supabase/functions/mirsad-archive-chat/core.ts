@@ -1,22 +1,27 @@
 import {
-  type Card, type Lang, type Tone, anchorName, bestCard, classify, distinctive, publicCard, rankCards,
-  relatedCards, sanitizeInline, say, stripStock, suggestions, type Mind,
+  type Card, type Lang, type Tone, anchorName, bestCard, classify, distinctive, fold, publicCard, rankCards,
+  relatedCards, sanitizeInline, say, suggestions, type Mind,
 } from "./archive-logic.ts";
-import {
-  type Analysis, type Gemini, type Mat, UNDERSTAND_SYSTEM, REVIEW_SYSTEM, cleanAnalysis, draftSystem,
-  draftUser, reviewUser, toBriefing, understandUser,
-} from "./ai.ts";
+import { type Gemini, type Mat, UNDERSTAND_SYSTEM, toBriefing, understandUser } from "./ai.ts";
+import { compose } from "./compose.ts";
+import { type EvidenceStore, gatherEvidence } from "./evidence.ts";
+import { fallbackReply } from "./verify.ts";
 
 export interface ChargeResult { allowed: boolean; charged: boolean; amount: number; remaining: number; unlimited: boolean; operations: string[] }
-export interface Store {
+export interface PassageHit { article_id: string; passage_index: number; passage_text: string; score: number }
+export interface Memory { context_summary: string; approved_reply: string; active_article_id: string | null; search_query: string }
+export interface Store extends EvidenceStore {
   getUser(token: string): Promise<string | null>;
   rateLimit(hash: string, windowStart: string, limit: number): Promise<boolean | null>;
   balance(userId: string): Promise<{ balance: number; unlimited: boolean }>;
   textSearch(text: string): Promise<Card[]>;
   semanticSearch(text: string, vector: number[]): Promise<Card[]>;
+  searchPassages(text: string, vector: number[] | null): Promise<PassageHit[]>;
   loadArticle(id: string): Promise<Card | null>;
   revisions(id: string): Promise<Card[]>;
   alreadyBriefed(userId: string, articleId: string): Promise<boolean>;
+  getMemory(userId: string): Promise<Memory | null>;
+  saveMemory(userId: string, memory: Memory): Promise<void>;
   charge(userId: string, ops: string[], articleId: string | null, commit: boolean): Promise<ChargeResult | null>;
   chargeChat(userId: string, requestId: string): Promise<ChargeResult | null>;
 }
@@ -31,15 +36,8 @@ const KINDS = new Set<Kind>(["smalltalk", "find_news", "ask_about_news", "about_
 const UUID = /^[0-9a-f-]{16,80}$/i;
 const CHAT_COST = 50;
 const CHAT_REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const analysisCache = new Map<string, { at: number; analysis: Analysis }>();
-const CACHE_TTL = 6 * 3600 * 1000;
-const REVIEW_VARIANTS = [
-  "ابدأ بخلاصة الحدث ثم اربطها بسياقه ودلالته.",
-  "ابدأ من سياق الخبر ثم وضّح ما تضيفه الوقائع إلى فهمه.",
-  "اجعل العلاقة بين الأطراف محور القراءة، بقدر ما تسنده المواد.",
-  "قدّم الدلالة أولًا ثم اربطها بالوقائع التي تحملها، من دون تنبؤ جازم.",
-  "اختر ترتيبًا سرديًا طبيعيًا مختلفًا عن الإجابات السابقة، مع تجنب أي قالب ثابت.",
-];
+// The platform kills long requests; every model call is bounded by this budget so we answer (or fall back) first.
+const BUDGET_MS = 115_000;
 
 const cors = (origin: string | null, origins: Set<string>) => ({
   "Access-Control-Allow-Origin": origin && origins.has(origin) ? origin : "https://marsad.website",
@@ -99,7 +97,7 @@ function rulesPlan(mind: Mind, query: string): Plan {
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
   if (!deps.gemini.has("core")) throw new Error("core_understanding_missing");
   try {
-    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 1400 });
+    const r = await deps.gemini.json("core", { system: UNDERSTAND_SYSTEM, user: understandUser(query, turnsText(history), active), maxTokens: 1400, deadlineAt: Date.now() + 40_000 });
     const kind = String(r.kind || "").trim() as Kind;
     if (!KINDS.has(kind)) throw new Error("core_understanding_invalid_kind");
     const standalone = sanitizeInline(r.standalone_question || r.standaloneQuestion || r.question, 300) || query;
@@ -115,6 +113,8 @@ async function understand(deps: Deps, query: string, history: Turn[], active: Ca
   }
 }
 
+// Stage 1: hybrid retrieval. Titles/summaries (text, then semantic) first; when they find nothing,
+// the stored full-article passages are searched (text + semantic, fused in SQL).
 async function retrieve(deps: Deps, plan: Plan, mind: Mind, shown: Set<string>, many: boolean) {
   const qs = [...new Set([...plan.queries, mind.searchText].map((q) => q.trim()).filter((q) => q.length >= 2))].slice(0, 4);
   const pool: Card[] = [];
@@ -123,13 +123,32 @@ async function retrieve(deps: Deps, plan: Plan, mind: Mind, shown: Set<string>, 
   const rankAll = () => { for (const q of qs) for (const i of rankCards(q, pool, shown)) { const o = best.get(i.rank.id); if (!o || i.rank.score > o.score) best.set(i.rank.id, { card: i.card, score: i.rank.score, pub: i.rank.published }); } };
   rankAll();
   let method = "text";
-  if (!best.size && deps.gemini.has("core") && qs.length) {
-    try {
-      const vec = await deps.gemini.embed(plan.standalone || qs[0]);
-      merge(pool, await deps.store.semanticSearch(plan.standalone || qs[0], vec)); rankAll(); method = "semantic";
-    } catch (e) { console.warn("semantic_skip", e instanceof Error ? e.message : "unknown"); }
+  let vector: number[] | null = null;
+  const queryVector = async () => {
+    if (vector || !deps.gemini.has("core") || !qs.length) return vector;
+    try { vector = await deps.gemini.embed(plan.standalone || qs[0], "query"); } catch (e) { console.warn("semantic_skip", e instanceof Error ? e.message : "unknown"); }
+    return vector;
+  };
+  if (!best.size) {
+    const v = await queryVector();
+    if (v) { merge(pool, await deps.store.semanticSearch(plan.standalone || qs[0], v)); rankAll(); method = "semantic"; }
   }
   let cards = [...best.values()].sort((a, b) => b.score - a.score || b.pub.localeCompare(a.pub)).map((x) => x.card);
+  if (!cards.length && qs.length) {
+    try {
+      const hits = await deps.store.searchPassages(qs.join(" "), await queryVector());
+      const toks = distinctive(qs.join(" "));
+      const primary = [...toks].sort((a, b) => b.length - a.length)[0] || "";
+      const ids: string[] = [];
+      for (const h of hits) {
+        const f = fold(h.passage_text);
+        const matched = toks.filter((t) => f.includes(t)).length;
+        if (primary && f.includes(primary) && matched >= Math.min(2, toks.length) && !shown.has(h.article_id) && !ids.includes(h.article_id)) ids.push(h.article_id);
+      }
+      const loaded = (await Promise.all(ids.slice(0, 5).map((id) => deps.store.loadArticle(id)))).filter((c): c is Card => !!c);
+      if (loaded.length) { cards = loaded; method = "body"; merge(pool, loaded); }
+    } catch (e) { console.warn("body_search_skip", e instanceof Error ? e.message : "unknown"); }
+  }
   if (!cards.length && many) {
     const toks = distinctive(qs.join(" ")).filter((t) => t.length >= 4);
     cards = pool.filter((c) => !shown.has(String(c.id))).map((c) => {
@@ -139,49 +158,6 @@ async function retrieve(deps: Deps, plan: Plan, mind: Mind, shown: Set<string>, 
     if (cards.length) method = "loose";
   }
   return { cards: cards.slice(0, 5), method, count: pool.length };
-}
-
-type Composed = { reply: string; analysis: Analysis | null; refs: string[]; pipeline: "core+nexus" };
-async function compose(deps: Deps, a: { kind: Kind; sub: Sub; question: string; summary: string; turns: string; mats: Mat[]; lang: Lang; tone: Tone; wantAnalysis: boolean; cacheKey: string }): Promise<Composed | null> {
-  if (!deps.gemini.has("core") || !deps.gemini.has("nexus")) return null;
-  const hit = a.cacheKey ? analysisCache.get(a.cacheKey) : undefined;
-  const cached = hit && Date.now() - hit.at < CACHE_TTL ? hit.analysis : null;
-  const needAnalysis = a.wantAnalysis && !cached;
-  const valid = new Set(a.mats.map((m) => m.ref));
-  const norm = (r: Record<string, unknown>) => ({
-    reply: stripStock(sanitizeInline(r.reply, 2500)),
-    analysis: needAnalysis ? cleanAnalysis(r.analysis, stripStock) : null,
-    refs: (Array.isArray(r.used_refs) ? r.used_refs : []).map((x) => String(x)).filter((x) => valid.has(x)),
-  });
-  let draft: ReturnType<typeof norm> | null = null;
-  let feedback = "";
-  let last: ReturnType<typeof norm> | null = null;
-  const style = REVIEW_VARIANTS[Math.floor(Math.random() * REVIEW_VARIANTS.length)];
-  const approvedOf = (raw: Record<string, unknown>) => raw.approved === true || raw.approved === "true" || raw.approved === 1;
-  const finish = (rev: ReturnType<typeof norm>, fromDraft: ReturnType<typeof norm>) => {
-    const analysis = cached || (needAnalysis ? rev.analysis || fromDraft.analysis : null);
-    if (a.cacheKey && analysis && !cached) {
-      if (analysisCache.size > 300) analysisCache.delete(analysisCache.keys().next().value as string);
-      analysisCache.set(a.cacheKey, { at: Date.now(), analysis });
-    }
-    return { reply: rev.reply, analysis, refs: rev.refs.length ? rev.refs : (fromDraft.refs.length ? fromDraft.refs : (valid.has("A1") ? ["A1"] : [])), pipeline: "core+nexus" as const };
-  };
-  for (let round = 1; round <= 3; round++) {
-    try {
-      draft = norm(await deps.gemini.json("nexus", { system: draftSystem(a.kind, a.sub, needAnalysis), user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached, feedback, a.summary), maxTokens: 3500 }));
-    } catch (e) { console.warn("nexus_draft_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); break; }
-    if (!draft.reply) break;
-    try {
-      const raw = await deps.gemini.json("core", { system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من 3.`, user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, used_refs: draft.refs }, a.summary), maxTokens: 4000 });
-      const rev = norm(raw);
-      feedback = sanitizeInline(raw.feedback, 1200);
-      if (!rev.reply) break;
-      last = rev;
-      const accepted = approvedOf(raw) || (!feedback && raw.approved == null);
-      if (accepted || round === 3) return finish(rev, draft);
-    } catch (e) { console.warn("core_review_failed", { round, reason: e instanceof Error ? e.message : "unknown" }); break; }
-  }
-  return last && draft ? finish(last, draft) : null;
 }
 
 export async function handleChat(req: Request, deps: Deps): Promise<Response> {
@@ -194,6 +170,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "صيغة الطلب غير صالحة." }, 400); }
 
+  const startedAt = Date.now();
+  const deadlineAt = startedAt + BUDGET_MS;
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   const userId = token ? await deps.store.getUser(token).catch(() => null) : null;
   if (!userId) return json({ error: "سجّل الدخول لاستخدام الأرشيف.", code: "login_required" }, 401);
@@ -232,8 +210,10 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     return json({ ...payload, unlocks: unlocksOf(done) });
   };
 
+  let stage = "start";
   try {
     if (action === "commit_chat") {
+      stage = "commit_chat";
       if (!CHAT_REQUEST_ID.test(suppliedRequestId)) return json({ error: "معرّف طلب الأرشيف غير صالح." }, 400);
       const done = await deps.store.chargeChat(userId, suppliedRequestId);
       if (!done) return fail503("تعذر تأكيد خصم رد الأرشيف. أعد المحاولة؛ لن يتكرر الخصم.");
@@ -242,6 +222,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
     // ---------------- standalone actions
     if (action === "open") {
+      stage = "open";
       const id = sanitizeInline(body.article_id, 80);
       const card = UUID.test(id) ? await deps.store.loadArticle(id) : null;
       if (!card) return json({ error: "الخبر غير متاح." }, 404);
@@ -253,6 +234,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       return json({ reply: "", briefing: null, articles: [publicCard(card)], suggestions: suggestions("ar"), lang: "ar", active_article_id: id, search_query: "", search: { candidate_count: 1, shown: 1, method: "open" }, unlocks: unlocksOf(done) });
     }
     if (action === "search") {
+      stage = "search";
       const mind = classify(query);
       if (!mind.searchText) return chargedPayload({ reply: say(mind.lang, mind.tone, "vague"), briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: 0, shown: 0, method: "clarify" } }, ["archive_other"]);
       const r = await retrieve(deps, rulesPlan(mind, query), mind, new Set(), true);
@@ -266,16 +248,26 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
 
     // ---------------- chat + briefing share the dialogue pipeline
+    stage = "context";
     const history = historyOf(body.history);
     const shown = idsOf(body, history);
-    const previousQuery = rememberedQuery(body, history);
+    let previousQuery = rememberedQuery(body, history);
     let activeId = action === "briefing" ? sanitizeInline(body.article_id, 80) : rememberedArticle(body, history);
-    const hasContext = history.length > 0 || !!activeId;
     const mind = action === "briefing" ? classify("حلل") : classify(query);
+    // The browser session may have lost its context; a follow-up phrase ("لخّص") can then lean on the last approved reply.
+    if (action === "chat" && !activeId && mind.follow) {
+      const memory = await deps.store.getMemory(userId).catch(() => null);
+      if (memory?.active_article_id && UUID.test(memory.active_article_id)) {
+        activeId = memory.active_article_id;
+        if (!previousQuery) previousQuery = sanitizeInline(memory.search_query, 180);
+        if (!history.length && memory.approved_reply) history.push({ role: "assistant", content: sanitizeInline(memory.approved_reply, 500), active_article_id: activeId });
+      }
+    }
+    const hasContext = history.length > 0 || !!activeId;
     const cannedPayload = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => ({ reply: say(lang, tone, key), briefing: null, articles: [], suggestions: [], lang, active_article_id: activeId || "", search_query: previousQuery, search: { candidate_count: 0, shown: 0, method: String(extra.method || "conversation") } });
     const freeCanned = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => json(cannedPayload(key, lang, tone, extra));
 
-  if (action === "chat" && !hasContext) {
+    if (action === "chat" && !hasContext) {
       if (mind.intent === "greeting") return freeCanned("greeting");
       if (mind.intent === "joke") return freeCanned("joke");
       if (mind.intent === "ambiguous") return freeCanned("vague");
@@ -283,12 +275,14 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
 
     const active = activeId ? await deps.store.loadArticle(activeId) : null;
     let plan: Plan;
+    stage = "understand";
     if (action === "briefing") {
       plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", summary: "", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
     } else {
       try { plan = await understand(deps, query, history, active, mind); }
       catch (e) {
         const reason = e instanceof Error ? e.message : "unknown";
+        console.error("archive_understand_failed", { request_id: requestId, reason });
         return fail503(reason === "resource_exhausted"
           ? "محرك فهم الأرشيف مشغول الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة."
           : "تعذر فهم السؤال عبر محرك الأرشيف الآن. أعد المحاولة لاحقًا. لم يتم خصم أي فتحة.");
@@ -303,6 +297,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       : freeCanned("vague", lang, tone);
 
     // ---- gather materials
+    stage = "retrieve";
     let primary: Card | null = null, others: Card[] = [], method = "conversation", candidates = 0;
     const kind = plan.kind;
     if (action === "briefing") {
@@ -356,34 +351,68 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const mats: Mat[] = [{ ref: "A1", card: primary, role: "primary", revisions }, ...others.map((c, i) => ({ ref: `A${i + 2}`, card: c, role: "other" as const }))];
 
     // Read-only preflight: reserve nothing before a reviewer-approved final answer exists.
+    stage = "balance";
     const bal = await deps.store.balance(userId);
     if (!bal.unlimited && bal.balance < CHAT_COST) return json({ error: `رصيد الفتحات لا يكفي لرد الأرشيف (المطلوب ${CHAT_COST}، المتبقي ${bal.balance}).`, code: "insufficient_unlocks", required: CHAT_COST, remaining: bal.balance }, 402);
-    const cacheKey = cardKind ? `${pid}|${String(primary.headline).length}|${String(primary.summary).length}|${primary.update_count}|${primary.updated_at ?? ""}` : "";
-    const out = await compose(deps, { kind, sub: plan.sub, question: plan.standalone || query, summary: plan.summary, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey });
 
-    if (!out) return fail503("لم يكتمل رد الأرشيف بعد المراجعة. لم يتم خصم أي فتحة.");
+    // Stage 2: read each card's full article (stored independently of ingestion), select the passages that answer the question.
+    stage = "evidence";
+    const terms = distinctive(`${plan.standalone || query} ${plan.queries.join(" ")}`);
+    const evidence = await gatherEvidence(deps.store, deps.gemini, mats, terms).catch((e) => { console.warn("evidence_failed", e instanceof Error ? e.message : "unknown"); return { read: 0, bodyKey: "nb" }; });
+    const cacheKey = cardKind ? `${pid}|${String(primary.headline).length}|${String(primary.summary).length}|${primary.update_count}|${primary.updated_at ?? ""}|${evidence.bodyKey}` : "";
+    const previousReply = [...history].reverse().find((t) => t.role === "assistant")?.content || "";
 
-    // New clients persist the answer before commit_chat; legacy page builds still charge here after success.
-    const cited = mats.filter((m) => out.refs.includes(m.ref)).map((m) => m.card);
+    // Stages 3-5: generation, critical review, extra check - up to four rounds alternating the two keys.
+    stage = "compose";
+    const out = await compose(deps.gemini, { kind, sub: plan.sub, question: plan.standalone || query, summary: plan.summary, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey, previousReply, deadlineAt });
+
+    if (!out.ok) {
+      // Nothing passed review + verification: alternate reply, no memory update, and NO charge.
+      console.warn("archive_reply_unverified", { request_id: requestId, reason: out.reason, rounds: out.rounds, evidence_read: evidence.read });
+      return json({
+        reply: fallbackReply(lang, requestId), briefing: null, analysis: null, entities: [], articles: [publicCard(primary)],
+        suggestions: suggestions(lang), lang, active_article_id: pid, search_query: previousQuery || plan.queries[0] || "",
+        search: { candidate_count: candidates, shown: 1, method }, pipeline: "fallback", fallback: true,
+        verification: { passed: false, reason: out.reason, rounds: out.rounds }, request_id: requestId,
+        unlocks: { charged: 0, remaining: bal.balance, unlimited: bal.unlimited, operations: [] },
+      });
+    }
+    const result = out.value;
+
+    const cited = mats.filter((m) => result.refs.includes(m.ref)).map((m) => m.card);
     const citedWithPrimary = [primary, ...cited.filter((card) => String(card.id) !== String(primary.id))];
     const shownCards = cardKind || kind === "about_active_card" ? [primary] : citedWithPrimary.slice(0, 3);
     const nextActive = cardKind ? pid : (shownCards[0] ? String(shownCards[0].id) : activeId);
+    const nextQuery = cardKind && kind !== "another_card" && kind !== "related_card" ? (plan.queries[0] || mind.searchText || previousQuery) : previousQuery || plan.queries[0] || "";
     const successPayload = {
-      reply: out.reply,
-      briefing: cardKind ? toBriefing(out.analysis) : null,
-      analysis: cardKind ? out.analysis : null,
+      reply: result.reply,
+      briefing: cardKind ? toBriefing(result.analysis, result.entities) : null,
+      analysis: cardKind ? result.analysis : null,
+      entities: cardKind ? result.entities : [],
       articles: shownCards.map(publicCard),
       suggestions: suggestions(lang), lang, active_article_id: nextActive || "",
-      search_query: cardKind && kind !== "another_card" && kind !== "related_card" ? (plan.queries[0] || mind.searchText || previousQuery) : previousQuery || plan.queries[0] || "",
-      search: { candidate_count: candidates, shown: shownCards.length, method }, pipeline: out.pipeline,
+      search_query: nextQuery,
+      search: { candidate_count: candidates, shown: shownCards.length, method, article_text_read: evidence.read }, pipeline: result.pipeline,
+      verification: { passed: true, rounds: result.rounds },
     };
+
+    // Stage 6: only an approved reply updates the conversation memory (best effort, never blocks the answer).
+    stage = "memory";
+    if (nextActive && UUID.test(nextActive)) {
+      await deps.store.saveMemory(userId, { context_summary: sanitizeInline(plan.summary || plan.standalone || query, 400), approved_reply: result.reply.slice(0, 2500), active_article_id: nextActive, search_query: sanitizeInline(nextQuery, 180) })
+        .catch((e) => console.warn("memory_save_failed", e instanceof Error ? e.message : "unknown"));
+    }
+
+    // Stage 7: safe single deduction. New clients persist the answer first, then call commit_chat with the same request_id
+    // (the SQL function charges 50 at most once per request_id); legacy builds are charged here once, after approval.
+    stage = "charge";
     if (clientChargeConfirm) return json({ ...successPayload, request_id: requestId, charge_pending: true });
     const done = await deps.store.chargeChat(userId, requestId);
     if (!done) return fail503("تعذر تأكيد تكلفة الرد. لم تُخصم أي فتحات.");
     if (!done.allowed) return insufficient(done);
     return json({ ...successPayload, unlocks: unlocksOf(done) });
   } catch (e) {
-    console.error("archive_pipeline_failed", e instanceof Error ? e.message : "unknown");
-    return json({ error: "حدث خطأ أثناء معالجة الأرشيف. لم يتم خصم أي فتحة." }, 502);
+    console.error("archive_pipeline_failed", { request_id: requestId, stage, reason: e instanceof Error ? e.message : "unknown" });
+    return json({ error: "حدث خطأ أثناء معالجة الأرشيف. لم يتم خصم أي فتحة.", code: "archive_pipeline_failed", request_id: requestId }, 502);
   }
 }
