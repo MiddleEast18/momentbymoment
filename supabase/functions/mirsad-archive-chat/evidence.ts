@@ -57,9 +57,9 @@ export async function fetchHtml(raw: string, fetchFn: typeof fetch = fetch, ms =
   let url = publicUrl(raw);
   if (!url) throw new Error("blocked_url");
   for (let hop = 0; hop < 4; hop++) {
-    const res = await fetchFn(url.href, { redirect: "manual", headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", "Accept-Language": "ar,en;q=0.8" }, signal: AbortSignal.timeout(ms) });
+    const res: Response = await fetchFn(url.href, { redirect: "manual", headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", "Accept-Language": "ar,en;q=0.8" }, signal: AbortSignal.timeout(ms) });
     if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location");
+      const loc: string | null = res.headers.get("location");
       let next: URL | null = null;
       try { next = loc ? publicUrl(new URL(loc, url).href) : null; } catch { next = null; }
       if (!next) throw new Error("blocked_redirect");

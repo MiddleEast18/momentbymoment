@@ -8,6 +8,7 @@ export class GeminiError extends Error {
 export interface JsonOpts { system: string; user: string; maxTokens: number; deadlineAt?: number }
 export interface Gemini {
   has(stage: Stage): boolean;
+  hasIndependentKeys(): boolean;
   json(stage: Stage, o: JsonOpts): Promise<Record<string, unknown>>;
   embed(text: string, task?: "query" | "document"): Promise<number[]>;
 }
@@ -42,12 +43,17 @@ export function parseJsonLoose(text: string): Record<string, unknown> {
 
 export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeof fetch = fetch): Gemini {
   const keyOf = (s: Stage) => (s === "core" ? keys.core : keys.nexus);
-  // The requested slot first, then the other key as failover; slots recently rejected by Google are skipped.
+  // Dialogue stays bound to its assigned key; model fallback happens only within that key.
   const order = (stage: Stage): Stage[] => {
-    const other: Stage = stage === "core" ? "nexus" : "core";
+    const key = keyOf(stage);
+    if (!key) return [];
+    return (deadUntil.get(key) ?? 0) > Date.now() ? [] : [stage];
+  };
+  // Embeddings are retrieval infrastructure, not a dialogue/review stage, so either key may serve them.
+  const embedOrder = (): Stage[] => {
     const list: Stage[] = [];
-    if (keyOf(stage)) list.push(stage);
-    if (keyOf(other) && keyOf(other) !== keyOf(stage)) list.push(other);
+    if (keys.core) list.push("core");
+    if (keys.nexus && keys.nexus !== keys.core) list.push("nexus");
     const live = list.filter((s) => !((deadUntil.get(keyOf(s)) ?? 0) > Date.now()));
     return live.length ? live : list;
   };
@@ -132,10 +138,11 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
   }
 
   return {
-    has: (s) => !!keyOf(s) || !!keyOf(s === "core" ? "nexus" : "core"),
+    has: (s) => !!keyOf(s),
+    hasIndependentKeys: () => !!keys.core && !!keys.nexus && keys.core !== keys.nexus,
     async json(stage, o) {
       const slots = order(stage);
-      if (!slots.length) throw new GeminiError("missing_key");
+      if (!slots.length) throw new GeminiError(keyOf(stage) ? "key_temporarily_rejected" : "missing_key");
       let failure = new GeminiError("failed");
       for (let i = 0; i < slots.length; i++) {
         try {
@@ -144,13 +151,12 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
           failure = error instanceof GeminiError ? error : new GeminiError("failed");
           if (failure.code === "deadline") throw failure;
           if (failure.code.startsWith("auth_")) markRejected(slots[i]);
-          if (i < slots.length - 1) console.warn("gemini_stage_failover", { stage, from: slots[i], reason: failure.code });
         }
       }
       throw failure;
     },
     async embed(text, task = "query") {
-      const slots = order("core");
+      const slots = embedOrder();
       if (!slots.length) throw new GeminiError("missing_key");
       let failure = new GeminiError("failed");
       for (const slot of slots) {
@@ -193,11 +199,11 @@ const RULES = `أنت جزء من «حوار الأرشيف» في منصة مِ
 
 const ANALYSIS_SPEC = `المخرجات المطلوبة ثلاثة مستقلة: (1) reply ملخص صحفي دقيق، (2) analysis تحليل معمّق، (3) entities الجهات المذكورة وأدوارها الموثقة.
 حقل analysis قراءة إضافية للخبر الرئيسي [A1]، لا تعيد صياغة reply ولا عنوان البطاقة. لكل حقل جملة واحدة كحد أقصى:
-- event: تفصيل محدد عمّا حدث ولم يذكره reply بعد.
-- context: خلفية أو تسلسل زمني يسنده الأرشيف فقط.
-- parties: الأطراف وأدوارهم، من دون إعادة ما سبق.
-- implications: دلالة مرتبطة صراحة بواقعة في المواد.
-- outlook: احتمال مشروط بوقائع المواد، لا تنبؤ جازم.
+- event: تفصيل محدد عمّا حدث ولم يذكره reply بعد، مسند إلى [A1].
+- context: خلفية أو تسلسل زمني وارد صراحة في مواد الأرشيف؛ لا تفترض سياقًا غير مرفق.
+- parties: الأطراف وأدوارهم كما تذكرهم المواد، دون استنتاج دوافع أو مصالح غير منصوص عليها.
+- implications: دلالة مرتبطة بواقعة محددة؛ صغها كقراءة لا كحقيقة إضافية.
+- outlook: احتمال مشروط بوقائع [A1]، لا تنبؤ جازم ولا توسيع إلى أحداث لم ترد.
 اترك أي حقل لا يضيف معلومة مستقلة فارغًا. لا تكرر واقعة أو فكرة بين الحقول أو مع reply. الخبر القصير يستحق تحليلًا قصيرًا.
 حقل entities قائمة (حتى ثمانية) بالأشخاص والجهات والأماكن المذكورة نصًا في المواد، لكل منها {"name":"","role":"","ref":"A1"}؛ role هو دورها كما يظهر في النص حرفيًا في معناه، وإن لم يُذكر دور فاتركه فارغًا. لا تضف اسمًا أو دورًا لم يرد.`;
 
@@ -252,7 +258,7 @@ export function draftSystem(kind: string, sub: string, withAnalysis: boolean) {
     ask_about_news: "اكتب reply فقرة إلى ثلاث فقرات قصيرة تجيب عن السؤال بتركيب ما في المواد، مع الإشارة للمصدر والتاريخ حيث يفيد. إن لم تكفِ المواد فقل ذلك.",
     about_active_card: sub === "summarize" ? "اكتب reply تلخيصًا في جملتين إلى ثلاث للبطاقة النشطة [A1]."
       : sub === "entities" ? "اكتب reply تعدّد الجهات والأشخاص والأماكن الواردة في [A1] مع دور كل منها كما يظهر من النص، وإن لم يُذكر أحد فقل ذلك."
-      : sub === "analyze" ? "اكتب reply قراءة تحليلية معمّقة في أربع إلى سبع جمل للبطاقة النشطة [A1]: الدلالات والمستفيدون والمسارات المحتملة المشروطة بالوقائع."
+      : sub === "analyze" ? "اكتب reply قراءة تحليلية معمّقة في أربع إلى سبع جمل للبطاقة النشطة [A1]: دلالات مرتبطة بوقائع محددة وأطراف موثقة ومسارات محتملة مشروطة بها، بلا افتراض دوافع أو مستفيدين غير مذكورين."
       : "اكتب reply يجيب عن سؤال المستخدم المتعلق بالبطاقة النشطة [A1] وبقية المواد.",
   };
   return `${RULES}
@@ -260,13 +266,14 @@ export function draftSystem(kind: string, sub: string, withAnalysis: boolean) {
 مهمتك: صياغة مسودة صحفية مفيدة ومحددة. ${how[kind] || how.ask_about_news}
 معايير إلزامية للـ reply:
 - ابدأ بالإجابة المباشرة عن قصد المستخدم، لا بعبارة عامة مثل «توضح المادة» أو «الخبر يتحدث عن».
+- اجعل بداية الرد وترتيب أفكاره تابعين لنوع المهمة؛ لا تكرر نص زر أو عبارة افتتاحية ثابتة.
 - اختر أهم الوقائع المحددة التي تجيب السؤال. اجعل كل جملة تضيف معلومة أو علاقة جديدة؛ لا تعِد الفكرة بصياغتين.
 - بطاقة الخبر وملخصها سيظهران أسفل الرد؛ لا تنسخ العنوان أو الملخص. أضف ما يفيد المستخدم ولا يظهر فيهما، أو فسّر الصلة إذا كان ذلك هو السؤال.
 - إذا كان الطلب متابعة، أجب الجزء الجديد مباشرة ولا تعِد سرد الرد السابق؛ اشرح مرجع الضمير بقدر الحاجة فقط.
 - فضّل الأسماء والتفاصيل المحددة الواردة في المواد (ومنها مقاطع نص المقال) على تعبيرات عامة مثل «الأطراف» و«التطورات».
 ${withAnalysis ? ANALYSIS_SPEC : "لا تُنتج analysis؛ اجعله null واجعل entities []."}
 أعد JSON: {"reply":"...","analysis":${withAnalysis ? '{"event":"","context":"","parties":"","implications":"","outlook":""}' : "null"},"entities":[],"used_refs":["A1"]}
-used_refs: المواد (أو مقاطعها مثل A1.P2) التي استندت إليها فعلًا فقط. إن لم تكن أي مادة ذات صلة بالسؤال فاجعلها [] وقل ذلك في reply.`;
+used_refs: المواد (أو مقاطعها مثل A1.P2) التي استندت إليها فعلًا فقط. عند قصور الأدلة، استشهد بالمادة التي راجعتها ثم وضّح حدود ما يمكن تقريره؛ لا تخترع مرجعًا ولا تترك used_refs فارغة إذا أجبت اعتمادًا على خبر.`;
 }
 
 export function draftUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, cached: unknown, feedback = "", summary = "", previous = "") {
@@ -283,7 +290,8 @@ export const REVIEW_SYSTEM = `${RULES}
 5. لا تكرر المعنى بين جمل reply أو بين reply وanalysis أو بين حقول analysis. اترك الحقل فارغًا إذا لم يضف معلومة جديدة.
 6. تحقق أن reply يجيب قصد السؤال فعلًا؛ في المتابعة أجب الجزء الجديد مباشرة. اجعله طبيعيًا وبلغة المستخدم ولهجته عند وضوحها، ومنسجمًا مع السياق.
 7. قرر صراحةً هل أصبحت المسودة صالحة للنشر: approved=true فقط إذا أجابت القصد وكانت كل معلوماتها مسندة ولم تكرر الرد السابق؛ وإلا approved=false واكتب ملاحظات محددة قابلة للتنفيذ في feedback (ما الخطأ بالضبط وأين).
-8. أعد JSON صالحًا بهذه البنية: {"reply":"...","analysis":null,"entities":[],"used_refs":["A1"],"approved":true,"feedback":""}. إن كان analysis في المسودة null فأبقه null و entities []. اترك فارغًا أي حقل لا تسنده المواد.`;
+8. ضع في used_refs مرجعًا واحدًا صالحًا على الأقل من المواد المرفقة إذا استند الرد إلى خبر؛ لا تخترع مرجعًا ولا تعتمد افتراضيًا على A1.
+9. أعد JSON صالحًا بهذه البنية: {"reply":"...","analysis":null,"entities":[],"used_refs":["A1"],"approved":true,"feedback":""}. إن كان analysis في المسودة null فأبقه null و entities []. اترك فارغًا أي حقل لا تسنده المواد.`;
 
 export function reviewUser(question: string, turns: string, mats: Mat[], lang: Lang, tone: Tone, draft: unknown, summary = "") {
   return `<context_summary>\n${sanitizeInline(summary, 400) || "(لا خلاصة سابقة)"}\n</context_summary>\n<conversation>\n${turns || "(لا سياق سابق)"}\n</conversation>\n${materialsBlock(mats, lang)}\n<user_language>${lang === "en" ? "English" : "العربية"} | النبرة: ${tone}</user_language>\n<question>\n${sanitizeInline(question, 500)}\n</question>\n<draft>\n${JSON.stringify(draft)}\n</draft>`;

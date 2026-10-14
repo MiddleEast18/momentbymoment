@@ -2,11 +2,10 @@ import { type Lang, type Tone, sanitizeInline, stripStock } from "./archive-logi
 import { type Analysis, type Entity, type Gemini, type Mat, type Stage, REVIEW_SYSTEM, cleanAnalysis, draftSystem, draftUser, reviewUser } from "./ai.ts";
 import { type Candidate, cleanEntities, corpusOf, verifyCandidate } from "./verify.ts";
 
-// Fixed rule: at most four draft->review rounds. Odd rounds draft on the NEXUS key and review on the CORE key;
-// even rounds swap them. Each round re-feeds the previous draft plus concrete corrective notes.
-export const MAX_ROUNDS = 4;
+// Keep task ownership stable: NEXUS drafts; CORE independently reviews. Never swap roles on a retry.
+export const MAX_ROUNDS = 3;
 const CACHE_TTL = 6 * 3600 * 1000;
-const FATAL = new Set(["missing_key", "deadline", "resource_exhausted", "network", "http_503", "http_529", "auth_400", "auth_401", "auth_403"]);
+const FATAL = new Set(["missing_key", "key_temporarily_rejected", "deadline", "resource_exhausted", "network", "http_503", "http_529", "auth_400", "auth_401", "auth_403"]);
 const cache = new Map<string, { at: number; analysis: Analysis; entities: Entity[] }>();
 const VARIANTS = [
   "ابدأ بخلاصة الحدث ثم اربطها بسياقه ودلالته.",
@@ -28,7 +27,7 @@ const codeOf = (e: unknown) => (e && typeof e === "object" && "code" in e ? Stri
 export function resetComposeCache() { cache.clear(); }
 
 export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeResult> {
-  if (!gemini.has("core") && !gemini.has("nexus")) return { ok: false, reason: "missing_keys", rounds: 0 };
+  if (!gemini.has("core") || !gemini.has("nexus") || !gemini.hasIndependentKeys()) return { ok: false, reason: "missing_independent_keys", rounds: 0 };
   const hit = a.cacheKey ? cache.get(a.cacheKey) : undefined;
   const cached = hit && Date.now() - hit.at < CACHE_TTL ? hit : null;
   const needAnalysis = a.wantAnalysis && !cached;
@@ -40,15 +39,14 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     entities: needAnalysis ? cleanEntities(r.entities, stripStock, corpus) : [],
     refs: (Array.isArray(r.used_refs) ? r.used_refs : []).map((x) => String(x).split(".")[0]).filter((x) => valid.has(x)),
   });
-  const approvedOf = (raw: Record<string, unknown>) => raw.approved === true || raw.approved === "true" || raw.approved === 1;
   const style = VARIANTS[Math.floor(Math.random() * VARIANTS.length)];
   let feedback = "", previous = "", reason = "unverified", rounds = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     if (a.deadlineAt - Date.now() < 12_000) { reason = "deadline"; break; }
     rounds = round;
-    const draftSlot: Stage = round % 2 === 1 ? "nexus" : "core";
-    const reviewSlot: Stage = round % 2 === 1 ? "core" : "nexus";
+    const draftSlot: Stage = "nexus";
+    const reviewSlot: Stage = "core";
 
     // 3: specialised journalistic generation (summary + deep analysis + documented entities)
     let draft: Candidate;
@@ -88,12 +86,12 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
       reply: rev.reply,
       analysis: needAnalysis ? rev.analysis || draft.analysis : null,
       entities: needAnalysis ? (rev.entities.length ? rev.entities : draft.entities) : [],
-      refs: rev.refs.length ? rev.refs : (draft.refs.length ? draft.refs : (valid.has("A1") ? ["A1"] : [])),
+      refs: rev.refs.length ? rev.refs : draft.refs,
     };
 
     // 5: extra deterministic check before the answer may move on
     const verdict = verifyCandidate(final, { mats: a.mats, lang: a.lang, previousReply: a.previousReply });
-    const approved = approvedOf(raw) || (!reviewerNotes && raw.approved == null);
+    const approved = raw.approved === true;
     if (approved && verdict.ok) {
       const analysis = cached?.analysis ?? final.analysis;
       const entities = cached?.entities ?? final.entities;
@@ -104,7 +102,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
       return { ok: true, value: { reply: final.reply, analysis, entities, refs: final.refs, rounds: round, pipeline: "core+nexus" } };
     }
     reason = approved ? "verification_failed" : "reviewer_rejected";
-    feedback = [reviewerNotes, ...verdict.issues].filter(Boolean).join("\n").slice(0, 1200);
+    feedback = [reviewerNotes, ...(approved ? [] : ["لا تعتمد الرد ما لم تُرجع approved=true صراحةً بعد مراجعة الأدلة."]), ...verdict.issues].filter(Boolean).join("\n").slice(0, 1200);
     previous = JSON.stringify(final).slice(0, 4000);
   }
   return { ok: false, reason, rounds };

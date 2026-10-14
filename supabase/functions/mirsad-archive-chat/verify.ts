@@ -64,6 +64,9 @@ export function verifyCandidate(c: Candidate, ctx: { mats: Mat[]; lang: Lang; pr
   const issues: string[] = [];
   const reply = c.reply.trim();
   if (reply.length < 25) issues.push("الرد قصير أو فارغ؛ أجب عن قصد السؤال بجملتين على الأقل.");
+  const validRefs = new Set(ctx.mats.map((m) => m.ref));
+  if (!c.refs.length) issues.push("الرد لا يحدد أي مادة أرشيفية استند إليها؛ أعده مع used_refs موثوقة.");
+  else if (c.refs.some((ref) => !validRefs.has(ref))) issues.push("يتضمن الرد إحالة إلى مادة غير موجودة ضمن المواد المرفقة.");
 
   const corpus = flatNumbers(corpusOf(ctx.mats));
   const outputs = [reply, ...(c.analysis ? Object.values(c.analysis) : []), ...c.entities.map((e) => e.role)].join("\n");

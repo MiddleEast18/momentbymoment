@@ -30,6 +30,7 @@ export interface Deps { store: Store; gemini: Gemini; hash(v: string): Promise<s
 type Kind = "smalltalk" | "find_news" | "ask_about_news" | "about_active_card" | "another_card" | "related_card" | "out_of_scope" | "unclear";
 type Sub = "summarize" | "analyze" | "entities" | "general";
 type Plan = { kind: Kind; sub: Sub; standalone: string; summary: string; queries: string[]; lang: Lang; tone: Tone; clarify: string; by: "model" | "rules" };
+type TaskType = "summarize" | "analyze" | "entities" | "related" | "another";
 type Turn = { role: "user" | "assistant"; content: string; article_ids?: string[]; search_query?: string; active_article_id?: string };
 
 const KINDS = new Set<Kind>(["smalltalk", "find_news", "ask_about_news", "about_active_card", "another_card", "related_card", "out_of_scope", "unclear"]);
@@ -92,6 +93,24 @@ function rulesPlan(mind: Mind, query: string): Plan {
   if (mind.follow === "related") return { ...base, kind: "related_card" };
   if (mind.follow) return { ...base, kind: "about_active_card", sub: mind.follow as Sub };
   return { ...base, kind: mind.intent === "question" && /(لماذا|ليش|كيف|why|how)/i.test(query) ? "ask_about_news" : "find_news" };
+}
+
+export function planForTask(task: unknown, query: string, mind: Mind, previousQuery: string): Plan | null {
+  const taskType = typeof task === "string" ? task as TaskType : "" as TaskType;
+  const mapping: Record<TaskType, { kind: Kind; sub: Sub }> = {
+    summarize: { kind: "about_active_card", sub: "summarize" },
+    analyze: { kind: "about_active_card", sub: "analyze" },
+    entities: { kind: "about_active_card", sub: "entities" },
+    related: { kind: "related_card", sub: "general" },
+    another: { kind: "another_card", sub: "general" },
+  };
+  if (!Object.hasOwn(mapping, taskType)) return null;
+  const target = mapping[taskType];
+  const anchor = previousQuery || mind.searchText;
+  return {
+    ...target, standalone: sanitizeInline(query, 300), summary: "",
+    queries: anchor ? [anchor] : [], lang: mind.lang, tone: mind.tone, clarify: "", by: "rules",
+  };
 }
 
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
@@ -254,6 +273,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     let previousQuery = rememberedQuery(body, history);
     let activeId = action === "briefing" ? sanitizeInline(body.article_id, 80) : rememberedArticle(body, history);
     const mind = action === "briefing" ? classify("حلل") : classify(query);
+    const explicitTaskPlan = action === "chat" ? planForTask(body.task_type, query, mind, previousQuery) : null;
     // The browser session may have lost its context; a follow-up phrase ("لخّص") can then lean on the last approved reply.
     if (action === "chat" && !activeId && mind.follow) {
       const memory = await deps.store.getMemory(userId).catch(() => null);
@@ -267,7 +287,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const cannedPayload = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => ({ reply: say(lang, tone, key), briefing: null, articles: [], suggestions: [], lang, active_article_id: activeId || "", search_query: previousQuery, search: { candidate_count: 0, shown: 0, method: String(extra.method || "conversation") } });
     const freeCanned = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => json(cannedPayload(key, lang, tone, extra));
 
-    if (action === "chat" && !hasContext) {
+    if (action === "chat" && !hasContext && !explicitTaskPlan) {
       if (mind.intent === "greeting") return freeCanned("greeting");
       if (mind.intent === "joke") return freeCanned("joke");
       if (mind.intent === "ambiguous") return freeCanned("vague");
@@ -278,6 +298,8 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     stage = "understand";
     if (action === "briefing") {
       plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", summary: "", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
+    } else if (explicitTaskPlan) {
+      plan = explicitTaskPlan;
     } else {
       try { plan = await understand(deps, query, history, active, mind); }
       catch (e) {

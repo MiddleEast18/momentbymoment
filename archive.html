@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0b0f14">
   <title>باحث الأخبار — مِرصاد</title>
-  <meta name="description" content="ابحث في أرشيف مِرصاد واقرأ تحليلًا صحفيًا مستندًا إلى عنوان الخبر وملخصه المحفوظين.">
+  <meta name="description" content="ابحث في أرشيف مِرصاد واقرأ تحليلًا صحفيًا يستند إلى متن الخبر ومقاطع المقال المحفوظة، أو إلى العنوان والملخص عند عدم توفر المتن.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,8 +26,8 @@
     <section class="archive-intro" aria-labelledby="archiveTitle">
       <p class="archive-kicker"><span class="archive-kicker__dot" aria-hidden="true"></span> ذاكرة أخبار مِرصاد</p>
       <h1 id="archiveTitle">ابحث في الأخبار،<br><span>واسأل بطريقتك.</span></h1>
-      <p class="archive-intro__copy">اكتب كما تتحدث. يبحث مرصاد في أخبار الأرشيف، ويظهر بطاقة واحدة عند تطابق الاسم في عنوانها أو ملخصها.</p>
-      <p class="archive-scope">قراءة صحفية للحدث وسياقه وأطرافه ودلالاته والنتائج المحتملة، استنادًا إلى العنوان والملخص المحفوظين دون إضافة وقائع غير واردة.</p>
+      <p class="archive-intro__copy">اكتب كما تتحدث. يبحث مرصاد في العناوين والملخصات ومقاطع المقالات المحفوظة، ويعرض بطاقة عند تطابق موثوق.</p>
+      <p class="archive-scope">قراءة صحفية للحدث وسياقه وأطرافه ودلالاته والنتائج المحتملة، استنادًا إلى متن المقال المحفوظ أو إلى العنوان والملخص عند عدم توفره، دون إضافة وقائع غير واردة.</p>
     </section>
 
     <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
@@ -90,7 +90,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Use a versioned filename: the CDN may ignore query-string cache busting. -->
-  <script src="archive-chat-20261011-v7.js" defer></script>
+  <script src="archive-chat-actions-20261014.js" defer></script>
+  <script src="archive-chat-20261014-v8.js" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
