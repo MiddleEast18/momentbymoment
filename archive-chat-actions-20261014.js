@@ -48,7 +48,23 @@
     return !!retryRequest && retryRequest.phase === 'commit';
   }
 
-  const api = Object.freeze({ taskTypeForSuggestion, shouldShowArticle, shouldShowBriefing, mustSettlePendingCommit, hasPendingCommit });
+  function hasUnsettledRequest(retryRequest) {
+    return !!retryRequest && typeof retryRequest.id === 'string' && retryRequest.id.length > 0;
+  }
+
+  function isValidChatChargeReceipt(payload) {
+    const unlocks = payload?.unlocks;
+    if (payload?.finalized !== true || !unlocks || typeof unlocks !== 'object' || Array.isArray(unlocks)) return false;
+    const charged = Number(unlocks.charged);
+    const remaining = Number(unlocks.remaining);
+    return (unlocks.unlimited === true || unlocks.unlimited === false)
+      && Number.isSafeInteger(charged) && (charged === 0 || charged === 50)
+      && Number.isSafeInteger(remaining) && remaining >= 0
+      && Array.isArray(unlocks.operations) && unlocks.operations.includes('archive_chat')
+      && (!unlocks.unlimited || charged === 0);
+  }
+
+  const api = Object.freeze({ taskTypeForSuggestion, shouldShowArticle, shouldShowBriefing, mustSettlePendingCommit, hasPendingCommit, hasUnsettledRequest, isValidChatChargeReceipt });
   root.MirsadArchiveActions = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(globalThis);

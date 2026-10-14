@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat-20261014-v12.css">
+  <link rel="stylesheet" href="archive-chat-20261015-v13.css">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
@@ -57,7 +57,7 @@
       <label class="visually-hidden" for="archivePrompt">اكتب سؤالك عن الأخبار</label>
       <textarea id="archivePrompt" name="query" rows="1" maxlength="500" placeholder="اسأل عن خبر في أرشيف مِرصاد…" required></textarea>
       <div class="archive-composer__bottom">
-        <span class="archive-composer__hint" id="archiveHint"><span aria-hidden="true">◉</span> <span id="archiveHintText">بطاقة واحدة عند تطابق واضح</span></span>
+        <span class="archive-composer__hint" id="archiveHint"><span aria-hidden="true">◉</span> <span id="archiveHintText">50 فتحة للرد المعتمد</span></span>
         <button class="archive-send" id="archiveSend" type="submit" aria-label="إرسال السؤال">
           <span class="archive-send__label">إرسال</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -67,6 +67,20 @@
   </main>
 
   <footer class="archive-footer"><span>مرصاد — ذاكرة عرض للأخبار المنشورة</span><a href="method.html">منهجية الرصد</a></footer>
+
+  <dialog class="archive-confirm" id="archiveClearDialog" aria-labelledby="archiveClearTitle" aria-describedby="archiveClearDescription">
+    <div class="archive-confirm__panel">
+      <div class="archive-confirm__radar" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19"/><circle cx="24" cy="24" r="11"/><circle cx="24" cy="24" r="3"/><path d="M24 5v19l13-13M24 24l13 13"/></svg></div>
+      <p class="archive-confirm__eyebrow">إدارة جلسة مرصاد</p>
+      <h2 id="archiveClearTitle">مسح محادثة الأرشيف؟</h2>
+      <p id="archiveClearDescription">سيُمسح الحوار المحفوظ في هذه الجلسة من هذا المتصفح، ولن يمكن استعادته بعد التأكيد.</p>
+      <div class="archive-confirm__notice"><span aria-hidden="true">i</span><p>هذا الإجراء لا يغيّر رصيد الفتحات ولا يمسّ سجل الخصم. لا يمكن المسح أثناء وجود رد لم يُحسم خصمه.</p></div>
+      <form method="dialog" class="archive-confirm__actions">
+        <button class="archive-confirm__button archive-confirm__button--quiet" type="submit" value="cancel">إبقاء المحادثة</button>
+        <button class="archive-confirm__button archive-confirm__button--danger" type="submit" value="clear">مسح المحادثة</button>
+      </form>
+    </div>
+  </dialog>
 
   <template id="archiveMessageTemplate">
     <article class="archive-message">
@@ -102,7 +116,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Use a versioned filename: the CDN may ignore query-string cache busting. -->
   <script src="archive-chat-actions-20261014.js" defer></script>
-  <script src="archive-chat-20261014-v15.js" defer></script>
+  <script src="archive-chat-20261015-v16.js" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
