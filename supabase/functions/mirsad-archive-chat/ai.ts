@@ -112,7 +112,12 @@ export function makeGemini(keys: { core: string; nexus: string; example?: string
           catch { last = cand?.finishReason === "MAX_TOKENS" ? "truncated" : "bad_json"; if (attempt < 1) continue; break; }
         }
         const reason = safeApiReason(data);
-        if (keyRejected(res.status, reason)) throw new GeminiError(`auth_${res.status}`);
+        if (keyRejected(res.status, reason)) {
+          // Keep each credential role-bound. Log only Google's sanitized
+          // diagnostic; never log the credential value itself.
+          console.warn("gemini_key_rejected", { slot, model: model.id, status: res.status, reason });
+          throw new GeminiError(`auth_${res.status}`);
+        }
         if (thinking && res.status === 400) {
           console.warn("gemini_http", { slot, model: model.id, status: res.status, reason, dropped_thinking: true });
           thinking = null;
