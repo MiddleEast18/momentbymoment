@@ -2,57 +2,18 @@ import { type Lang, type Tone, sanitizeInline, stripStock } from "./archive-logi
 import { type Analysis, type Entity, type Gemini, type Mat, type Stage, REVIEW_SYSTEM, cleanAnalysis, draftSystem, draftUser, reviewUser } from "./ai.ts";
 import { type Candidate, cleanEntities, corpusOf, verifyCandidate } from "./verify.ts";
 
-// Fixed rule: at most four draft->review rounds. Odd rounds draft on the NEXUS key and review on the CORE key;
-// even rounds swap them. Each round re-feeds the previous draft plus concrete corrective notes.
-export const MAX_ROUNDS = 4;
+// Keep task ownership stable: NEXUS drafts; CORE independently reviews. Never swap roles on a retry.
+export const MAX_ROUNDS = 3;
 const CACHE_TTL = 6 * 3600 * 1000;
-const FATAL = new Set(["missing_key", "deadline", "resource_exhausted", "network", "http_503", "http_529", "auth_400", "auth_401", "auth_403"]);
+const FATAL = new Set(["missing_key", "key_temporarily_rejected", "deadline", "resource_exhausted", "network", "http_503", "http_529", "auth_400", "auth_401", "auth_403"]);
 const cache = new Map<string, { at: number; analysis: Analysis; entities: Entity[] }>();
-
-// Editorial angle follows the TASK the user asked for (not a random pick), so a summary, an analysis,
-// an entity list and a related-card request are each steered differently instead of sharing one stock opening.
-const GUIDE: Record<string, string[]> = {
-  find_news: [
-    "ابدأ بما يجيب طلب البحث مباشرة: ماذا حدث ومن الطرف الرئيسي، ثم أضف دلالة واحدة مسندة.",
-    "ابدأ بأحدث واقعة تذكرها المواد ثم اربطها بسياقها القريب.",
-  ],
-  another_card: [
-    "قدّم هذه البطاقة بوصفها إضافة جديدة، وابدأ بما يميزها عن البطاقة السابقة.",
-    "ابدأ بالواقعة التي لم تظهر في البطاقات السابقة ثم اربطها بالموضوع نفسه.",
-  ],
-  related_card: [
-    "ابدأ بوجه الارتباط بالبطاقة السابقة (الاسم أو الحدث المشترك) ثم قدّم ما تضيفه هذه البطاقة.",
-    "وضّح أولًا ما يجمع الخبرين ثم ما يختلف فيه الجديد.",
-  ],
-  ask_about_news: [
-    "أجب السؤال أولًا بخلاصة مباشرة ثم رتّب الوقائع الداعمة حسب أهميتها للسؤال.",
-    "اربط بين الأخبار ذات الصلة وبيّن ما يجمعها أو يفرّق بينها، وقل صراحة إن لم تكفِ المواد.",
-  ],
-  summarize: [
-    "لخّص أهم واقعتين فقط بصياغتك، دون نسخ العنوان أو الملخص.",
-    "ابدأ بمن فعل ماذا ومتى، ثم أضف النتيجة أو الخطوة التالية إن وردت.",
-  ],
-  analyze: [
-    "قدّم الدلالة أولًا ثم الوقائع التي تسندها، وكل استنتاج بصيغة قراءة لا خبر.",
-    "اجعل العلاقة بين الأطراف محور القراءة بقدر ما تسنده المواد، من دون تنبؤ جازم.",
-  ],
-  entities: [
-    "رتّب الجهات حسب حضورها في النص، وصف دور كل جهة بما ورد فقط.",
-  ],
-  general: [
-    "أجب الجزء المطلوب من البطاقة النشطة مباشرة دون إعادة سرد ما قيل.",
-    "ابدأ بالإجابة ثم أشر إلى الواقعة التي تسندها.",
-  ],
-};
-const seedOf = (s: string) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
-export function guideKey(kind: string, sub: string) {
-  if (kind === "about_active_card") return GUIDE[sub] ? sub : "general";
-  return GUIDE[kind] ? kind : "ask_about_news";
-}
-export function styleFor(kind: string, sub: string, seed: string) {
-  const list = GUIDE[guideKey(kind, sub)];
-  return list[seedOf(`${kind}|${sub}|${seed}`) % list.length];
-}
+const VARIANTS = [
+  "ابدأ بخلاصة الحدث ثم اربطها بسياقه ودلالته.",
+  "ابدأ من سياق الخبر ثم وضّح ما تضيفه الوقائع إلى فهمه.",
+  "اجعل العلاقة بين الأطراف محور القراءة، بقدر ما تسنده المواد.",
+  "قدّم الدلالة أولًا ثم اربطها بالوقائع التي تحملها، من دون تنبؤ جازم.",
+  "اختر ترتيبًا سرديًا طبيعيًا مختلفًا عن الإجابات السابقة، مع تجنب أي قالب ثابت.",
+];
 
 export type Composed = { reply: string; analysis: Analysis | null; entities: Entity[]; refs: string[]; rounds: number; pipeline: "core+nexus" };
 export type ComposeArgs = {
@@ -66,10 +27,8 @@ const codeOf = (e: unknown) => (e && typeof e === "object" && "code" in e ? Stri
 export function resetComposeCache() { cache.clear(); }
 
 export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeResult> {
-  if (!gemini.has("core") && !gemini.has("nexus")) return { ok: false, reason: "missing_keys", rounds: 0 };
-  // The cached analysis is written in one language; never serve it to a reader of the other.
-  const ckey = a.cacheKey ? `${a.lang}|${a.cacheKey}` : "";
-  const hit = ckey ? cache.get(ckey) : undefined;
+  if (!gemini.has("core") || !gemini.has("nexus") || !gemini.hasIndependentKeys()) return { ok: false, reason: "missing_independent_keys", rounds: 0 };
+  const hit = a.cacheKey ? cache.get(a.cacheKey) : undefined;
   const cached = hit && Date.now() - hit.at < CACHE_TTL ? hit : null;
   const needAnalysis = a.wantAnalysis && !cached;
   const valid = new Set(a.mats.map((m) => m.ref));
@@ -80,22 +39,20 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     entities: needAnalysis ? cleanEntities(r.entities, stripStock, corpus) : [],
     refs: (Array.isArray(r.used_refs) ? r.used_refs : []).map((x) => String(x).split(".")[0]).filter((x) => valid.has(x)),
   });
-  const approvedOf = (raw: Record<string, unknown>) => raw.approved === true || raw.approved === "true" || raw.approved === 1;
-  const style = styleFor(a.kind, a.sub, a.question);
-  const styleNote = `توجيه تحريري لهذا النوع من المهام: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع.`;
+  const style = VARIANTS[Math.floor(Math.random() * VARIANTS.length)];
   let feedback = "", previous = "", reason = "unverified", rounds = 0;
 
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     if (a.deadlineAt - Date.now() < 12_000) { reason = "deadline"; break; }
     rounds = round;
-    const draftSlot: Stage = round % 2 === 1 ? "nexus" : "core";
-    const reviewSlot: Stage = round % 2 === 1 ? "core" : "nexus";
+    const draftSlot: Stage = "nexus";
+    const reviewSlot: Stage = "core";
 
     // 3: specialised journalistic generation (summary + deep analysis + documented entities)
     let draft: Candidate;
     try {
       draft = norm(await gemini.json(draftSlot, {
-        system: `${draftSystem(a.kind, a.sub, needAnalysis)}\n\n${styleNote}`,
+        system: draftSystem(a.kind, a.sub, needAnalysis),
         user: draftUser(a.question, a.turns, a.mats, a.lang, a.tone, cached ? { analysis: cached.analysis, entities: cached.entities } : null, feedback, a.summary, previous),
         maxTokens: 3500, deadlineAt: a.deadlineAt,
       }));
@@ -111,7 +68,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     let raw: Record<string, unknown>;
     try {
       raw = await gemini.json(reviewSlot, {
-        system: `${REVIEW_SYSTEM}\n\n${styleNote} هذه جولة المراجعة ${round} من ${MAX_ROUNDS}.`,
+        system: `${REVIEW_SYSTEM}\n\nتوجيه تحريري متغير لهذا الرد: ${style} لا تحوّل التوجيه إلى عبارة جاهزة ولا تضف أي وقائع. هذه جولة المراجعة ${round} من ${MAX_ROUNDS}.`,
         user: reviewUser(a.question, a.turns, a.mats, a.lang, a.tone, { reply: draft.reply, analysis: draft.analysis, entities: draft.entities, used_refs: draft.refs }, a.summary),
         maxTokens: 4000, deadlineAt: a.deadlineAt,
       });
@@ -129,25 +86,23 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
       reply: rev.reply,
       analysis: needAnalysis ? rev.analysis || draft.analysis : null,
       entities: needAnalysis ? (rev.entities.length ? rev.entities : draft.entities) : [],
-      refs: rev.refs.length ? rev.refs : (draft.refs.length ? draft.refs : (valid.has("A1") ? ["A1"] : [])),
+      refs: rev.refs.length ? rev.refs : draft.refs,
     };
 
     // 5: extra deterministic check before the answer may move on
     const verdict = verifyCandidate(final, { mats: a.mats, lang: a.lang, previousReply: a.previousReply });
-    const approved = approvedOf(raw) || (!reviewerNotes && raw.approved == null);
+    const approved = raw.approved === true;
     if (approved && verdict.ok) {
       const analysis = cached?.analysis ?? final.analysis;
       const entities = cached?.entities ?? final.entities;
-      if (ckey && needAnalysis && final.analysis) {
+      if (a.cacheKey && needAnalysis && final.analysis) {
         if (cache.size > 300) cache.delete(cache.keys().next().value as string);
-        cache.set(ckey, { at: Date.now(), analysis: final.analysis, entities: final.entities });
+        cache.set(a.cacheKey, { at: Date.now(), analysis: final.analysis, entities: final.entities });
       }
       return { ok: true, value: { reply: final.reply, analysis, entities, refs: final.refs, rounds: round, pipeline: "core+nexus" } };
     }
     reason = approved ? "verification_failed" : "reviewer_rejected";
-    // A rejection without notes would send the next round in blind; give it something actionable.
-    const rejectNote = approved ? "" : "رفض المراجع المسودة دون ملاحظات؛ راجع كل جملة مقابل المواد واحذف ما لا تسنده.";
-    feedback = [reviewerNotes || rejectNote, ...verdict.issues].filter(Boolean).join("\n").slice(0, 1200);
+    feedback = [reviewerNotes, ...(approved ? [] : ["لا تعتمد الرد ما لم تُرجع approved=true صراحةً بعد مراجعة الأدلة."]), ...verdict.issues].filter(Boolean).join("\n").slice(0, 1200);
     previous = JSON.stringify(final).slice(0, 4000);
   }
   return { ok: false, reason, rounds };
