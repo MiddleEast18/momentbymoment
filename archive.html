@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat-20261011-v7.css">
+  <link rel="stylesheet" href="archive-chat-20261014-v9.css">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
@@ -32,13 +32,24 @@
 
     <section class="archive-conversation" id="conversation" aria-label="محادثة البحث في الأخبار" aria-live="polite" aria-relevant="additions text">
       <div class="archive-welcome" id="welcomeState">
-        <span class="archive-welcome__symbol" aria-hidden="true">⌕</span>
-        <p>اسأل عن شخص أو مكان أو حدث. إذا لم يكن التطابق قويًا سأطلب توضيحًا بدل بطاقة خاطئة.</p>
-        <div class="archive-suggestions" aria-label="أسئلة مقترحة">
-          <button type="button" class="archive-suggestion">ما الأخبار المتعلقة ببيروت؟</button>
-          <button type="button" class="archive-suggestion">ابحث عن خبر الزلزال في تركيا</button>
-          <button type="button" class="archive-suggestion">أخبار الطاقة في السعودية</button>
+        <div class="archive-welcome__radar" aria-hidden="true">
+          <svg viewBox="0 0 96 96" focusable="false">
+            <circle class="archive-welcome__grid" cx="48" cy="48" r="35" />
+            <circle class="archive-welcome__grid" cx="48" cy="48" r="23" />
+            <circle class="archive-welcome__grid" cx="48" cy="48" r="11" />
+            <path class="archive-welcome__axis" d="M48 11v74M11 48h74" />
+            <g class="archive-welcome__sweep">
+              <path class="archive-welcome__sweep-fill" d="M48 48V13a35 35 0 0 1 30.3 17.5Z" />
+              <path class="archive-welcome__sweep-line" d="M48 48V13" />
+            </g>
+            <circle class="archive-welcome__blip" cx="67" cy="31" r="2.5" />
+            <circle class="archive-welcome__pulse" cx="67" cy="31" r="4" />
+            <circle cx="48" cy="48" r="2.5" fill="currentColor" />
+          </svg>
         </div>
+        <p class="archive-welcome__title">اسأل مرصاد عمّا نُشر في الأرشيف</p>
+        <p class="archive-welcome__copy">عن خبر، شخصية أو مكان</p>
+        <button type="button" class="archive-example" id="archiveExample">مثال لسؤال</button>
       </div>
     </section>
 
@@ -91,7 +102,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Use a versioned filename: the CDN may ignore query-string cache busting. -->
   <script src="archive-chat-actions-20261014.js" defer></script>
-  <script src="archive-chat-20261014-v8.js" defer></script>
+  <script src="archive-chat-20261014-v9.js" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
