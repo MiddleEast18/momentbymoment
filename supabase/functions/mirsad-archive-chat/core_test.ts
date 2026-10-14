@@ -1,5 +1,5 @@
 import { classify } from "./archive-logic.ts";
-import { planForTask } from "./core.ts";
+import { isCardKind, planForTask } from "./core.ts";
 
 function assert(condition: unknown, message = "assertion failed"): asserts condition {
   if (!condition) throw new Error(message);
@@ -16,6 +16,7 @@ Deno.test("task buttons map deterministically without the CORE understanding cal
   assert(entities?.kind === "about_active_card" && entities.sub === "entities");
   assert(planForTask("related", "بطاقة مرتبطة", mind, "حدث سابق")?.kind === "related_card");
   assert(planForTask("another", "بطاقة أخرى", mind, "حدث سابق")?.kind === "another_card");
+  assert(isCardKind("about_active_card", "chat"), "active-card tasks must keep analysis payloads enabled");
 });
 
 Deno.test("unrecognized task values cannot exploit object prototype properties", () => {

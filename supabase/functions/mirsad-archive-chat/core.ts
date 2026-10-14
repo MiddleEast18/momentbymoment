@@ -114,6 +114,10 @@ export function planForTask(task: unknown, query: string, mind: Mind, previousQu
   };
 }
 
+export function isCardKind(kind: Kind, action: string) {
+  return kind === "find_news" || kind === "about_active_card" || kind === "another_card" || kind === "related_card" || action === "briefing";
+}
+
 async function understand(deps: Deps, query: string, history: Turn[], active: Card | null, mind: Mind): Promise<Plan> {
   if (!deps.gemini.has("core")) throw new Error("core_understanding_missing");
   try {
@@ -386,7 +390,9 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       primary = r.cards[0]; others = r.cards.slice(1, kind === "ask_about_news" ? 5 : 3);
     }
     if (!primary?.id) return fail503("تعذر تجهيز خبر الأرشيف. لم يتم خصم أي فتحة.");
-    const cardKind = kind === "find_news" || kind === "another_card" || kind === "related_card" || action === "briefing";
+    // Active-card tasks (summarize/analyze/entities) must produce the same
+    // verified analysis payload as a normal news result.
+    const cardKind = isCardKind(kind, action);
     const pid = String(primary.id);
     const revisions = await deps.store.revisions(pid).catch(() => []);
     const mats: Mat[] = [{ ref: "A1", card: primary, role: "primary", revisions }, ...others.map((c, i) => ({ ref: `A${i + 2}`, card: c, role: "other" as const }))];
