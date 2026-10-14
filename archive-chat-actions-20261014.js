@@ -30,6 +30,16 @@
     return types[label] || null;
   }
 
+  function shouldShowArticle(taskType, articleId, shownIds, restoring = false) {
+    if (taskType && taskType !== 'related' && taskType !== 'another') return false;
+    const id = String(articleId || '');
+    return restoring || !id || !Array.isArray(shownIds) || !shownIds.includes(id);
+  }
+
+  function shouldShowBriefing(taskType) {
+    return !taskType || taskType === 'analyze';
+  }
+
   function mustSettlePendingCommit(retryRequest, query) {
     return !!retryRequest && retryRequest.phase === 'commit' && retryRequest.query !== query;
   }
@@ -38,7 +48,7 @@
     return !!retryRequest && retryRequest.phase === 'commit';
   }
 
-  const api = Object.freeze({ taskTypeForSuggestion, mustSettlePendingCommit, hasPendingCommit });
+  const api = Object.freeze({ taskTypeForSuggestion, shouldShowArticle, shouldShowBriefing, mustSettlePendingCommit, hasPendingCommit });
   root.MirsadArchiveActions = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(globalThis);
