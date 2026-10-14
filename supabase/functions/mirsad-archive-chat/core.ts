@@ -14,6 +14,7 @@ export interface Store extends EvidenceStore {
   getUser(token: string): Promise<string | null>;
   rateLimit(hash: string, windowStart: string, limit: number): Promise<boolean | null>;
   balance(userId: string): Promise<{ balance: number; unlimited: boolean }>;
+  recentCards?(limit: number): Promise<Card[]>;
   textSearch(text: string): Promise<Card[]>;
   semanticSearch(text: string, vector: number[]): Promise<Card[]>;
   searchPassages(text: string, vector: number[] | null): Promise<PassageHit[]>;
@@ -195,9 +196,9 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   const userId = token ? await deps.store.getUser(token).catch(() => null) : null;
   if (!userId) return json({ error: "سجّل الدخول لاستخدام الأرشيف.", code: "login_required" }, 401);
 
-  const action = ["open", "briefing", "search", "commit_chat"].includes(String(body.action)) ? String(body.action) : "chat";
+  const action = ["open", "briefing", "search", "example", "commit_chat"].includes(String(body.action)) ? String(body.action) : "chat";
   const query = sanitizeInline(body.query, 500);
-  if (action !== "open" && action !== "briefing" && action !== "commit_chat" && query.length < 2) return json({ error: "اكتب سؤالًا أطول قليلًا." }, 400);
+  if (action !== "open" && action !== "briefing" && action !== "example" && action !== "commit_chat" && query.length < 2) return json({ error: "اكتب سؤالًا أطول قليلًا." }, 400);
   const suppliedRequestId = sanitizeInline(body.request_id, 80);
   const clientChargeConfirm = CHAT_REQUEST_ID.test(suppliedRequestId);
   const requestId = clientChargeConfirm ? suppliedRequestId : crypto.randomUUID();
@@ -240,6 +241,26 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       return json({ finalized: true, unlocks: unlocksOf(done) });
     }
     // ---------------- standalone actions
+    if (action === "example") {
+      stage = "example";
+      const cards = deps.store.recentCards ? await deps.store.recentCards(32) : [];
+      if (!cards.length) return json({ error: "لا توجد بطاقات أخبار متاحة لتوليد مثال الآن." }, 404);
+      if (!deps.gemini.has("example")) return fail503("خدمة أمثلة الأرشيف غير مهيأة مؤقتًا. لم تُخصم أي فتحة.");
+      const material = cards.slice(0, 32).map((c, i) => `[A${i + 1}] ${sanitizeInline(c.headline, 220)} | ${sanitizeInline(c.summary, 320)}`).join("\n");
+      const out = await deps.gemini.json("example", {
+        system: `أنت مولّد أمثلة لواجهة أرشيف أخبار عربية. اختر بطاقة واحدة أو صلة واضحة بين بطاقتين من القائمة فقط، واكتب سؤالًا عربيًا قصيرًا ومحددًا يفتح زاوية مفيدة. لا تجب عن السؤال، ولا تضف واقعة أو اسمًا غير وارد. أعد JSON فقط بالشكل {"question":"..."}.`,
+        user: `بطاقات الأرشيف الحالية:\n${material}\nاختر بطاقة مختلفة عن الاختيارات العامة قدر الإمكان، واجعل السؤال بين 6 و18 كلمة.`,
+        maxTokens: 180, temperature: 0.9, deadlineAt,
+      });
+      const question = sanitizeInline(out.question, 300);
+      if (question.length < 8) return fail503("تعذر توليد مثال صالح الآن. لم تُخصم أي فتحة.");
+      const b = await bill(["archive_other"], null);
+      if (!b.pre) return fail503();
+      if (!b.pre.allowed) return insufficient(b.pre);
+      const done = await b.commit();
+      if (!done?.allowed) return done ? insufficient(done) : fail503();
+      return json({ question, unlocks: unlocksOf(done) });
+    }
     if (action === "open") {
       stage = "open";
       const id = sanitizeInline(body.article_id, 80);

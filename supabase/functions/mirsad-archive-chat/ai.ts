@@ -1,11 +1,11 @@
 import { type Card, type Lang, type Tone, fold, publishedLabel, sanitizeInline } from "./archive-logic.ts";
 
-export type Stage = "core" | "nexus";
+export type Stage = "core" | "nexus" | "example";
 export class GeminiError extends Error {
   code: string;
   constructor(code: string) { super(code); this.code = code; }
 }
-export interface JsonOpts { system: string; user: string; maxTokens: number; deadlineAt?: number }
+export interface JsonOpts { system: string; user: string; maxTokens: number; deadlineAt?: number; temperature?: number }
 export interface Gemini {
   has(stage: Stage): boolean;
   hasIndependentKeys(): boolean;
@@ -41,8 +41,8 @@ export function parseJsonLoose(text: string): Record<string, unknown> {
   throw new GeminiError("bad_json");
 }
 
-export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeof fetch = fetch): Gemini {
-  const keyOf = (s: Stage) => (s === "core" ? keys.core : keys.nexus);
+export function makeGemini(keys: { core: string; nexus: string; example?: string }, fetchFn: typeof fetch = fetch): Gemini {
+  const keyOf = (s: Stage) => s === "core" ? keys.core : s === "nexus" ? keys.nexus : (keys.example || "");
   // Dialogue stays bound to its assigned key; model fallback happens only within that key.
   const order = (stage: Stage): Stage[] => {
     const key = keyOf(stage);
@@ -68,6 +68,7 @@ export function makeGemini(keys: { core: string; nexus: string }, fetchFn: typeo
       generationConfig: {
         responseMimeType: "application/json",
         maxOutputTokens: o.maxTokens,
+        ...(typeof o.temperature === "number" ? { temperature: Math.min(2, Math.max(0, o.temperature)) } : {}),
         ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}),
       },
       safetySettings: ["HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "HARM_CATEGORY_DANGEROUS_CONTENT"]

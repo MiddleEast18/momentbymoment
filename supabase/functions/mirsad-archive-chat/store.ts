@@ -20,6 +20,18 @@ export function makeStore(db: any): Store {
       const r = await db.from("user_unlocks").select("unlock_balance, unlimited_unlocks").eq("user_id", userId).maybeSingle();
       return { balance: Number(r.data?.unlock_balance || 0), unlimited: !!r.data?.unlimited_unlocks };
     },
+    async recentCards(limit) {
+      const cap = Math.max(1, Math.min(400, Math.floor(Number(limit) || 400)));
+      const r = await db.from("news_articles")
+        .select("id, headline, summary, category, source_name, published_at, updated_at, created_at")
+        .eq("is_pending_verification", false)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false, nullsFirst: false })
+        .limit(cap);
+      if (r.error) throw new Error("recent_cards_failed");
+      return Array.isArray(r.data) ? r.data as Card[] : [];
+    },
     async textSearch(text) {
       const r = await db.rpc("mirsad_archive_chat_text_search", { p_search_text: text, p_limit: 6 });
       if (r.error) throw new Error("search_failed");

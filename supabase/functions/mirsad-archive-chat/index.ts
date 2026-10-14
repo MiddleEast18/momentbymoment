@@ -9,12 +9,13 @@ const K = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 // Exact secret names, as stored in Supabase.
 const CORE = Deno.env.get("MARSAD_GEMINI_CORE_2026") || "";
 const NEXUS = Deno.env.get("MRSAD_COGNITIVE_DIALOGUE_NEXUS_2026") || "";
-console.log("archive-chat boot", { core_key: !!CORE, nexus_key: !!NEXUS, distinct_keys: !!CORE && !!NEXUS && CORE !== NEXUS });
+const EXAMPLE = Deno.env.get("MRSAD_GM2_26") || "";
+console.log("archive-chat boot", { core_key: !!CORE, nexus_key: !!NEXUS, example_key: !!EXAMPLE, distinct_keys: !!CORE && !!NEXUS && CORE !== NEXUS });
 
 const ORIGINS = new Set(["https://marsad.website", "https://www.marsad.website"]);
 const ENC = new TextEncoder();
 const db = U && K ? createClient(U, K, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
-const gemini = makeGemini({ core: CORE, nexus: NEXUS });
+const gemini = makeGemini({ core: CORE, nexus: NEXUS, example: EXAMPLE });
 
 Deno.serve((req: Request) => {
   if (!db) {
