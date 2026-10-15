@@ -26,7 +26,10 @@ export interface Store extends EvidenceStore {
   charge(userId: string, ops: string[], articleId: string | null, commit: boolean): Promise<ChargeResult | null>;
   chargeChat(userId: string, requestId: string): Promise<ChargeResult | null>;
 }
-export interface Deps { store: Store; gemini: Gemini; hash(v: string): Promise<string>; origins: Set<string>; now?: () => number }
+export interface Deps {
+  store: Store; gemini: Gemini; hash(v: string): Promise<string>; origins: Set<string>; now?: () => number;
+  onStage?: (event: { request_id: string; stage: string; elapsed_ms: number }) => void;
+}
 
 type Kind = "smalltalk" | "find_news" | "ask_about_news" | "about_active_card" | "another_card" | "related_card" | "out_of_scope" | "unclear";
 type Sub = "summarize" | "analyze" | "entities" | "general";
@@ -206,6 +209,10 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   const suppliedRequestId = sanitizeInline(body.request_id, 80);
   const clientChargeConfirm = CHAT_REQUEST_ID.test(suppliedRequestId);
   const requestId = clientChargeConfirm ? suppliedRequestId : crypto.randomUUID();
+  const reportStage = (stageName: string) => {
+    try { deps.onStage?.({ request_id: requestId, stage: stageName, elapsed_ms: Date.now() - startedAt }); }
+    catch { /* diagnostics must never break an archive response */ }
+  };
 
   if (action !== "commit_chat") {
     const now = deps.now ? deps.now() : Date.now();
@@ -235,9 +242,10 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   };
 
   let stage = "start";
+  reportStage(stage);
   try {
     if (action === "commit_chat") {
-      stage = "commit_chat";
+      stage = "commit_chat"; reportStage(stage);
       if (!CHAT_REQUEST_ID.test(suppliedRequestId)) return json({ error: "معرّف طلب الأرشيف غير صالح." }, 400);
       const done = await deps.store.chargeChat(userId, suppliedRequestId);
       if (!done) return fail503("تعذر تأكيد خصم رد الأرشيف. أعد المحاولة؛ لن يتكرر الخصم.");
@@ -246,7 +254,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
     // ---------------- standalone actions
     if (action === "example") {
-      stage = "example";
+      stage = "example"; reportStage(stage);
       const cards = deps.store.recentCards ? await deps.store.recentCards(32) : [];
       if (!cards.length) return json({ error: "لا توجد بطاقات أخبار متاحة لتوليد مثال الآن." }, 404);
       if (!deps.gemini.has("example")) return fail503("خدمة أمثلة الأرشيف غير مهيأة مؤقتًا. لم تُخصم أي فتحة.");
@@ -266,7 +274,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       return json({ question, unlocks: unlocksOf(done) });
     }
     if (action === "open") {
-      stage = "open";
+      stage = "open"; reportStage(stage);
       const id = sanitizeInline(body.article_id, 80);
       const card = UUID.test(id) ? await deps.store.loadArticle(id) : null;
       if (!card) return json({ error: "الخبر غير متاح." }, 404);
@@ -278,7 +286,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       return json({ reply: "", briefing: null, articles: [publicCard(card)], suggestions: suggestions("ar"), lang: "ar", active_article_id: id, search_query: "", search: { candidate_count: 1, shown: 1, method: "open" }, unlocks: unlocksOf(done) });
     }
     if (action === "search") {
-      stage = "search";
+      stage = "search"; reportStage(stage);
       const mind = classify(query);
       if (!mind.searchText) return chargedPayload({ reply: say(mind.lang, mind.tone, "vague"), briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: 0, shown: 0, method: "clarify" } }, ["archive_other"]);
       const r = await retrieve(deps, rulesPlan(mind, query), mind, new Set(), true);
@@ -292,7 +300,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
 
     // ---------------- chat + briefing share the dialogue pipeline
-    stage = "context";
+    stage = "context"; reportStage(stage);
     const history = historyOf(body.history);
     const shown = idsOf(body, history);
     let previousQuery = rememberedQuery(body, history);
@@ -320,7 +328,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
 
     const active = activeId ? await deps.store.loadArticle(activeId) : null;
     let plan: Plan;
-    stage = "understand";
+    stage = "understand"; reportStage(stage);
     if (action === "briefing") {
       plan = { kind: "find_news", sub: "general", standalone: "حلّل هذا الخبر", summary: "", queries: [], lang: "ar", tone: "plain", clarify: "", by: "rules" };
     } else if (explicitTaskPlan) {
@@ -342,7 +350,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
       : freeCanned("vague", lang, tone);
 
     // ---- gather materials
-    stage = "retrieve";
+    stage = "retrieve"; reportStage(stage);
     let primary: Card | null = null, others: Card[] = [], method = "conversation", candidates = 0;
     const kind = plan.kind;
     if (action === "briefing") {
@@ -398,20 +406,25 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const mats: Mat[] = [{ ref: "A1", card: primary, role: "primary", revisions }, ...others.map((c, i) => ({ ref: `A${i + 2}`, card: c, role: "other" as const }))];
 
     // Read-only preflight: reserve nothing before a reviewer-approved final answer exists.
-    stage = "balance";
+    stage = "balance"; reportStage(stage);
     const bal = await deps.store.balance(userId);
     if (!bal.unlimited && bal.balance < CHAT_COST) return json({ error: `رصيد الفتحات لا يكفي لرد الأرشيف (المطلوب ${CHAT_COST}، المتبقي ${bal.balance}).`, code: "insufficient_unlocks", required: CHAT_COST, remaining: bal.balance }, 402);
 
     // Stage 2: read each card's full article (stored independently of ingestion), select the passages that answer the question.
-    stage = "evidence";
+    stage = "evidence"; reportStage(stage);
     const terms = distinctive(`${plan.standalone || query} ${plan.queries.join(" ")}`);
     const evidence = await gatherEvidence(deps.store, deps.gemini, mats, terms).catch((e) => { console.warn("evidence_failed", e instanceof Error ? e.message : "unknown"); return { read: 0, bodyKey: "nb" }; });
     const cacheKey = cardKind ? `${pid}|${String(primary.headline).length}|${String(primary.summary).length}|${primary.update_count}|${primary.updated_at ?? ""}|${evidence.bodyKey}` : "";
     const previousReply = [...history].reverse().find((t) => t.role === "assistant")?.content || "";
 
     // Stages 3-5: generation, critical review, extra check - up to four rounds alternating the two keys.
-    stage = "compose";
-    const out = await compose(deps.gemini, { kind, sub: plan.sub, question: plan.standalone || query, summary: plan.summary, turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey, previousReply, deadlineAt });
+    stage = "compose"; reportStage(stage);
+    const out = await compose(deps.gemini, {
+      kind, sub: plan.sub, question: plan.standalone || query, summary: plan.summary,
+      turns: turnsText(history), mats, lang, tone, wantAnalysis: cardKind, cacheKey,
+      previousReply, deadlineAt,
+      onStage: (phase, round) => reportStage(`${phase}_round_${round}`),
+    });
 
     if (!out.ok) {
       // Nothing passed review + verification: alternate reply, no memory update, and NO charge.
@@ -444,7 +457,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     };
 
     // Stage 6: only an approved reply updates the conversation memory (best effort, never blocks the answer).
-    stage = "memory";
+    stage = "memory"; reportStage(stage);
     if (nextActive && UUID.test(nextActive)) {
       await deps.store.saveMemory(userId, { context_summary: sanitizeInline(plan.summary || plan.standalone || query, 400), approved_reply: result.reply.slice(0, 2500), active_article_id: nextActive, search_query: sanitizeInline(nextQuery, 180) })
         .catch((e) => console.warn("memory_save_failed", e instanceof Error ? e.message : "unknown"));
@@ -452,14 +465,15 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
 
     // Stage 7: safe single deduction. New clients persist the answer first, then call commit_chat with the same request_id
     // (the SQL function charges 50 at most once per request_id); legacy builds are charged here once, after approval.
-    stage = "charge";
+    stage = "charge"; reportStage(stage);
     if (clientChargeConfirm) return json({ ...successPayload, request_id: requestId, charge_pending: true });
     const done = await deps.store.chargeChat(userId, requestId);
     if (!done) return fail503("تعذر تأكيد تكلفة الرد. لم تُخصم أي فتحات.");
     if (!done.allowed) return insufficient(done);
     return json({ ...successPayload, unlocks: unlocksOf(done) });
   } catch (e) {
-    console.error("archive_pipeline_failed", { request_id: requestId, stage, reason: e instanceof Error ? e.message : "unknown" });
-    return json({ error: "حدث خطأ أثناء معالجة الأرشيف. لم يتم خصم أي فتحة.", code: "archive_pipeline_failed", request_id: requestId }, 502);
+    console.error("archive_pipeline_failed", { request_id: requestId, stage, elapsed_ms: Date.now() - startedAt, reason: e instanceof Error ? e.message : "unknown" });
+    reportStage("failed");
+    return json({ error: "تعذر إكمال معالجة الأرشيف. أعد المحاولة بالسؤال نفسه؛ لم يُخصم رصيد لهذا الرد.", code: "archive_pipeline_failed", request_id: requestId, failed_stage: stage }, 502);
   }
 }
