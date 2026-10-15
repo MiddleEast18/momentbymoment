@@ -19,6 +19,7 @@ export type Composed = { reply: string; analysis: Analysis | null; entities: Ent
 export type ComposeArgs = {
   kind: string; sub: string; question: string; summary: string; turns: string; mats: Mat[]; lang: Lang; tone: Tone;
   wantAnalysis: boolean; cacheKey: string; previousReply?: string; deadlineAt: number;
+  onStage?: (stage: "draft" | "review" | "verify", round: number) => void;
 };
 export type ComposeResult = { ok: true; value: Composed } | { ok: false; reason: string; rounds: number };
 
@@ -45,6 +46,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     if (a.deadlineAt - Date.now() < 12_000) { reason = "deadline"; break; }
     rounds = round;
+    a.onStage?.("draft", round);
     const draftSlot: Stage = "nexus";
     const reviewSlot: Stage = "core";
 
@@ -65,6 +67,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     if (!draft.reply) { feedback = "المسودة السابقة كانت فارغة؛ اكتب ردًا كاملًا يجيب السؤال."; reason = "empty_draft"; continue; }
 
     // 4: critical review (claims vs evidence, fabrication, contradiction, repetition)
+    a.onStage?.("review", round);
     let raw: Record<string, unknown>;
     try {
       raw = await gemini.json(reviewSlot, {
@@ -90,6 +93,7 @@ export async function compose(gemini: Gemini, a: ComposeArgs): Promise<ComposeRe
     };
 
     // 5: extra deterministic check before the answer may move on
+    a.onStage?.("verify", round);
     const verdict = verifyCandidate(final, { mats: a.mats, lang: a.lang, previousReply: a.previousReply });
     const approved = raw.approved === true;
     if (approved && verdict.ok) {
