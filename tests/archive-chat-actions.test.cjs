@@ -7,6 +7,7 @@ const {
   mustSettlePendingCommit,
   hasPendingCommit,
   hasUnsettledRequest,
+  archiveChatStorageKey,
   isValidChatChargeReceipt,
 } = require('../archive-chat-actions-20261014.js');
 
@@ -34,6 +35,15 @@ test('any unresolved archive request blocks clearing until it is recovered', () 
   assert.equal(hasUnsettledRequest({ query: 'سؤال', id: 'req-1', phase: 'commit' }), true);
   assert.equal(hasUnsettledRequest(null), false);
   assert.equal(hasUnsettledRequest({ query: 'سؤال' }), false);
+});
+
+test('archive chat history uses a distinct persistent storage key for each account', () => {
+  assert.equal(archiveChatStorageKey('user-a'), 'marsad-archive-chats-v2:user-a');
+  assert.equal(archiveChatStorageKey('user-b'), 'marsad-archive-chats-v2:user-b');
+  assert.notEqual(archiveChatStorageKey('user-a'), archiveChatStorageKey('user-b'));
+  assert.equal(archiveChatStorageKey(null), null);
+  assert.equal(archiveChatStorageKey('   '), null);
+  assert.equal(archiveChatStorageKey('id/with space'), 'marsad-archive-chats-v2:id%2Fwith%20space');
 });
 
 test('chat charge receipts accept only finalized 50-unlock or idempotent zero-unlock charges', () => {

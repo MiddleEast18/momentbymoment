@@ -5,8 +5,8 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'archive.html'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v16.js'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v13.css'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v20.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v15.css'), 'utf8');
 
 test('archive clear uses an accessible Mirsad-branded dialog instead of a browser alert', () => {
   assert.match(html, /<dialog[^>]+id="archiveClearDialog"/);
@@ -14,7 +14,7 @@ test('archive clear uses an accessible Mirsad-branded dialog instead of a browse
   assert.match(html, /aria-describedby="archiveClearDescription"/);
   assert.match(html, /مسح محادثة الأرشيف\؟/);
   assert.match(html, /إبقاء المحادثة/);
-  assert.match(html, /archive-chat-20261015-v14\.css/);
+  assert.match(html, /archive-chat-20261015-v15\.css/);
   assert.doesNotMatch(js, /window\.confirm\(/);
   assert.match(js, /returnValue === 'clear'/);
   assert.match(html, /لا يغيّر رصيد الفتحات ولا يمسّ سجل الخصم/);

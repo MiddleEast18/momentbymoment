@@ -52,6 +52,11 @@
     return !!retryRequest && typeof retryRequest.id === 'string' && retryRequest.id.length > 0;
   }
 
+  function archiveChatStorageKey(userId) {
+    if (typeof userId !== 'string' || !userId.trim()) return null;
+    return `marsad-archive-chats-v2:${encodeURIComponent(userId.trim())}`;
+  }
+
   function isValidChatChargeReceipt(payload) {
     const unlocks = payload?.unlocks;
     if (payload?.finalized !== true || !unlocks || typeof unlocks !== 'object' || Array.isArray(unlocks)) return false;
@@ -64,7 +69,7 @@
       && (!unlocks.unlimited || charged === 0);
   }
 
-  const api = Object.freeze({ taskTypeForSuggestion, shouldShowArticle, shouldShowBriefing, mustSettlePendingCommit, hasPendingCommit, hasUnsettledRequest, isValidChatChargeReceipt });
+  const api = Object.freeze({ taskTypeForSuggestion, shouldShowArticle, shouldShowBriefing, mustSettlePendingCommit, hasPendingCommit, hasUnsettledRequest, archiveChatStorageKey, isValidChatChargeReceipt });
   root.MirsadArchiveActions = api;
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(globalThis);

@@ -5,12 +5,12 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'archive.html'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v18.js'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v14.css'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v20.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v15.css'), 'utf8');
 
 test('the pending indicator stays animated and reports elapsed time after the five stage sequence', () => {
-  assert.match(html, /archive-chat-20261015-v18\.js/);
-  assert.match(html, /archive-chat-20261015-v14\.css/);
+  assert.match(html, /archive-chat-20261015-v20\.js/);
+  assert.match(html, /archive-chat-20261015-v15\.css/);
   assert.match(js, /className = 'archive-pending__elapsed'/);
   assert.match(js, /setInterval\(\(\) => \{[\s\S]*?elapsed\.textContent/);
   assert.match(js, /if \(step >= steps\.length - 1\) return;/);

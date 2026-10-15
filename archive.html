@@ -14,11 +14,16 @@
   <link rel="stylesheet" href="news-reader.css?v=202609180045">
   <link rel="stylesheet" href="news-card-fixes-v3.css?v=202610030800">
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
-  <link rel="stylesheet" href="archive-chat-20261015-v14.css">
+  <link rel="stylesheet" href="archive-chat-20261015-v15.css">
 </head>
 <body class="archive-chat-page">
   <header class="archive-header">
-    <a class="archive-back" href="live.html"><span aria-hidden="true">→</span> العودة إلى البث</a>
+    <div class="archive-header__left">
+      <a class="archive-back" href="live.html"><span aria-hidden="true">→</span> العودة إلى البث</a>
+      <button type="button" class="archive-history-toggle" id="archiveHistoryToggle" aria-haspopup="dialog" aria-controls="archiveHistoryDialog">
+        <span aria-hidden="true">◷</span> سجل الدردشات
+      </button>
+    </div>
     <button type="button" class="archive-clear" id="archiveClear" hidden>حذف المحادثة</button>
   </header>
 
@@ -68,12 +73,27 @@
 
   <footer class="archive-footer"><span>مرصاد — ذاكرة عرض للأخبار المنشورة</span><a href="method.html">منهجية الرصد</a></footer>
 
+  <dialog class="archive-history-dialog" id="archiveHistoryDialog" aria-labelledby="archiveHistoryTitle">
+    <section class="archive-history-panel">
+      <header class="archive-history__header">
+        <div>
+          <p class="archive-confirm__eyebrow">سجل مستقل لهذا الحساب</p>
+          <h2 id="archiveHistoryTitle">الدردشات السابقة</h2>
+        </div>
+        <button type="button" class="archive-history__close" id="archiveHistoryClose" aria-label="إغلاق سجل الدردشات">×</button>
+      </header>
+      <button type="button" class="archive-history__new" id="archiveHistoryNew"><span aria-hidden="true">＋</span> دردشة جديدة</button>
+      <p class="archive-history__empty" id="archiveHistoryEmpty">لا توجد دردشات محفوظة بعد.</p>
+      <div class="archive-history__list" id="archiveHistoryList" role="list" aria-label="الدردشات المحفوظة"></div>
+    </section>
+  </dialog>
+
   <dialog class="archive-confirm" id="archiveClearDialog" aria-labelledby="archiveClearTitle" aria-describedby="archiveClearDescription">
     <div class="archive-confirm__panel">
       <div class="archive-confirm__radar" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19"/><circle cx="24" cy="24" r="11"/><circle cx="24" cy="24" r="3"/><path d="M24 5v19l13-13M24 24l13 13"/></svg></div>
       <p class="archive-confirm__eyebrow">إدارة جلسة مرصاد</p>
       <h2 id="archiveClearTitle">مسح محادثة الأرشيف؟</h2>
-      <p id="archiveClearDescription">سيُمسح الحوار المحفوظ في هذه الجلسة من هذا المتصفح، ولن يمكن استعادته بعد التأكيد.</p>
+      <p id="archiveClearDescription">سيُحذف الحوار الحالي من سجل هذا الحساب على هذا الجهاز. لن تتأثر الدردشات الأخرى.</p>
       <div class="archive-confirm__notice"><span aria-hidden="true">i</span><p>هذا الإجراء لا يغيّر رصيد الفتحات ولا يمسّ سجل الخصم. لا يمكن المسح أثناء وجود رد لم يُحسم خصمه.</p></div>
       <form method="dialog" class="archive-confirm__actions">
         <button class="archive-confirm__button archive-confirm__button--quiet" type="submit" value="cancel">إبقاء المحادثة</button>
@@ -116,7 +136,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Use a versioned filename: the CDN may ignore query-string cache busting. -->
   <script src="archive-chat-actions-20261014.js" defer></script>
-  <script src="archive-chat-20261015-v18.js" defer></script>
+  <script src="archive-chat-20261015-v20.js" defer></script>
   <script src="mirsad-nav.js?v=202610042205" defer></script>
 </body>
 </html>
