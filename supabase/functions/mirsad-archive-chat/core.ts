@@ -6,6 +6,7 @@ import { type Gemini, type Mat, UNDERSTAND_SYSTEM, toBriefing, understandUser } 
 import { compose } from "./compose.ts";
 import { type EvidenceStore, gatherEvidence } from "./evidence.ts";
 import { fallbackReply } from "./verify.ts";
+import { generateSmalltalk } from "./smalltalk.ts";
 
 export interface ChargeResult { allowed: boolean; charged: boolean; amount: number; remaining: number; unlimited: boolean; operations: string[] }
 export interface PassageHit { article_id: string; passage_index: number; passage_text: string; score: number }
@@ -206,6 +207,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
   const suppliedRequestId = sanitizeInline(body.request_id, 80);
   const clientChargeConfirm = CHAT_REQUEST_ID.test(suppliedRequestId);
   const requestId = clientChargeConfirm ? suppliedRequestId : crypto.randomUUID();
+  const smalltalkSeed = crypto.randomUUID();
 
   if (action !== "commit_chat") {
     const now = deps.now ? deps.now() : Date.now();
@@ -280,8 +282,18 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     if (action === "search") {
       stage = "search";
       const mind = classify(query);
-      if (!mind.searchText) return chargedPayload({ reply: say(mind.lang, mind.tone, "vague"), briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: 0, shown: 0, method: "clarify" } }, ["archive_other"]);
+      if (!mind.searchText) {
+        if (mind.intent === "joke") {
+          const out = await generateSmalltalk(deps.gemini, { message: query, lang: mind.lang, tone: mind.tone, turns: "", recentReplies: [], seed: smalltalkSeed, deadlineAt, fallbackKey: "joke" });
+          return json({ reply: out.reply, briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: 0, shown: 0, method: "smalltalk" }, pipeline: out.pipeline });
+        }
+        return chargedPayload({ reply: say(mind.lang, mind.tone, "vague"), briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: 0, shown: 0, method: "clarify" } }, ["archive_other"]);
+      }
       const r = await retrieve(deps, rulesPlan(mind, query), mind, new Set(), true);
+      if (!r.cards.length && mind.intent === "joke") {
+        const out = await generateSmalltalk(deps.gemini, { message: query, lang: mind.lang, tone: mind.tone, turns: "", recentReplies: [], seed: smalltalkSeed, deadlineAt, fallbackKey: "joke" });
+        return json({ reply: out.reply, briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: "", search: { candidate_count: r.count, shown: 0, method: r.method }, pipeline: out.pipeline });
+      }
       if (!r.cards.length) return chargedPayload({ reply: say(mind.lang, mind.tone, "none"), briefing: null, articles: [], suggestions: [], lang: mind.lang, active_article_id: "", search_query: mind.searchText, search: { candidate_count: r.count, shown: 0, method: r.method } }, ["archive_search"]);
       const b = await bill(["archive_search"], null);
       if (!b.pre) return fail503();
@@ -311,10 +323,15 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     const hasContext = history.length > 0 || !!activeId;
     const cannedPayload = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => ({ reply: say(lang, tone, key), briefing: null, articles: [], suggestions: [], lang, active_article_id: activeId || "", search_query: previousQuery, search: { candidate_count: 0, shown: 0, method: String(extra.method || "conversation") } });
     const freeCanned = (key: string, lang = mind.lang, tone = mind.tone, extra: Record<string, unknown> = {}) => json(cannedPayload(key, lang, tone, extra));
+    const smalltalkPayload = async (lang = mind.lang, tone = mind.tone, card: Card | null = null) => {
+      const recentReplies = history.filter((t) => t.role === "assistant").slice(-3).map((t) => t.content);
+      const out = await generateSmalltalk(deps.gemini, { message: query, lang: mind.lang, tone: mind.tone, turns: turnsText(history), recentReplies, seed: smalltalkSeed, deadlineAt, fallbackKey: mind.intent === "greeting" ? "greeting" : "joke", activeCard: card ? { headline: sanitizeInline(card.headline, 280), summary: sanitizeInline(card.summary, 700) } : null });
+      return json({ reply: out.reply, briefing: null, articles: [], suggestions: [], lang, active_article_id: activeId || "", search_query: previousQuery, search: { candidate_count: 0, shown: 0, method: "conversation" }, pipeline: out.pipeline });
+    };
 
     if (action === "chat" && !hasContext && !explicitTaskPlan) {
-      if (mind.intent === "greeting") return freeCanned("greeting");
-      if (mind.intent === "joke") return freeCanned("joke");
+      if (mind.intent === "greeting") return await smalltalkPayload();
+      if (mind.intent === "joke") return await smalltalkPayload();
       if (mind.intent === "ambiguous") return freeCanned("vague");
     }
 
@@ -335,7 +352,7 @@ export async function handleChat(req: Request, deps: Deps): Promise<Response> {
     }
     const { lang, tone } = plan;
 
-    if (plan.kind === "smalltalk") return freeCanned(mind.intent === "joke" ? "joke" : "greeting", lang, tone);
+    if (plan.kind === "smalltalk") return await smalltalkPayload(mind.lang, mind.tone, active);
     if (plan.kind === "out_of_scope") return freeCanned("scope", lang, tone);
     if (plan.kind === "unclear") return plan.clarify
       ? json({ ...cannedPayload("vague", lang, tone), reply: plan.clarify })
