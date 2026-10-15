@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'archive.html'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v20.js'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v21.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v15.css'), 'utf8');
 
 test('archive clear uses an accessible Mirsad-branded dialog instead of a browser alert', () => {
