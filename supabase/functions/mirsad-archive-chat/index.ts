@@ -23,6 +23,7 @@ Deno.serve((req: Request) => {
   }
   return handleChat(req, {
     store: makeStore(db), gemini, origins: ORIGINS,
+    onStage: (event) => console.log("archive_progress", event),
     hash: async (v: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", ENC.encode(`${K}:${v}`)))].map((b) => b.toString(16).padStart(2, "0")).join(""),
   });
 });

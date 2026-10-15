@@ -67,3 +67,13 @@ Deno.test("composition refuses to claim independent review when keys are not dis
   assert(!result.ok && result.reason === "missing_independent_keys");
   assert(gemini.calls.length === 0);
 });
+
+
+Deno.test("compose reports draft, review, and verification phases without changing approval flow", async () => {
+  const seen: string[] = [];
+  const gemini = new FakeGemini({ approved: true });
+  const a = { ...args(), onStage: (stage: "draft" | "review" | "verify", round: number) => seen.push(`${stage}:${round}`) };
+  const result = await compose(gemini, a);
+  assert(result.ok);
+  assert(seen.join(",") === "draft:1,review:1,verify:1", `unexpected phase order: ${seen.join(",")}`);
+});
