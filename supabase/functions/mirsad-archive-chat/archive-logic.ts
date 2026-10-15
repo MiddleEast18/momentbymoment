@@ -117,8 +117,11 @@ export function classify(raw: string): Mind {
   if (gibberish) return { ...base, intent: "ambiguous", searchText: "" };
   const greetingLead = /^(?:اهلا|اهلين|هلا|هلو|مرحبا|السلام|سلام|صباح الخير|مساء الخير|صباح النور|مساء النور|كيفك|كيف حالك|شلونك|hi|hello|hey|good morning|good evening|thanks|thank you|شكرا|شكرا لك|يسلمو|تمام|حلو|ok|okay)(?:\s|$)/.test(folded);
   if (greetingLead && keys.length === 0) return { ...base, intent: "greeting", searchText: "" };
-  if (/(نكت|طرفه|اضحك|joke|مزح|تستهبل)/.test(folded)) return { ...base, intent: "joke", searchText: "" };
-  if (/(ههه+|hahaha|\blol\b|\blmao\b)/.test(folded) && keys.length === 0) return { ...base, intent: "joke", searchText: "" };
+  const jokeWord = /(?:^|\s)(?:نكت|طرفه|اضحك|joke|مزح|تستهبل|لغز|الغاز|احجيه|احجية|riddle)(?:\s|$)/.test(folded);
+  const laughSignal = /(?:^|\s)(?:ههه+|hahaha|lol|lmao)(?:\s|$)/.test(folded) || /[😂🤣😅😆😄😁😹]/u.test(text);
+  const newsLike = keys.some((key) => EVENTISH.has(key)) ||
+    (keys.length > 0 && (/[?؟]/.test(text) || /(ماذا\s+حدث|ما\s+الخبر|اخبار|خبر|what\s+happened|latest\s+news)/i.test(folded)));
+  if ((jokeWord || laughSignal) && !newsLike) return { ...base, intent: "joke", searchText: "" };
   const follow = followOf(folded, keys);
   if (follow === "analyze") return { ...base, intent: "analysis", follow, searchText: "" };
   if (follow) return { ...base, intent: "followup", follow, searchText: "" };
