@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'archive.html'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v22.js'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v23.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v15.css'), 'utf8');
 
 test('the history control sits beneath the live link and opens an accessible closable dialog', () => {
@@ -18,7 +18,7 @@ test('the history control sits beneath the live link and opens an accessible clo
 });
 
 test('the account archive opens a new chat, while saved chats remain independently selectable and newest-first', () => {
-  assert.match(html, /archive-chat-20261015-v22\.js/);
+  assert.match(html, /archive-chat-20261015-v23\.js/);
   assert.match(html, /archive-chat-20261015-v15\.css/);
   assert.match(js, /function startNewConversation\(\)/);
   assert.match(js, /function openSavedChat\(chatId\)/);

@@ -5,10 +5,10 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'archive.html'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v22.js'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'archive-chat-20261015-v23.js'), 'utf8');
 
 test('an interrupted saved archive question is resumed after restoration', () => {
-  assert.match(html, /archive-chat-20261015-v22\.js/);
+  assert.match(html, /archive-chat-20261015-v23\.js/);
   assert.match(js, /function resumeInterruptedRequest\(\)/);
   assert.match(js, /const retry = state\.retryRequest;/);
   assert.match(js, /void submitQuestion\(retry\.query, retry\.taskType \|\| null\)/);

@@ -30,7 +30,7 @@ test('pending charge blocks a different query but not its own idempotent retry',
   assert.equal(hasPendingCommit(null), false);
 });
 
-test('any unresolved archive request blocks clearing until it is recovered', () => {
+test('hasUnsettledRequest identifies requests that still have a recovery ID', () => {
   assert.equal(hasUnsettledRequest({ query: 'سؤال', id: 'req-1' }), true);
   assert.equal(hasUnsettledRequest({ query: 'سؤال', id: 'req-1', phase: 'commit' }), true);
   assert.equal(hasUnsettledRequest(null), false);
