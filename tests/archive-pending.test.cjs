@@ -11,7 +11,7 @@ const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v17.css'), 'u
 test('the pending indicator stays animated and reports elapsed time after the five stage sequence', () => {
   assert.match(html, /archive-chat-20261015-v23\.js/);
   assert.match(html, /archive-chat-20261015-v17\.css/);
-  assert.match(html, /reader-settings\.js\?v=202610050820/);
+  assert.match(html, /reader-settings\.js\?v=202610161800/);
   assert.match(js, /className = 'archive-pending__elapsed'/);
   assert.match(js, /setInterval\(\(\) => \{[\s\S]*?elapsed\.textContent/);
   assert.match(js, /if \(step >= steps\.length - 1\) return;/);

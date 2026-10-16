@@ -65,8 +65,15 @@
     if (rail && cycleWidth > 0) rail.style.transform = `translate3d(${x - cycleWidth}px,0,0)`;
   };
 
+  const motionReduced = () => {
+    const motion = document.documentElement.getAttribute('data-rs-motion');
+    if (motion === 'reduce') return true;
+    if (motion === 'full') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  };
+
   const tick = (now) => {
-    if (document.documentElement.getAttribute('data-rs-motion') === 'reduce') {
+    if (motionReduced()) {
       last = now;
       raf = requestAnimationFrame(tick);
       return;
@@ -245,6 +252,12 @@
       apply();
       last = performance.now();
     });
+  });
+
+  window.addEventListener('mirsad-reader-settings-sync', () => {
+    if (rebuilding || !currentItems.length) return;
+    rebuild(currentItems, true);
+    last = performance.now();
   });
 
   fetchLatestUrgent();

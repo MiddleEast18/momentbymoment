@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="info.css?v=202610020020">
-  <link rel="stylesheet" href="reader-settings.css?v=202610050820">
-  <script src="reader-settings.js?v=202610050820"></script>
+  <link rel="stylesheet" href="reader-settings.css?v=202610161800">
+  <script src="reader-settings.js?v=202610161800"></script>
   <link rel="stylesheet" href="mirsad-nav.css?v=202610050820">
   <script src="mirsad-nav.js?v=202610042205" defer></script>
   <style>
@@ -92,6 +92,7 @@
     .rs-seg { display: flex; flex-wrap: wrap; }
     .rs-seg button { min-height: 38px; padding: 6px 10px; border-radius: 0; margin-top: -1px; margin-inline-start: -1px; }
     .rs-seg button:disabled { opacity: .38; cursor: not-allowed; }
+    .rs-seg button.is-locked[aria-pressed="true"] { opacity: 1; border-style: dashed; cursor: not-allowed; }
     .rs-scale { width: 100%; height: 28px; margin-top: 8px; accent-color: var(--gold); }
     .rs-ticks { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
     .rs-ticks span { text-align: center; }
@@ -99,7 +100,7 @@
     .rs-panel { margin: 0 0 10px; padding: 12px; border: 1px solid var(--line); background: #10151c; }
     .rs-specimen { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius, 14px); background: #121820; }
     .rs-specimen__meta { margin: 8px 0; color: var(--text-faint); font-size: 12px; }
-    .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); font-size: 24px; }
+    .rs-specimen__title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0 0 8px; font-family: var(--font-display); font-size: 24px; }
     .rs-badges { display: flex; gap: 6px; }
     .card__update-badge, .card__verification-badge { padding: 3px 8px; border-radius: 0; border: 1px solid rgba(201, 162, 39, .4); color: var(--gold); font-size: 11px; }
     .rs-links, .rs-map { margin: 0; padding: 0; color: var(--text-dim); list-style: none; }
@@ -293,7 +294,7 @@
               <div class="rs-node__rail"><span>40</span></div>
               <div>
                 <b>حفظ واستعادة</b>
-                <small>الاستيراد يدمج الملف فوق القيم المعروفة ولا يمس مفاتيح الحساب.</small>
+                <small>الاستيراد يدمج القيم الصالحة فوق إعدادات هذا الجهاز، ويتجاهل المفاتيح الغريبة. لا يمس الحساب.</small>
                 <div class="rs-actions">
                   <button type="button" id="rsReset">استعادة الهوية</button>
                   <button type="button" id="rsExport">تصدير</button>
@@ -380,9 +381,11 @@
         document.querySelectorAll('[data-key]').forEach(function (button) {
           var key = button.getAttribute('data-key');
           var value = button.getAttribute('data-value');
-          var current = key === 'preset' ? state.preset : String(view[key]);
+          var current = key === 'preset' ? state.preset : String(state[key]);
+          var locked = (key === 'density' && value === 'compact' && state.scale >= 120) || (key === 'gold' && value === 'soft' && state.contrast === 'high');
           button.setAttribute('aria-pressed', current === value ? 'true' : 'false');
-          button.disabled = (key === 'density' && value === 'compact' && state.scale >= 120) || (key === 'gold' && value === 'soft' && state.contrast === 'high');
+          button.disabled = locked;
+          button.classList.toggle('is-locked', locked && current === value);
         });
         if (document.activeElement !== scale) scale.value = String(state.scale);
         scale.setAttribute('aria-valuenow', String(state.scale));
@@ -394,8 +397,8 @@
         document.getElementById('rsDensityNote').textContent = state.scale >= 120 && state.density === 'compact' ? 'المضغوطة محفوظة وتُعرض مريحة الآن' : 'فراغ شبكة البث وصف الدول';
         document.getElementById('rsGoldNote').textContent = state.contrast === 'high' && state.gold === 'soft' ? 'الهادئ محفوظ ويُعرض الأصلي الآن' : 'درجة الهوية';
         var notes = RS.links(state);
-        var active = notes.filter(function (note) { return note.indexOf('لا قيد نشط') !== 0; });
-        document.getElementById('rsLockCount').textContent = active.length ? active.length + ' قيد نشط' : 'لا قيد نشط';
+        var lockNotes = RS.locks(state);
+        document.getElementById('rsLockCount').textContent = lockNotes.length === 1 ? 'قيد واحد نشط' : lockNotes.length === 2 ? 'قيدان نشطان' : 'لا قيد نشط';
         document.getElementById('rsLinks').innerHTML = notes.map(function (note) { return '<li>' + note + '</li>'; }).join('');
         var drifts = [];
         document.getElementById('rsBus').innerHTML = fields.map(function (field) {
@@ -447,25 +450,34 @@
         document.getElementById('rsStatus').textContent = 'عادت الإعدادات إلى هوية مِرصاد.';
       });
       document.getElementById('rsExport').addEventListener('click', function () {
-        var blob = new Blob([JSON.stringify(RS.read(), null, 2)], { type: 'application/json' });
+        var blob = new Blob([JSON.stringify(RS.transport(state), null, 2)], { type: 'application/json' });
         var url = URL.createObjectURL(blob);
         var link = document.createElement('a');
         link.href = url;
         link.download = 'mirsad-reader-settings.json';
+        document.body.appendChild(link);
         link.click();
-        URL.revokeObjectURL(url);
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+        document.getElementById('rsStatus').textContent = 'نُزّل ملف النقل المحلي. الإعدادات ما زالت على هذا الجهاز.';
       });
       document.getElementById('rsImport').addEventListener('click', function () { document.getElementById('rsFile').click(); });
       document.getElementById('rsFile').addEventListener('change', function (event) {
         var file = event.target.files && event.target.files[0];
         event.target.value = '';
         if (!file) return;
+        if (file.size > 65536) {
+          document.getElementById('rsStatus').textContent = 'الملف أكبر من الحد. النقل المحلي يقبل ملف إعدادات صغير فقط.';
+          return;
+        }
         file.text().then(function (text) {
           var parsed = JSON.parse(text);
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('shape');
-          if (!Object.keys(RS.defaults).some(function (key) { return parsed[key] != null; })) throw new Error('shape');
-          commit(parsed);
-          document.getElementById('rsStatus').textContent = 'استُورد الملف وطُبّق على هذا الجهاز.';
+          var result = RS.merge(state, parsed);
+          if (!result.ok) throw new Error(result.reason || 'shape');
+          commit(result.value);
+          document.getElementById('rsStatus').textContent = result.skipped
+            ? 'استُورد الملف ودُمج فوق إعدادات هذا الجهاز. تُجاهلت القيم غير الصالحة.'
+            : 'استُورد الملف ودُمج فوق إعدادات هذا الجهاز.';
         }).catch(function () {
           document.getElementById('rsStatus').textContent = 'تعذر قراءة الملف. المطلوب ملف إعدادات مِرصاد.';
         });

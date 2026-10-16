@@ -2,6 +2,7 @@
   'use strict';
   document.addEventListener('touchstart', function () {}, { passive: true });
   var KEY = 'mirsad.readerSettings.v1';
+  var TRANSPORT_KIND = 'mirsad.readerSettings';
   var defaults = {
     preset: 'marsad',
     scale: 100,
@@ -27,6 +28,21 @@
     calm: { preset: 'calm', scale: 100, leading: 'roomy', track: 'wide', lines: 3, font: 'kufi', density: 'relaxed', width: 'narrow', chrome: 'quiet', radius: 'round', touch: 'regular', badges: 'hide', contrast: 'standard', gold: 'soft', motion: 'reduce' }
   };
   var scales = [90, 95, 100, 105, 110, 115, 120, 125];
+  var choices = {
+    leading: ['tight', 'normal', 'roomy'],
+    track: ['off', 'wide'],
+    lines: [2, 3, 4],
+    font: ['plex', 'kufi'],
+    density: ['compact', 'regular', 'relaxed'],
+    width: ['board', 'narrow'],
+    chrome: ['full', 'quiet'],
+    radius: ['sharp', 'soft', 'round'],
+    touch: ['regular', 'large'],
+    badges: ['show', 'hide'],
+    contrast: ['standard', 'high'],
+    gold: ['standard', 'soft'],
+    motion: ['system', 'reduce', 'full']
+  };
   function pick(raw) {
     var next = Object.assign({}, defaults);
     if (!raw || typeof raw !== 'object') return next;
@@ -38,20 +54,47 @@
   function normalize(raw) {
     var next = pick(raw);
     next.scale = scales.indexOf(Number(next.scale)) >= 0 ? Number(next.scale) : 100;
-    next.leading = ['tight', 'normal', 'roomy'].indexOf(next.leading) >= 0 ? next.leading : 'normal';
+    next.leading = choices.leading.indexOf(next.leading) >= 0 ? next.leading : 'normal';
     next.track = next.track === 'wide' ? 'wide' : 'off';
-    next.lines = [2, 3, 4].indexOf(Number(next.lines)) >= 0 ? Number(next.lines) : 3;
+    next.lines = choices.lines.indexOf(Number(next.lines)) >= 0 ? Number(next.lines) : 3;
     next.font = next.font === 'kufi' ? 'kufi' : 'plex';
-    next.density = ['compact', 'regular', 'relaxed'].indexOf(next.density) >= 0 ? next.density : 'regular';
+    next.density = choices.density.indexOf(next.density) >= 0 ? next.density : 'regular';
     next.width = next.width === 'narrow' ? 'narrow' : 'board';
     next.chrome = next.chrome === 'quiet' ? 'quiet' : 'full';
-    next.radius = ['sharp', 'soft', 'round'].indexOf(next.radius) >= 0 ? next.radius : 'soft';
+    next.radius = choices.radius.indexOf(next.radius) >= 0 ? next.radius : 'soft';
     next.touch = next.touch === 'large' ? 'large' : 'regular';
     next.badges = next.badges === 'hide' ? 'hide' : 'show';
     next.contrast = next.contrast === 'high' ? 'high' : 'standard';
     next.gold = next.gold === 'soft' ? 'soft' : 'standard';
-    next.motion = ['system', 'reduce', 'full'].indexOf(next.motion) >= 0 ? next.motion : 'system';
+    next.motion = choices.motion.indexOf(next.motion) >= 0 ? next.motion : 'system';
     return next;
+  }
+  function allowed(key, value) {
+    if (key === 'scale') return scales.indexOf(Number(value)) >= 0;
+    if (key === 'lines') return choices.lines.indexOf(Number(value)) >= 0;
+    var list = choices[key];
+    return !!list && list.indexOf(value) >= 0;
+  }
+  function payloadSettings(incoming) {
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return null;
+    if (incoming.kind === TRANSPORT_KIND && incoming.settings && typeof incoming.settings === 'object' && !Array.isArray(incoming.settings)) return incoming.settings;
+    return incoming;
+  }
+  function merge(base, incoming) {
+    var source = payloadSettings(incoming);
+    if (!source) return { ok: false, reason: 'shape', value: normalize(base), skipped: 0 };
+    var presetName = typeof source.preset === 'string' ? source.preset : '';
+    var next = Object.prototype.hasOwnProperty.call(presets, presetName) ? normalize(presets[presetName]) : normalize(base);
+    var applied = Object.prototype.hasOwnProperty.call(presets, presetName) ? 1 : 0;
+    var skipped = 0;
+    Object.keys(defaults).forEach(function (key) {
+      if (key === 'preset' || !Object.prototype.hasOwnProperty.call(source, key) || source[key] == null) return;
+      if (!allowed(key, source[key])) { skipped += 1; return; }
+      next[key] = key === 'scale' || key === 'lines' ? Number(source[key]) : source[key];
+      applied += 1;
+    });
+    if (!applied) return { ok: false, reason: 'empty', value: normalize(base), skipped: skipped };
+    return { ok: true, reason: '', value: matchPreset(normalize(next)), skipped: skipped };
   }
   function effective(raw) {
     var next = normalize(raw);
@@ -87,6 +130,9 @@
     apply(next);
     return next;
   }
+  function transport(raw) {
+    return { kind: TRANSPORT_KIND, version: 1, settings: matchPreset(normalize(raw)) };
+  }
   function attr(name, value, skip) {
     if (value == null || value === skip) document.documentElement.removeAttribute(name);
     else document.documentElement.setAttribute(name, String(value));
@@ -108,14 +154,19 @@
     attr('data-rs-gold', next.gold, 'standard');
     attr('data-rs-motion', next.motion, 'system');
   }
-  function links(raw) {
-    var intent = normalize(raw);
-    var next = effective(intent);
+  function lockNotes(intent, next) {
     var notes = [];
     if (intent.density === 'compact' && next.density !== 'compact') notes.push('الحجم ' + intent.scale + ' لا يُبقي الكثافة المضغوطة حتى لا يُقص العنوان. اللوحة تُعرض مريحة الآن، والمضغوطة تعود وحدها إذا نزل الحجم تحت 120.');
     if (intent.gold === 'soft' && next.gold !== 'soft') notes.push('التباين العالي يثبت الذهبي الأصلي مؤقتاً حتى تبقى الحدود واضحة. الدرجة الهادئة محفوظة وتعود عند الرجوع إلى هوية الموقع.');
-    if (next.motion === 'reduce') notes.push('تقليل الحركة يهدّئ النبض والبطاقات، ويبقي دوران الشعار وفتح القائمة حتى لا تتعطل الإعدادات نفسها.');
-    if (next.motion === 'full') notes.push('الحركة الكاملة تبقي دوران الشعار والقائمة حتى لو كان الجهاز طالباً تقليل الحركة.');
+    return notes;
+  }
+  function links(raw) {
+    var intent = normalize(raw);
+    var next = effective(intent);
+    var notes = lockNotes(intent, next);
+    if (next.motion === 'reduce') notes.push('تقليل الحركة يهدّئ النبض والبطاقات وشريط العاجل، ويبقي دوران الشعار وفتح القائمة حتى لا تتعطل الإعدادات نفسها.');
+    if (next.motion === 'full') notes.push('الحركة الكاملة تبقي دوران الشعار والقائمة وشريط العاجل حتى لو كان الجهاز طالباً تقليل الحركة.');
+    if (next.motion === 'system' && typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) notes.push('حسب الجهاز: النظام يطلب تقليل الحركة، لذلك شريط العاجل يتوقف الآن من غير أن تتغير القيمة المحفوظة.');
     if (next.font === 'kufi' && next.track === 'wide') notes.push('الكوفي مع التباعد الواسع يبطئ المسح. يناسب القراءة المتأنية لا العناوين السريعة.');
     if (next.lines === 2 && next.density === 'compact') notes.push('سطران مع كثافة مضغوطة وضع مسح: سياق أقل، وبطاقات أكثر في الشاشة.');
     if (next.lines === 4 && next.leading === 'roomy') notes.push('أربعة أسطر مع ارتفاع واسع تُطيل البطاقة حتى يبقى العنوان والسطر الذهبي ظاهرين داخل الإطار.');
@@ -123,6 +174,10 @@
     if (next.badges === 'hide') notes.push('إخفاء الشارات مظهر فقط. حالة التحديث والمراجعة في البيانات لا تتغير.');
     if (!notes.length) notes.push('لا قيد نشط. كل اختيار محفوظ كما هو، ويظهر على هذا الجهاز فقط.');
     return notes;
+  }
+  function locks(raw) {
+    var intent = normalize(raw);
+    return lockNotes(intent, effective(intent));
   }
   apply(read());
   window.addEventListener('storage', function (event) {
@@ -138,5 +193,5 @@
     // Apply only. A write here would fire storage again and loop between tabs.
     try { window.dispatchEvent(new CustomEvent('mirsad-reader-settings-sync', { detail: next })); } catch (error) {}
   });
-  window.MirsadReaderSettings = { KEY: KEY, defaults: defaults, presets: presets, scales: scales, read: read, write: write, normalize: normalize, effective: effective, apply: apply, links: links };
+  window.MirsadReaderSettings = { KEY: KEY, TRANSPORT_KIND: TRANSPORT_KIND, defaults: defaults, presets: presets, scales: scales, read: read, write: write, normalize: normalize, effective: effective, merge: merge, transport: transport, apply: apply, links: links, locks: locks };
 })();

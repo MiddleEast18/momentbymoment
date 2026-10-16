@@ -9,8 +9,8 @@ const css = fs.readFileSync(path.join(root, 'archive-chat-20261015-v17.css'), 'u
 const sharedSettings = fs.readFileSync(path.join(root, 'reader-settings.js'), 'utf8');
 
 test('archive loads the shared local reading settings engine and stylesheet', () => {
-  assert.match(html, /reader-settings\.css\?v=202610050820/);
-  assert.match(html, /reader-settings\.js\?v=202610050820/);
+  assert.match(html, /reader-settings\.css\?v=202610161800/);
+  assert.match(html, /reader-settings\.js\?v=202610161800/);
   assert.match(html, /archive-chat-20261015-v17\.css/);
   assert.match(sharedSettings, /localStorage\.getItem\(KEY\)/);
   assert.match(sharedSettings, /mirsad-reader-settings-sync/);
