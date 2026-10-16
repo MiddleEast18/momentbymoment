@@ -199,12 +199,11 @@
     window.dispatchEvent(new CustomEvent('mirsad:auth-ready'));
   }
   function returnToIntroAfterAuth(){
-    // Successful sign-in belongs on the broadcast. Do not clear the intro
-    // pass or bounce back to the preliminary page.
-    if(introReturnInFlight)return;
+    if(!isLivePage()||introReturnInFlight)return;
     introReturnInFlight=true;
-    try{localStorage.setItem('mirsad.introPassed.v1','1')}catch{}
-    signalAuthSettled();
+    try{localStorage.removeItem('mirsad.introPassed.v1')}catch{}
+    document.documentElement.style.setProperty('visibility','hidden','important');
+    window.location.replace(sessionHomeUrl());
   }
   function discardTransientUi(){
     document.getElementById('mirsadUserMenu')?.remove();
@@ -468,7 +467,8 @@
   async function finishAuthenticated(user){
     localStorage.removeItem(CONFIG.GUEST_KEY);removeGuestExit();
     document.getElementById('mirsadAuthGate')?.remove();document.body.classList.remove('mirsad-auth-required');document.getElementById('mirsadGuestLockToast')?.remove();
-    if(authJustCompleted){try{localStorage.setItem('mirsad.introPassed.v1','1')}catch{}} signalAuthSettled();
+    if(authJustCompleted && isLivePage()){returnToIntroAfterAuth();return;}
+    if(!(authJustCompleted && isLivePage())) signalAuthSettled();
     onboardingStyles();
     const profilePromise=withAuthTimeout(ensureProfile(user),5000).catch(error=>{console.error('[mirsad auth] profile setup failed',error);return null});
     const [profile,unlockAccount,serverOnboarding]=await Promise.all([profilePromise,ensureUnlockAccount(),shouldShowSignupOnboarding()]);

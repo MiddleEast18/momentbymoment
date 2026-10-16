@@ -257,9 +257,37 @@
           if (ref && /^[A-Za-z0-9_-]{4,64}$/.test(ref.trim())) localStorage.setItem('mirsad.pendingReferral.v1', ref.trim().toUpperCase());
         } catch (error) {}
         if (authQuery || authHash) {
-          markPassed();
-          document.documentElement.classList.add('mirsad-intro-hold');
-          location.replace('live.html' + search + hash);
+          if (window.__mirsadIntroAuthStarted) return;
+          window.__mirsadIntroAuthStarted = true;
+          var script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+          script.async = true;
+          script.onload = function () {
+            try {
+              var url = 'https://dndlkenyfymlrjnslyzb.supabase.co';
+              var key = 'sb_publishable_C92j3hFC-qVem_ncKHDf9Q_Ew970XUx';
+              var client = window.supabase.createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: 'pkce' } });
+              var code = new URLSearchParams(location.search).get('code');
+              var finish = function () {
+                try {
+                  var clean = new URL(location.href);
+                  ['code','state','error','error_code','error_description'].forEach(function (name) { clean.searchParams.delete(name); });
+                  if (clean.hash) {
+                    var hash = new URLSearchParams(clean.hash.replace(/^#/, ''));
+                    ['access_token','refresh_token','expires_in','expires_at','token_type','type','error','error_code','error_description','provider_token','provider_refresh_token'].forEach(function (name) { hash.delete(name); });
+                    var next = hash.toString();
+                    clean.hash = next ? next : '';
+                  }
+                  history.replaceState({}, document.title, clean.pathname + clean.search + (clean.hash || ''));
+                } catch (error) {}
+              };
+              if (code) client.auth.exchangeCodeForSession(code).then(finish, finish);
+              else if (location.hash.indexOf('access_token=') !== -1) {
+                window.supabase.createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } }).auth.getSession().then(finish, finish);
+              } else finish();
+            } catch (error) {}
+          };
+          document.head.appendChild(script);
           return;
         }
       }
